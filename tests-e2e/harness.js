@@ -12,7 +12,7 @@ const DADOS = {
       situacao: "Homologada", data_publicacao: "2026-03-14" },
     { numero_controle: "X-2", ano: 2026, sequencial: 4,
       modalidade_nome: "Pregão - Eletrônico", objeto: "Contratação de empresa para manutenção de vias públicas",
-      valor_estimado: 200000, valor_homologado: 182400,
+      valor_estimado: 200000, valor_homologado: null,
       situacao: "Divulgada no PNCP", data_publicacao: "2026-05-02" },
     { numero_controle: "X-3", ano: 2025, sequencial: 50,
       modalidade_nome: "Pregão - Eletrônico", objeto: "Registro de preços para medicamentos básicos",
@@ -43,8 +43,9 @@ function scriptPonte() {
     window.pywebview = { api: {
       get_estado: async () => ({ versao: "9.9.9", municipio: "Orindiúva",
         uf: "SP", ibge: "3534203", tema: "portal", largura: "compacta",
+        fonte: "normal", densidade: "confortavel",
         limite_dispensa_compras: "62639.92", limite_dispensa_obras: "125279.84",
-        last_sync: "2026-07-29",
+        last_sync: "2026-07-29", sincronizado_em: "2026-07-29T14:32:00",
         kpis: { contratacoes: 131, homologado_ano: 10828702.73, vigentes: 47,
                 vencendo_60: 9, propostas_abertas: 2 } }),
       filtros_disponiveis: async () => ({ anos: [2026, 2025, 2024],
@@ -65,6 +66,8 @@ function scriptPonte() {
       checar_atualizacao: async () => null,
       set_config: async (k, v) => {
         window.__chamadas.push({ metodo: "set_config", k, v }); return true; },
+      set_titulo: async t => {
+        window.__chamadas.push({ metodo: "set_titulo", t }); return true; },
       listar_orgaos: async () => [],
       ultimo_log: async () => [],
       municipios: async () => [],

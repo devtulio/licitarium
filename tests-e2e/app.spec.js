@@ -54,6 +54,51 @@ test("tema troca via configurações e persiste via set_config",
   expect(salvo.v).toBe("observatorio");
 });
 
+test("valor sem homologação é marcado como estimado", async ({ page }) => {
+  const linhas = page.locator(".linha:not(.cab)");
+  // X-1 tem homologado: valor limpo, sem marca
+  await expect(linhas.nth(0).locator(".est")).toHaveCount(0);
+  // X-2 só tem estimado: itálico + "est."
+  await expect(linhas.nth(1).locator(".est")).toContainText("est.");
+  await expect(linhas.nth(1).locator(".est")).toContainText("200.000,00");
+});
+
+test("badge de situação encurtada mantém o texto completo no title",
+    async ({ page }) => {
+  const badge = page.locator(".linha:not(.cab)").nth(1).locator(".badge");
+  await expect(badge).toHaveText("Divulgada");
+  await expect(badge).toHaveAttribute("title", "Divulgada no PNCP");
+});
+
+test("limpar filtros aparece com filtro ativo e restaura a lista",
+    async ({ page }) => {
+  await expect(page.locator("#btn-limpar")).toBeHidden();
+  await page.locator("#f-busca").fill("merenda");
+  await expect(page.locator("#btn-limpar")).toBeVisible();
+  await page.locator("#btn-limpar").click();
+  await expect(page.locator("#f-busca")).toHaveValue("");
+  await expect(page.locator("#btn-limpar")).toBeHidden();
+});
+
+test("selo, título da janela e última sincronização no rodapé",
+    async ({ page }) => {
+  await expect(page.locator("#svg-selo polygon").first()).toBeVisible();
+  const titulo = await page.evaluate(() =>
+    window.__chamadas.find(c => c.metodo === "set_titulo"));
+  expect(titulo.t).toBe("Licitarium — Orindiúva/SP");
+  await expect(page.locator("#sync-msg")).toContainText("Sincronizado");
+});
+
+test("densidade compacta aplica e persiste", async ({ page }) => {
+  await page.locator("#btn-config").click();
+  await page.locator("#cfg-densidade").selectOption("compacta");
+  await expect(page.locator("html"))
+    .toHaveAttribute("data-densidade", "compacta");
+  const salvo = await page.evaluate(() => window.__chamadas.find(
+    c => c.metodo === "set_config" && c.k === "densidade"));
+  expect(salvo.v).toBe("compacta");
+});
+
 test("modal trava o fundo, recebe foco e prende o Tab", async ({ page }) => {
   await page.locator("#btn-relatorios").click();
   await expect(page.locator("body")).toHaveClass(/travado/);

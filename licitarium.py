@@ -162,6 +162,7 @@ class Api:
                     "tema": cfg.get("tema", "portal"),
                     "largura": cfg.get("largura", "compacta"),
                     "fonte": cfg.get("fonte", "normal"),
+                    "densidade": cfg.get("densidade", "confortavel"),
                     "limite_dispensa_compras":
                         cfg.get("limite_dispensa_compras",
                                 str(relatorios.LIMITE_PADRAO_COMPRAS)),
@@ -169,6 +170,9 @@ class Api:
                         cfg.get("limite_dispensa_obras",
                                 str(relatorios.LIMITE_PADRAO_OBRAS)),
                     "last_sync": cfg.get("last_sync_contratacoes"),
+                    "sincronizado_em": db.execute(
+                        "SELECT MAX(iniciado_em) FROM sync_log"
+                        " WHERE status='ok'").fetchone()[0],
                     "kpis": self._kpis(db)}
         finally:
             db.close()
@@ -198,9 +202,14 @@ class Api:
                 "vencendo_60": vencendo_60,
                 "propostas_abertas": propostas_abertas}
 
+    def set_titulo(self, texto):
+        if self._janela:
+            self._janela.set_title(texto)
+        return True
+
     def set_config(self, chave, valor):
-        if chave not in ("tema", "largura", "fonte", "limite_dispensa_compras",
-                         "limite_dispensa_obras"):
+        if chave not in ("tema", "largura", "fonte", "densidade",
+                         "limite_dispensa_compras", "limite_dispensa_obras"):
             return False
         db = abrir_db()
         try:
@@ -625,8 +634,15 @@ del "%~f0"
 
 def main():
     api = Api()
+    db = abrir_db()
+    try:  # título já nasce com o município (a UI reconfirma no boot)
+        municipio = pncp._config(db, "municipio_nome")
+        uf = pncp._config(db, "municipio_uf")
+    finally:
+        db.close()
+    titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
     api._janela = webview.create_window(
-        "Licitarium", str(DIR_APP / "ui" / "index.html"), js_api=api,
+        titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600))
     webview.start()
 
