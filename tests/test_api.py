@@ -40,6 +40,9 @@ def test_ordenacao_por_coluna(api):
     r = api.listar("contratacoes", {"ord": "valor", "dir": "desc"})
     # valor = COALESCE(homologado, estimado): B=25, C=15, A=10
     assert [i["numero_controle"] for i in r["itens"]] == ["B", "C", "A"]
+    r = api.listar("contratacoes", {"ord": "numero", "dir": "asc"})
+    # cronológico: 1/2025, 1/2026, 2/2026 (fixture: C=1/2025? A e B são 2026)
+    assert [i["numero_controle"] for i in r["itens"]][0] == "C"
 
 
 def test_ordenacao_invalida_cai_no_padrao(api):

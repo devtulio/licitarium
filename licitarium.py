@@ -63,7 +63,8 @@ TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
            "atas": "atas", "pca": "pca_itens"}
 CHAVES = {"pca": "id"}  # demais tabelas usam numero_controle
 ORDENAVEIS = {
-    "contratacoes": {"modalidade": "modalidade_nome", "objeto": "objeto",
+    "contratacoes": {"numero": "(ano*100000+COALESCE(sequencial,0))",
+                     "modalidade": "modalidade_nome", "objeto": "objeto",
                      "valor": "COALESCE(valor_homologado, valor_estimado)",
                      "situacao": "situacao"},
     "contratos": {"numero": "numero_controle", "objeto": "objeto",

@@ -105,7 +105,7 @@
   .cab { font-size:11px; letter-spacing:.07em; text-transform:uppercase;
          color:var(--muted); cursor:default; background:var(--surface2); }
   .cab:hover { background:var(--surface2); }
-  .g-contratacoes { grid-template-columns:150px 1fr 120px 120px; }
+  .g-contratacoes { grid-template-columns:80px 135px 1fr 120px 120px; }
   .g-contratos    { grid-template-columns:150px 1fr 160px 110px; }
   .g-atas         { grid-template-columns:200px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
@@ -118,7 +118,8 @@
   [data-theme="pergaminho"] .num { font-family:Georgia,serif; }
   .dim { color:var(--muted); font-size:12px; }
   /* colunas curtas centralizadas (mesmo tratamento dos relatórios) */
-  .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(4),
+  .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(2),
+  .g-contratacoes > :nth-child(5),
   .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
   .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(3),
   .g-pca > :nth-child(1), .g-pca > :nth-child(3) { text-align:center; }
@@ -506,8 +507,9 @@ function filtrosAtuais() {
 
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const COLUNAS = {
-  contratacoes: [["Modalidade","modalidade"], ["Objeto","objeto"],
-                 ["Valor","valor"], ["Situação","situacao"]],
+  contratacoes: [["Número","numero"], ["Modalidade","modalidade"],
+                 ["Objeto","objeto"], ["Valor","valor"],
+                 ["Situação","situacao"]],
   contratos:    [["Número","numero"], ["Objeto / Fornecedor","objeto"],
                  ["Vigência","vigencia"], ["Valor","valor"]],
   atas:         [["Número","numero"], ["Contratação de origem","origem"],
@@ -526,8 +528,8 @@ function badgeSituacao(s) {
 
 function renderLinha(tipo, d) {
   if (tipo === "contratacoes")
-    return `<span class="dim">${esc(d.modalidade_nome ?? "–")}<br>
-        ${d.sequencial ?? ""}/${d.ano ?? ""}</span>
+    return `<span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>
+      <span class="dim">${esc(d.modalidade_nome ?? "–")}</span>
       <span class="obj">${esc(d.objeto ?? "–")}</span>
       <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
       <span style="justify-self:center">${badgeSituacao(d.situacao)}</span>`;
