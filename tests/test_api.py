@@ -78,6 +78,28 @@ def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
     assert len(urls) == 1
 
 
+def test_auto_update_desligado_com_sac(api, monkeypatch):
+    """Smart App Control ativo: não oferecer troca automática do exe."""
+    monkeypatch.setattr(licitarium.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(licitarium.Api, "_sac_ativo", staticmethod(lambda: True))
+    api._asset_url = "https://exemplo/Licitarium.exe"
+    r = api.instalar_atualizacao()
+    assert r["ok"] is False and "Smart App Control" in r["erro"]
+
+
+def test_validar_exe_recusa_quando_nao_abre(api, monkeypatch):
+    chamadas = []
+
+    def falha(cmd, **kw):
+        chamadas.append(cmd)
+        raise licitarium.subprocess.TimeoutExpired(cmd, 90)
+    monkeypatch.setattr(licitarium.subprocess, "run", falha)
+    monkeypatch.setattr(licitarium.time, "sleep", lambda s: None)
+    assert api._validar_exe("C:/x/novo.exe") is False
+    assert len(chamadas) == 3                      # tentou 3 vezes
+    assert chamadas[0][1] == "--verificar"
+
+
 def test_script_atualizacao():
     from pathlib import PureWindowsPath
     s = licitarium._script_atualizacao(
@@ -86,10 +108,10 @@ def test_script_atualizacao():
     assert r'del "C:\App\Licitarium.exe"' in s
     assert r'move /y "C:\d\novo.exe" "C:\App\Licitarium.exe"' in s
     assert "goto espera" in s
-    # troca → folga → start → confere se subiu → segundo start
-    assert s.count('start "" "C:\\App\\Licitarium.exe"') == 2
-    assert "tasklist /fi \"imagename eq Licitarium.exe\"" in s
-    assert "if errorlevel 1 start" in s
+    # troca → folga → start único (retry por tasklist daria falso positivo:
+    # bootloader travado na caixa de erro ainda aparece como processo vivo)
+    assert s.count('start "" "C:\\App\\Licitarium.exe"') == 1
+    assert "tasklist" not in s
     assert s.index("move /y") < s.index("timeout /t 3") < s.index('start ""')
 
 

@@ -46,6 +46,12 @@ guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
 > pode exibir "aplicativo não reconhecido". Clique em **Mais informações →
 > Executar assim mesmo**. O código é aberto — você pode auditar e compilar você
 > mesmo.
+>
+> **Windows 11 com Smart App Control:** essa proteção bloqueia binários sem
+> assinatura digital. Com ela ativa, a atualização automática fica desligada
+> (o aviso de versão nova leva ao download manual) e o próprio primeiro
+> download pode ser barrado. Alternativas: rodar a partir do código-fonte,
+> desligar o Smart App Control, ou aguardar uma versão assinada.
 
 **A partir do código:**
 

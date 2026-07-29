@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 import webbrowser
 from datetime import date, datetime
@@ -524,19 +525,65 @@ class Api:
                 self._asset_url = next(
                     (a.get("browser_download_url") for a in d.get("assets", [])
                      if a.get("name") == "Licitarium.exe"), None)
-                # instalação automática só faz sentido rodando como exe
-                auto = bool(self._asset_url and getattr(sys, "frozen", False))
+                # instalação automática só faz sentido rodando como exe e
+                # sem Smart App Control barrando o binário novo
+                auto = bool(self._asset_url and getattr(sys, "frozen", False)
+                            and not self._sac_ativo())
                 return {"nova": tag, "auto": auto}
         except Exception:
             pass
         return None
 
+    @staticmethod
+    def _sac_ativo():
+        """Smart App Control do Windows 11 (bloqueia binário sem assinatura
+        nem reputação). Com ele ligado a troca automática do exe não completa:
+        as DLLs que o onefile extrai são barradas e o início falha em
+        "Failed to load Python DLL". Melhor não prometer o que não funciona.
+        """
+        try:
+            import winreg
+            with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SYSTEM\CurrentControlSet\Control\CI\Policy") as k:
+                # 0=desligado, 1=ativo, 2=avaliação
+                return winreg.QueryValueEx(
+                    k, "VerifiedAndReputablePolicyState")[0] == 1
+        except (ImportError, OSError):
+            return False
+
+    def _validar_exe(self, exe, tentativas=3):
+        """Roda o exe novo com --verificar antes de confiar nele.
+
+        Vale por dois motivos: se o processo chega a executar Python, o
+        empacotamento está íntegro; e a extração da runtime (que o onefile
+        faz a cada abertura em %TEMP%\\_MEI<pid>) já aconteceu uma vez, o que
+        tira do caminho o antivírus varrendo o binário recém-escrito — a causa
+        do "Failed to load Python DLL" que aparecia no primeiro início.
+        """
+        for tentativa in range(tentativas):
+            try:
+                r = subprocess.run(
+                    [str(exe), "--verificar"], timeout=90,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                if r.returncode == 0:
+                    return True
+            except (subprocess.TimeoutExpired, OSError):
+                pass  # bootloader travado na caixa de erro: mata e repete
+            time.sleep(3)
+        return False
+
     def instalar_atualizacao(self):
-        """Baixa o exe novo e troca pelo atual via script que espera o app
-        fechar. Só quando rodando como executável (sys.frozen)."""
+        """Baixa o exe novo, valida, e troca pelo atual via script que espera
+        o app fechar. Só quando rodando como executável (sys.frozen)."""
         if not (getattr(sys, "frozen", False)
                 and getattr(self, "_asset_url", None)):
             return {"ok": False, "erro": "instalação automática indisponível"}
+        if self._sac_ativo():
+            return {"ok": False,
+                    "erro": "o Smart App Control do Windows bloqueia programas "
+                            "sem assinatura digital — baixe a versão nova pela "
+                            "página do projeto"}
         try:
             destino = DIR_DADOS / "update"
             destino.mkdir(parents=True, exist_ok=True)
@@ -552,6 +599,12 @@ class Api:
             if esperado and novo.stat().st_size != esperado:
                 novo.unlink(missing_ok=True)
                 return {"ok": False, "erro": "download incompleto"}
+            if not self._validar_exe(novo):
+                novo.unlink(missing_ok=True)
+                return {"ok": False,
+                        "erro": "o executável novo não abriu nesta máquina "
+                                "(antivírus ou política do Windows) — a versão "
+                                "atual foi mantida"}
             bat = destino / "atualizar.bat"
             bat.write_text(_script_atualizacao(Path(sys.executable), novo),
                            encoding="ascii", errors="replace")
@@ -610,10 +663,11 @@ class Api:
 def _script_atualizacao(exe_atual, exe_novo):
     """Gera o .bat que espera o app fechar, troca o exe e reabre.
 
-    O exe onefile extrai a runtime em %TEMP%\\_MEI<pid> a cada início; se o
-    antivírus ainda está varrendo o arquivo recém-escrito, essa extração pode
-    falhar ("Failed to load Python DLL"). Daí a folga antes do start e o
-    segundo start caso o processo não tenha subido.
+    A folga antes do start dá tempo de o Windows liberar o arquivo recém
+    movido. Não há retry aqui de propósito: quando o bootloader falha, ele
+    fica na tela com a caixa de erro, então o processo existe e qualquer
+    checagem por tasklist daria falso positivo — a defesa é validar o exe
+    antes da troca (ver Api._validar_exe).
     """
     return f"""@echo off
 :espera
@@ -625,9 +679,6 @@ if exist "{exe_atual}" (
 move /y "{exe_novo}" "{exe_atual}" >nul
 timeout /t 3 /nobreak >nul
 start "" "{exe_atual}"
-timeout /t 12 /nobreak >nul
-tasklist /fi "imagename eq {exe_atual.name}" | find /i "{exe_atual.name}" >nul
-if errorlevel 1 start "" "{exe_atual}"
 del "%~f0"
 """
 
@@ -648,4 +699,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # --verificar: chegar aqui já prova que a runtime empacotada carregou;
+    # usado pelo autoupdate para validar e aquecer o exe novo antes da troca
+    if "--verificar" in sys.argv:
+        print(VERSAO)
+        sys.exit(0)
     main()
