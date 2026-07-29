@@ -382,11 +382,11 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap">
         <div style="flex:1; min-width:180px">
           <label for="cfg-lim-compras">Compras e serviços (inciso II)</label>
-          <input type="number" step="0.01" id="cfg-lim-compras" style="width:100%">
+          <input type="text" inputmode="numeric" id="cfg-lim-compras" style="width:100%">
         </div>
         <div style="flex:1; min-width:180px">
           <label for="cfg-lim-obras">Obras/eng. (inciso I)</label>
-          <input type="number" step="0.01" id="cfg-lim-obras" style="width:100%">
+          <input type="text" inputmode="numeric" id="cfg-lim-obras" style="width:100%">
         </div>
       </div>
       <div class="aviso">Usados no Alerta de Fracionamento. Atualizados por
@@ -832,8 +832,8 @@ $("btn-config").addEventListener("click", async () => {
   $("cfg-orgaos").querySelectorAll("input[data-cnpj]").forEach(c =>
     c.addEventListener("change", () =>
       api.set_orgao_ativo(c.dataset.cnpj, c.checked)));
-  $("cfg-lim-compras").value = e.limite_dispensa_compras;
-  $("cfg-lim-obras").value = e.limite_dispensa_obras;
+  aplicarLimCompras(parseFloat(e.limite_dispensa_compras) || 0);
+  aplicarLimObras(parseFloat(e.limite_dispensa_obras) || 0);
   const log = await api.ultimo_log();
   $("cfg-log").innerHTML = log.map(l =>
     `<div class="logline">${esc(l.iniciado_em?.slice(0,16).replace("T"," "))} ·
@@ -842,10 +842,24 @@ $("btn-config").addEventListener("click", async () => {
     .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
   $("veu-config").classList.remove("oculto");
 });
-$("cfg-lim-compras").addEventListener("change", () =>
-  api.set_config("limite_dispensa_compras", $("cfg-lim-compras").value));
-$("cfg-lim-obras").addEventListener("change", () =>
-  api.set_config("limite_dispensa_obras", $("cfg-lim-obras").value));
+// máscara de dinheiro: digita só dígitos, exibe R$ formatado,
+// salva o valor numérico puro (dataset.valor)
+function mascaraDinheiro(input, aoSalvar) {
+  const aplicar = v => {
+    input.value = brl.format(v);
+    input.dataset.valor = v;
+  };
+  input.addEventListener("input", () => {
+    const digitos = input.value.replace(/\D/g, "");
+    aplicar((parseInt(digitos || "0", 10)) / 100);
+  });
+  input.addEventListener("change", () => aoSalvar(input.dataset.valor));
+  return aplicar;
+}
+const aplicarLimCompras = mascaraDinheiro($("cfg-lim-compras"),
+  v => api.set_config("limite_dispensa_compras", v));
+const aplicarLimObras = mascaraDinheiro($("cfg-lim-obras"),
+  v => api.set_config("limite_dispensa_obras", v));
 $("btn-trocar").addEventListener("click", () => {
   $("veu-config").classList.add("oculto");
   iniciarWizard();

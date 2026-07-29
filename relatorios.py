@@ -187,8 +187,14 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
     """
     ano = int(ano)
     limites = limites or {}
-    limite_compras = float(limites.get("compras") or LIMITE_PADRAO_COMPRAS)
-    limite_obras = float(limites.get("obras") or LIMITE_PADRAO_OBRAS)
+
+    def _limite(valor, padrao):
+        try:
+            return float(valor)
+        except (TypeError, ValueError):
+            return padrao
+    limite_compras = _limite(limites.get("compras"), LIMITE_PADRAO_COMPRAS)
+    limite_obras = _limite(limites.get("obras"), LIMITE_PADRAO_OBRAS)
     og = " AND orgao_cnpj=?" if orgao else ""
     og_args = [orgao] if orgao else []
     unidades = [dict(r) for r in db.execute(

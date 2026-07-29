@@ -54,6 +54,20 @@ test("tema troca via configurações e persiste via set_config",
   expect(salvo.v).toBe("observatorio");
 });
 
+test("limites de dispensa usam máscara de dinheiro e salvam número puro",
+    async ({ page }) => {
+  await page.locator("#btn-config").click();
+  const campo = page.locator("#cfg-lim-compras");
+  await expect(campo).toHaveValue(/R\$/);            // carrega formatado
+  await campo.fill("7500000");                        // digita só dígitos
+  await expect(campo).toHaveValue(/75\.000,00/);      // exibe mascarado
+  await page.keyboard.press("Tab");                   // dispara change
+  const salvo = await page.evaluate(() =>
+    window.__chamadas.filter(c => c.metodo === "set_config"
+      && c.k === "limite_dispensa_compras").pop());
+  expect(parseFloat(salvo.v)).toBe(75000);            // persiste numérico
+});
+
 test("chip de vencimento navega para contratos vigentes", async ({ page }) => {
   await page.locator("#chip-vencendo").click();
   await expect(page.locator('nav.abas button[data-tipo="contratos"]'))
