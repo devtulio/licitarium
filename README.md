@@ -2,6 +2,8 @@
 
 # Licitarium
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21682535.svg)](https://doi.org/10.5281/zenodo.21682535)
+
 **Repositório local de contratações públicas municipais.** O Licitarium espelha,
 no seu computador, tudo o que o seu município publica no
 [PNCP](https://pncp.gov.br) — contratações (editais e avisos), contratos, atas
