@@ -199,7 +199,7 @@ def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None):
                                   "codigoMunicipioIbge": codigo_ibge},
                                  tamanho_pagina=50):
                 total += _upsert_contratacao(db, item)
-    db.commit()
+            db.commit()  # transação curta por janela: não segurar trava
     return total
 
 
@@ -221,7 +221,7 @@ def sync_contratos(db, cnpj, inicio, fim, progresso=None):
                               "cnpjOrgao": cnpj},
                              tamanho_pagina=500):
             total += _upsert_contrato(db, item)
-    db.commit()
+        db.commit()  # transação curta por janela
     return total
 
 
@@ -234,7 +234,7 @@ def sync_atas(db, cnpj, inicio, fim, progresso=None):
                               "cnpj": cnpj},
                              tamanho_pagina=500):
             total += _upsert_ata(db, item)
-    db.commit()
+        db.commit()  # transação curta por janela
     return total
 
 

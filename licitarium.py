@@ -58,6 +58,10 @@ def abrir_db():
     DIR_DADOS.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(ARQUIVO_DB)
     db.row_factory = sqlite3.Row
+    # WAL + busy_timeout: a thread de sync grava enquanto a ponte JS lê/grava
+    # config — sem isso, "database is locked" na primeira concorrência
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA busy_timeout=10000")
     db.executescript(SCHEMA)
     return db
 
@@ -66,7 +70,9 @@ class Api:
     """Métodos chamados do JS via window.pywebview.api.*"""
 
     def __init__(self):
-        self.janela = None  # definida em main()
+        # _janela: o prefixo é obrigatório — pywebview expõe e inspeciona todo
+        # atributo público do js_api, e a janela nativa entra em recursão
+        self._janela = None  # definida em main()
         self._sync_ativo = threading.Lock()
         self._status = {"rodando": False, "msg": "", "resumo": None, "erro": None}
         self._municipios = None
@@ -309,12 +315,12 @@ class Api:
         self._avisar_ui()
 
     def _avisar_ui(self, fim=False):
-        if not self.janela:
+        if not self._janela:
             return
         evento = "onSyncFim" if fim else "onSyncProgresso"
         payload = json.dumps(self._status, ensure_ascii=False)
         try:
-            self.janela.evaluate_js(f"window.{evento} && {evento}({payload})")
+            self._janela.evaluate_js(f"window.{evento} && {evento}({payload})")
         except Exception:
             pass  # janela fechando
 
@@ -334,7 +340,7 @@ class Api:
     def exportar_csv(self, tipo, filtros=None):
         if tipo not in TABELAS:
             return {"ok": False, "erro": "tipo inválido"}
-        destino = self.janela.create_file_dialog(
+        destino = self._janela.create_file_dialog(
             webview.SAVE_DIALOG, save_filename=f"{tipo}.csv",
             file_types=("CSV (*.csv)",))
         if not destino:
@@ -365,7 +371,7 @@ class Api:
 
 def main():
     api = Api()
-    api.janela = webview.create_window(
+    api._janela = webview.create_window(
         "Licitarium", str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600))
     webview.start()
