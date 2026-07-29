@@ -1,0 +1,18 @@
+// Gera os screenshots do README (docs/screenshots/*.png) com dados de exemplo.
+const path = require("path");
+const { test, expect } = require("@playwright/test");
+const { abrirApp } = require("./harness");
+
+const DESTINO = path.resolve(__dirname, "..", "docs", "screenshots");
+
+for (const tema of ["portal", "pergaminho", "observatorio"]) {
+  test(`screenshot tema ${tema}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 780 });
+    await abrirApp(page);
+    await page.evaluate(t => {
+      document.documentElement.dataset.theme = t;
+    }, tema);
+    await expect(page.locator(".linha:not(.cab)")).toHaveCount(3);
+    await page.screenshot({ path: path.join(DESTINO, `${tema}.png`) });
+  });
+}

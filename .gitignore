@@ -1,4 +1,7 @@
 __pycache__/
+node_modules/
+test-results/
+playwright-report/
 .pytest_cache/
 build/
 dist/

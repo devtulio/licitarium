@@ -13,6 +13,13 @@ acervo pesquisável, offline e permanente.
 *Licitarium* — do latim *licitatio* (lance, leilão) + *-arium* (lugar que
 guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
 
+![Licitarium — tema Portal](docs/screenshots/portal.png)
+
+<p align="center">
+  <img src="docs/screenshots/pergaminho.png" width="49%" alt="Tema Pergaminho">
+  <img src="docs/screenshots/observatorio.png" width="49%" alt="Tema Observatório">
+</p>
+
 ## Como funciona
 
 - Na primeira execução você escolhe o município; o Licitarium baixa todo o
