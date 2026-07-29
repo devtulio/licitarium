@@ -514,10 +514,18 @@ async function iniciarApp(e) {
   api.checar_atualizacao().then(at => {
     if (!at) return;
     const alvo = $("rodape-versao");
+    const rotulo = at.auto ? `Nova versão ${esc(at.nova)} — clique para atualizar`
+                           : `Nova versão ${esc(at.nova)} disponível ↗`;
     alvo.innerHTML = `<a href="#" id="link-atualizacao"
-      style="color:var(--accent)">Nova versão ${esc(at.nova)} disponível ↗</a>`;
-    $("link-atualizacao").addEventListener("click", ev => {
-      ev.preventDefault(); api.abrir_atualizacao();
+      style="color:var(--accent)">${rotulo}</a>`;
+    $("link-atualizacao").addEventListener("click", async ev => {
+      ev.preventDefault();
+      if (!at.auto) { api.abrir_atualizacao(); return; }
+      if (!confirm(`Baixar e instalar a versão ${at.nova}?\n` +
+                   `O Licitarium será fechado e reaberto sozinho.`)) return;
+      alvo.textContent = "Baixando atualização…";
+      const r = await api.instalar_atualizacao();
+      if (!r.ok) alvo.textContent = `Falha na atualização: ${r.erro}`;
     });
   });
 }

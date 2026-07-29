@@ -7,6 +7,8 @@ import csv
 import json
 import re
 import sqlite3
+import subprocess
+import sys
 import threading
 import urllib.request
 import webbrowser
@@ -501,10 +503,46 @@ class Api:
             remota = [int(x) for x in tag.split(".")] if tag else []
             if remota > local:
                 self._atualizacao = d.get("html_url")
-                return {"nova": tag}
+                self._asset_url = next(
+                    (a.get("browser_download_url") for a in d.get("assets", [])
+                     if a.get("name") == "Licitarium.exe"), None)
+                # instalação automática só faz sentido rodando como exe
+                auto = bool(self._asset_url and getattr(sys, "frozen", False))
+                return {"nova": tag, "auto": auto}
         except Exception:
             pass
         return None
+
+    def instalar_atualizacao(self):
+        """Baixa o exe novo e troca pelo atual via script que espera o app
+        fechar. Só quando rodando como executável (sys.frozen)."""
+        if not (getattr(sys, "frozen", False)
+                and getattr(self, "_asset_url", None)):
+            return {"ok": False, "erro": "instalação automática indisponível"}
+        try:
+            destino = DIR_DADOS / "update"
+            destino.mkdir(parents=True, exist_ok=True)
+            novo = destino / "Licitarium.novo.exe"
+            req = urllib.request.Request(
+                self._asset_url, headers={"User-Agent": pncp.USER_AGENT})
+            with urllib.request.urlopen(req, timeout=300) as r, \
+                    open(novo, "wb") as f:
+                while bloco := r.read(1024 * 256):
+                    f.write(bloco)
+            bat = destino / "atualizar.bat"
+            bat.write_text(_script_atualizacao(Path(sys.executable), novo),
+                           encoding="ascii", errors="replace")
+            subprocess.Popen(
+                ["cmd", "/c", str(bat)],
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.DETACHED_PROCESS,
+                close_fds=True)
+            # o script espera este processo liberar o exe; fechar a janela
+            # encerra o app e deixa a troca acontecer
+            threading.Timer(0.5, self._janela.destroy).start()
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "erro": str(e)}
 
     def abrir_atualizacao(self):
         if getattr(self, "_atualizacao", None):
@@ -544,6 +582,21 @@ class Api:
             return {"ok": True, "arquivo": caminho, "linhas": len(itens)}
         finally:
             db.close()
+
+
+def _script_atualizacao(exe_atual, exe_novo):
+    """Gera o .bat que espera o app fechar, troca o exe e reabre."""
+    return f"""@echo off
+:espera
+del "{exe_atual}" >nul 2>&1
+if exist "{exe_atual}" (
+  timeout /t 1 /nobreak >nul
+  goto espera
+)
+move /y "{exe_novo}" "{exe_atual}" >nul
+start "" "{exe_atual}"
+del "%~f0"
+"""
 
 
 def main():

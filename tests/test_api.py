@@ -78,6 +78,15 @@ def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
     assert len(urls) == 1
 
 
+def test_script_atualizacao():
+    from pathlib import PurePath
+    s = licitarium._script_atualizacao(PurePath(r"C:\App\Licitarium.exe"),
+                                       PurePath(r"C:\d\novo.exe"))
+    assert r'del "C:\App\Licitarium.exe"' in s
+    assert r'move /y "C:\d\novo.exe" "C:\App\Licitarium.exe"' in s
+    assert 'start "" "C:' in s and "goto espera" in s
+
+
 def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):
     """Banco 0.2.0 (atas sem numero_ata) ganha as colunas preenchidas do raw."""
     import json
