@@ -238,11 +238,11 @@ def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem):
 
 def render_contratacoes(d, municipio, uf, periodo_txt):
     linhas = "".join(f"""<tr>
-      <td>{_e(l['sequencial'])}/{_e(l['ano'])}</td>
-      <td>{_e(l['modalidade_nome'])}</td>
-      <td>{_e(l['amparo'])}</td>
+      <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
+      <td class="ctr">{_e(l['modalidade_nome'])}</td>
+      <td class="ctr">{_e(l['amparo'])}</td>
       <td class="obj">{_e(l['objeto'])}</td>
-      <td>{_e(l['unidade'])}</td>
+      <td class="ctr">{_e(l['unidade'])}</td>
       <td class="num">{moeda(l['valor_estimado'])}</td>
       <td class="num">{moeda(l['valor_homologado'])}</td>
       <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
@@ -251,8 +251,9 @@ def render_contratacoes(d, municipio, uf, periodo_txt):
     desagio = f" · Deságio médio: {t['desagio']:.1f}%".replace(".", ",") \
         if t["desagio"] is not None else ""
     corpo = f"""<table>
-<thead><tr><th>Processo</th><th>Modalidade</th><th>Amparo legal</th>
-<th>Objeto</th><th>Unidade</th><th class="num">Valor estimado</th>
+<thead><tr><th class="ctr">Processo</th><th class="ctr">Modalidade</th>
+<th class="ctr">Amparo legal</th>
+<th>Objeto</th><th class="ctr">Unidade</th><th class="num">Valor estimado</th>
 <th class="num">Valor homologado</th><th class="num">Publicação</th></tr></thead>
 <tbody>{linhas or '<tr><td colspan="8">Nenhum registro no período.</td></tr>'}</tbody>
 <tfoot><tr><td colspan="5">Total: {t['n']} contratações{desagio}</td>
@@ -264,8 +265,8 @@ def render_contratacoes(d, municipio, uf, periodo_txt):
 
 def render_contratos(d, municipio, uf, periodo_txt):
     linhas = "".join(f"""<tr>
-      <td>{_e(l['numero'] or l['numero_controle'])}</td>
-      <td>{_e(l['fornecedor_nome'])}<br>
+      <td class="ctr">{_e(l['numero'] or l['numero_controle'])}</td>
+      <td class="ctr">{_e(l['fornecedor_nome'])}<br>
           <small>{_e(l['fornecedor_ni'])}</small></td>
       <td class="obj">{_e(l['objeto'])}</td>
       <td class="num">{moeda(l['valor_global'])}</td>
@@ -274,7 +275,7 @@ def render_contratos(d, municipio, uf, periodo_txt):
       for l in d["linhas"])
     t = d["totais"]
     corpo = f"""<table>
-<thead><tr><th>Contrato</th><th>Fornecedor</th><th>Objeto</th>
+<thead><tr><th class="ctr">Contrato</th><th class="ctr">Fornecedor</th><th>Objeto</th>
 <th class="num">Valor global</th><th class="num">Vigência</th>
 <th class="num">Publicação</th></tr></thead>
 <tbody>{linhas or '<tr><td colspan="6">Nenhum registro no período.</td></tr>'}</tbody>
@@ -286,14 +287,14 @@ def render_contratos(d, municipio, uf, periodo_txt):
 
 def render_atas(d, municipio, uf, periodo_txt):
     linhas = "".join(f"""<tr>
-      <td>{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
-      <td>{_e(l['contratacao_controle'])}</td>
+      <td class="ctr">{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
+      <td class="ctr">{_e(l['contratacao_controle'])}</td>
       <td class="obj">{_e(l['objeto'])}</td>
       <td class="num">{data_br(l['vigencia_inicio'])} – {data_br(l['vigencia_fim'])}</td>
       <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
       for l in d["linhas"])
     corpo = f"""<table>
-<thead><tr><th>Ata</th><th>Contratação de origem</th><th>Objeto</th>
+<thead><tr><th class="ctr">Ata</th><th class="ctr">Contratação de origem</th><th>Objeto</th>
 <th class="num">Vigência</th><th class="num">Publicação</th></tr></thead>
 <tbody>{linhas or '<tr><td colspan="5">Nenhum registro no período.</td></tr>'}</tbody>
 <tfoot><tr><td colspan="5">Total: {d['totais']['n']} atas</td></tr></tfoot></table>"""
