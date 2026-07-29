@@ -195,9 +195,16 @@ class Api:
         f = filtros or {}
         where, args = [], []
         if f.get("ano"):
-            coluna = "vigencia_inicio" if tipo == "atas" else "data_publicacao"
-            where.append(f"substr({coluna},1,4)=?")
-            args.append(str(f["ano"]))
+            if tipo == "contratacoes":
+                # ano do processo (anoCompra), não da publicação: o PNCP
+                # reescreve dataPublicacaoPncp quando o órgão atualiza o
+                # processo, jogando um "36/2024" para o ano corrente
+                where.append("ano=?")
+                args.append(f["ano"])
+            else:
+                coluna = "vigencia_inicio" if tipo == "atas" else "data_publicacao"
+                where.append(f"substr({coluna},1,4)=?")
+                args.append(str(f["ano"]))
         if f.get("modalidade") and tipo == "contratacoes":
             where.append("modalidade_id=?")
             args.append(f["modalidade"])
@@ -248,8 +255,8 @@ class Api:
         db = abrir_db()
         try:
             anos = [r[0] for r in db.execute(
-                "SELECT DISTINCT substr(data_publicacao,1,4) FROM contratacoes "
-                "WHERE data_publicacao IS NOT NULL ORDER BY 1 DESC")]
+                "SELECT DISTINCT ano FROM contratacoes "
+                "WHERE ano IS NOT NULL ORDER BY 1 DESC")]
             situacoes = [r[0] for r in db.execute(
                 "SELECT DISTINCT situacao FROM contratacoes "
                 "WHERE situacao IS NOT NULL ORDER BY 1")]
