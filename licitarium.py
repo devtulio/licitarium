@@ -534,10 +534,15 @@ class Api:
             novo = destino / "Licitarium.novo.exe"
             req = urllib.request.Request(
                 self._asset_url, headers={"User-Agent": pncp.USER_AGENT})
-            with urllib.request.urlopen(req, timeout=300) as r, \
-                    open(novo, "wb") as f:
-                while bloco := r.read(1024 * 256):
-                    f.write(bloco)
+            with urllib.request.urlopen(req, timeout=300) as r:
+                esperado = int(r.headers.get("Content-Length") or 0)
+                with open(novo, "wb") as f:
+                    while bloco := r.read(1024 * 256):
+                        f.write(bloco)
+            # download truncado viraria um exe quebrado no lugar do bom
+            if esperado and novo.stat().st_size != esperado:
+                novo.unlink(missing_ok=True)
+                return {"ok": False, "erro": "download incompleto"}
             bat = destino / "atualizar.bat"
             bat.write_text(_script_atualizacao(Path(sys.executable), novo),
                            encoding="ascii", errors="replace")
@@ -594,7 +599,13 @@ class Api:
 
 
 def _script_atualizacao(exe_atual, exe_novo):
-    """Gera o .bat que espera o app fechar, troca o exe e reabre."""
+    """Gera o .bat que espera o app fechar, troca o exe e reabre.
+
+    O exe onefile extrai a runtime em %TEMP%\\_MEI<pid> a cada início; se o
+    antivírus ainda está varrendo o arquivo recém-escrito, essa extração pode
+    falhar ("Failed to load Python DLL"). Daí a folga antes do start e o
+    segundo start caso o processo não tenha subido.
+    """
     return f"""@echo off
 :espera
 del "{exe_atual}" >nul 2>&1
@@ -603,7 +614,11 @@ if exist "{exe_atual}" (
   goto espera
 )
 move /y "{exe_novo}" "{exe_atual}" >nul
+timeout /t 3 /nobreak >nul
 start "" "{exe_atual}"
+timeout /t 12 /nobreak >nul
+tasklist /fi "imagename eq {exe_atual.name}" | find /i "{exe_atual.name}" >nul
+if errorlevel 1 start "" "{exe_atual}"
 del "%~f0"
 """
 

@@ -79,12 +79,18 @@ def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
 
 
 def test_script_atualizacao():
-    from pathlib import PurePath
-    s = licitarium._script_atualizacao(PurePath(r"C:\App\Licitarium.exe"),
-                                       PurePath(r"C:\d\novo.exe"))
+    from pathlib import PureWindowsPath
+    s = licitarium._script_atualizacao(
+        PureWindowsPath(r"C:\App\Licitarium.exe"),
+        PureWindowsPath(r"C:\d\novo.exe"))
     assert r'del "C:\App\Licitarium.exe"' in s
     assert r'move /y "C:\d\novo.exe" "C:\App\Licitarium.exe"' in s
-    assert 'start "" "C:' in s and "goto espera" in s
+    assert "goto espera" in s
+    # troca → folga → start → confere se subiu → segundo start
+    assert s.count('start "" "C:\\App\\Licitarium.exe"') == 2
+    assert "tasklist /fi \"imagename eq Licitarium.exe\"" in s
+    assert "if errorlevel 1 start" in s
+    assert s.index("move /y") < s.index("timeout /t 3") < s.index('start ""')
 
 
 def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):

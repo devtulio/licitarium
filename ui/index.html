@@ -155,6 +155,8 @@
   /* ══ MODAIS ══ */
   .veu { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
          align-items:flex-start; justify-content:center; padding:36px 16px; overflow-y:auto; }
+  /* com modal aberto o fundo não rola: a roda do mouse fica no diálogo */
+  body.travado { overflow:hidden; }
   .modal { width:min(760px, 100%); padding:0; }
   .mhead { padding:18px 20px; display:flex; justify-content:space-between;
            gap:14px; align-items:flex-start; }
@@ -795,7 +797,7 @@ async function abrirDetalhe(nc) {
       return `<div><div class="k">${rotulo}</div><div class="v">${esc(v)}</div></div>`;
     }).join("");
   $("det-raw").innerHTML = jsonColorido(d.raw);
-  $("veu-detalhe").classList.remove("oculto");
+  abrirModal("veu-detalhe");
 }
 $("det-pncp").addEventListener("click", () =>
   api.abrir_pncp(estado.tipo, detalheAtual));
@@ -827,7 +829,7 @@ async function montarOpcoesRelatorio() {
 $("btn-relatorios").addEventListener("click", async () => {
   await montarOpcoesRelatorio();
   $("rel-status").textContent = "";
-  $("veu-relatorios").classList.remove("oculto");
+  abrirModal("veu-relatorios");
 });
 $("rel-tipo").addEventListener("change", montarOpcoesRelatorio);
 $("rel-gerar").addEventListener("click", async () => {
@@ -871,7 +873,7 @@ $("btn-config").addEventListener("click", async () => {
      ${esc(l.tipo)} · ${l.status === "ok" ? `${l.registros} registros`
        : `<span style="color:var(--warn)">erro: ${esc(l.erro)}</span>`}</div>`)
     .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
-  $("veu-config").classList.remove("oculto");
+  abrirModal("veu-config");
 });
 // máscara de dinheiro: digita só dígitos, exibe R$ formatado,
 // salva o valor numérico puro (dataset.valor)
@@ -892,7 +894,7 @@ const aplicarLimCompras = mascaraDinheiro($("cfg-lim-compras"),
 const aplicarLimObras = mascaraDinheiro($("cfg-lim-obras"),
   v => api.set_config("limite_dispensa_obras", v));
 $("btn-trocar").addEventListener("click", () => {
-  $("veu-config").classList.add("oculto");
+  fecharModal("veu-config");
   iniciarWizard();
 });
 $("btn-add-orgao").addEventListener("click", async () => {
@@ -902,12 +904,50 @@ $("btn-add-orgao").addEventListener("click", async () => {
   else if (r.erro) alert(r.erro);
 });
 
-// fechar modais (botão × e tecla Esc)
+// ── modais: trava o fundo, move o foco e prende o Tab ─────────────────────
+const FOCAVEIS = 'button:not([disabled]), input, select, textarea, a[href],' +
+                 ' summary, [tabindex]:not([tabindex="-1"])';
+let focoAnterior = null;
+
+function abrirModal(id) {
+  focoAnterior = document.activeElement;
+  const veu = $(id);
+  veu.classList.remove("oculto");
+  document.body.classList.add("travado");
+  veu.querySelector(FOCAVEIS)?.focus();
+}
+
+function fecharModal(id) {
+  $(id).classList.add("oculto");
+  if (!document.querySelector(".veu:not(.oculto)"))
+    document.body.classList.remove("travado");
+  focoAnterior?.focus();
+}
+
+function fecharTodosModais() {
+  document.querySelectorAll(".veu:not(.oculto)")
+    .forEach(v => v.classList.add("oculto"));
+  document.body.classList.remove("travado");
+  focoAnterior?.focus();
+}
+
 document.querySelectorAll("[data-fecha]").forEach(b =>
-  b.addEventListener("click", () => $(b.dataset.fecha).classList.add("oculto")));
+  b.addEventListener("click", () => fecharModal(b.dataset.fecha)));
+
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape")
-    document.querySelectorAll(".veu").forEach(v => v.classList.add("oculto"));
+  if (e.key === "Escape") { fecharTodosModais(); return; }
+  if (e.key !== "Tab") return;
+  const veu = document.querySelector(".veu:not(.oculto)");
+  if (!veu) return;
+  const itens = [...veu.querySelectorAll(FOCAVEIS)]
+    .filter(el => el.offsetParent !== null);
+  if (!itens.length) return;
+  const primeiro = itens[0], ultimo = itens[itens.length - 1];
+  if (e.shiftKey && document.activeElement === primeiro) {
+    e.preventDefault(); ultimo.focus();
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault(); primeiro.focus();
+  }
 });
 
 // ── sincronização ─────────────────────────────────────────────────────────

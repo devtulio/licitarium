@@ -54,6 +54,22 @@ test("tema troca via configurações e persiste via set_config",
   expect(salvo.v).toBe("observatorio");
 });
 
+test("modal trava o fundo, recebe foco e prende o Tab", async ({ page }) => {
+  await page.locator("#btn-relatorios").click();
+  await expect(page.locator("body")).toHaveClass(/travado/);
+  // foco entrou no diálogo
+  expect(await page.evaluate(() =>
+    document.querySelector("#veu-relatorios").contains(document.activeElement)))
+    .toBe(true);
+  // Tab circula dentro do diálogo, nunca volta para o fundo
+  for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+  expect(await page.evaluate(() =>
+    document.querySelector("#veu-relatorios").contains(document.activeElement)))
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("body")).not.toHaveClass(/travado/);
+});
+
 test("tamanho da fonte aplica zoom e persiste", async ({ page }) => {
   await page.locator("#btn-config").click();
   await page.locator("#cfg-fonte").selectOption("grande");
