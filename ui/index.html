@@ -79,7 +79,19 @@
   [data-largura="expandida"] main { max-width:none; }
 
   .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
-  .kpi { padding:13px 16px; }
+  .kpi { padding:13px 16px; text-align:left; cursor:pointer; color:var(--text); }
+  .kpi:hover { border-color:var(--accent); }
+  .alertas { display:flex; gap:8px; margin:-6px 0 14px; flex-wrap:wrap; }
+  .chip { background:color-mix(in srgb, var(--warn) 13%, transparent);
+          color:var(--warn); border:1px solid
+          color-mix(in srgb, var(--warn) 35%, transparent);
+          border-radius:var(--pill); padding:6px 14px; font-size:12.5px;
+          cursor:pointer; }
+  .chip.info { background:color-mix(in srgb, var(--accent) 12%, transparent);
+               color:var(--accent); border-color:
+               color-mix(in srgb, var(--accent) 35%, transparent); }
+  .check-filtro { display:flex; align-items:center; gap:6px; font-size:13px;
+                  color:var(--muted); white-space:nowrap; }
   .kpi .n { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;
             color:var(--accent); }
   [data-theme="pergaminho"] .kpi .n { font-family:Georgia,serif; font-weight:400; }
@@ -213,13 +225,20 @@
   </header>
   <main>
     <div class="kpis">
-      <div class="card kpi"><div class="n" id="kpi-contratacoes">–</div>
-        <div class="l">contratações</div></div>
-      <div class="card kpi"><div class="n" id="kpi-homologado">–</div>
-        <div class="l" id="kpi-homologado-l">homologado</div></div>
-      <div class="card kpi"><div class="n" id="kpi-vigentes">–</div>
-        <div class="l">contratos vigentes</div></div>
+      <button class="card kpi" id="kpi-card-contratacoes"
+        title="Ver todas as contratações">
+        <div class="n" id="kpi-contratacoes">–</div>
+        <div class="l">contratações</div></button>
+      <button class="card kpi" id="kpi-card-homologado"
+        title="Ver contratações do ano">
+        <div class="n" id="kpi-homologado">–</div>
+        <div class="l" id="kpi-homologado-l">homologado</div></button>
+      <button class="card kpi" id="kpi-card-vigentes"
+        title="Ver contratos vigentes">
+        <div class="n" id="kpi-vigentes">–</div>
+        <div class="l">contratos vigentes</div></button>
     </div>
+    <div class="alertas oculto" id="alertas"></div>
     <nav class="abas" role="tablist">
       <button data-tipo="contratacoes" class="on" role="tab">Contratações</button>
       <button data-tipo="contratos" role="tab">Contratos</button>
@@ -234,6 +253,10 @@
         <option value="">Todas as situações</option></select>
       <select id="f-orgao" aria-label="Órgão">
         <option value="">Todos os órgãos</option></select>
+      <label class="check-filtro" id="cx-propostas">
+        <input type="checkbox" id="f-propostas"> Propostas abertas</label>
+      <label class="check-filtro oculto" id="cx-vigentes">
+        <input type="checkbox" id="f-vigentes"> Vigentes</label>
       <input type="search" id="f-busca" placeholder="Buscar no objeto…"
              aria-label="Buscar">
       <button class="btn ghost" id="btn-csv">Exportar CSV</button>
@@ -493,6 +516,19 @@ function renderKpis(k) {
   $("kpi-homologado-l").textContent =
     `homologado em ${new Date().getFullYear()}`;
   $("kpi-vigentes").textContent = k.vigentes;
+  const alertas = [];
+  if (k.vencendo_60 > 0)
+    alertas.push(`<button class="chip" id="chip-vencendo">⚠ ${k.vencendo_60}
+      contrato(s)/ata(s) vencem nos próximos 60 dias</button>`);
+  if (k.propostas_abertas > 0)
+    alertas.push(`<button class="chip info" id="chip-propostas">⏱
+      ${k.propostas_abertas} processo(s) com propostas abertas</button>`);
+  $("alertas").innerHTML = alertas.join("");
+  $("alertas").classList.toggle("oculto", alertas.length === 0);
+  $("chip-vencendo")?.addEventListener("click",
+    () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
+  $("chip-propostas")?.addEventListener("click",
+    () => irPara("contratacoes", {propostas: true}));
 }
 
 async function carregarFiltros() {
@@ -516,6 +552,8 @@ function filtrosAtuais() {
            modalidade: $("f-modalidade").value || null,
            situacao: $("f-situacao").value || null,
            orgao: $("f-orgao").value || null,
+           propostas: $("f-propostas").checked || null,
+           vigentes: $("f-vigentes").checked || null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
@@ -614,8 +652,30 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     const soContratacoes = estado.tipo === "contratacoes";
     $("f-modalidade").classList.toggle("oculto", !soContratacoes);
     $("f-situacao").classList.toggle("oculto", !soContratacoes);
+    $("cx-propostas").classList.toggle("oculto", !soContratacoes);
+    $("cx-vigentes").classList.toggle("oculto",
+      !["contratos", "atas"].includes(estado.tipo));
+    $("f-propostas").checked = false;
+    $("f-vigentes").checked = false;
     carregarLista();
   }));
+["f-propostas", "f-vigentes"].forEach(id =>
+  $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
+
+// navegação programática (KPIs e alertas)
+function irPara(tipo, ajustes = {}) {
+  document.querySelector(`nav.abas button[data-tipo="${tipo}"]`).click();
+  if (ajustes.ano !== undefined) $("f-ano").value = ajustes.ano ?? "";
+  if (ajustes.vigentes) $("f-vigentes").checked = true;
+  if (ajustes.propostas) $("f-propostas").checked = true;
+  if (ajustes.ord) { estado.ord = ajustes.ord; estado.dir = ajustes.dir || "asc"; }
+  carregarLista();
+}
+$("kpi-card-contratacoes").addEventListener("click", () => irPara("contratacoes"));
+$("kpi-card-homologado").addEventListener("click",
+  () => irPara("contratacoes", {ano: String(new Date().getFullYear())}));
+$("kpi-card-vigentes").addEventListener("click",
+  () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
 ["f-ano","f-modalidade","f-situacao","f-orgao"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 let buscaTimer;

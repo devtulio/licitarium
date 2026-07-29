@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS contratacoes (
   orgao_cnpj TEXT, orgao_nome TEXT, unidade TEXT,
   modalidade_id INTEGER, modalidade_nome TEXT, situacao TEXT, objeto TEXT,
   valor_estimado REAL, valor_homologado REAL,
+  data_encerramento_proposta TEXT,
   data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS contratos (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
@@ -102,6 +103,13 @@ def abrir_db():
                    " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
                    " ano_ata=json_extract(raw,'$.anoAta')")
         db.commit()
+    colunas_c = {r[1] for r in db.execute("PRAGMA table_info(contratacoes)")}
+    if colunas_c and "data_encerramento_proposta" not in colunas_c:
+        db.execute("ALTER TABLE contratacoes"
+                   " ADD COLUMN data_encerramento_proposta TEXT")
+        db.execute("UPDATE contratacoes SET data_encerramento_proposta="
+                   "json_extract(raw,'$.dataEncerramentoProposta')")
+        db.commit()
     colunas_ct = {r[1] for r in db.execute("PRAGMA table_info(contratos)")}
     if colunas_ct and "numero_contrato" not in colunas_ct:
         db.execute("ALTER TABLE contratos ADD COLUMN numero_contrato TEXT")
@@ -160,8 +168,19 @@ class Api:
         vigentes = db.execute(
             "SELECT COUNT(*) FROM contratos WHERE substr(vigencia_fim,1,10)>=?",
             (hoje,)).fetchone()[0]
+        vencendo_60 = db.execute(
+            "SELECT (SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)"
+            " BETWEEN date('now') AND date('now','+60 day')) +"
+            " (SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)"
+            " BETWEEN date('now') AND date('now','+60 day'))").fetchone()[0]
+        propostas_abertas = db.execute(
+            "SELECT COUNT(*) FROM contratacoes"
+            " WHERE datetime(data_encerramento_proposta) >= datetime('now')"
+        ).fetchone()[0]
         return {"contratacoes": n_contratacoes,
-                "homologado_ano": homologado_ano, "vigentes": vigentes}
+                "homologado_ano": homologado_ano, "vigentes": vigentes,
+                "vencendo_60": vencendo_60,
+                "propostas_abertas": propostas_abertas}
 
     def set_config(self, chave, valor):
         if chave not in ("tema", "largura"):
@@ -270,6 +289,11 @@ class Api:
         if f.get("orgao"):
             where.append("orgao_cnpj=?")
             args.append(f["orgao"])
+        if f.get("vigentes") and tipo in ("contratos", "atas"):
+            where.append("date(vigencia_fim) >= date('now')")
+        if f.get("propostas") and tipo == "contratacoes":
+            where.append(
+                "datetime(data_encerramento_proposta) >= datetime('now')")
         if f.get("busca"):
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",

@@ -128,14 +128,15 @@ def _upsert_contratacao(db, item):
         """INSERT OR REPLACE INTO contratacoes
            (numero_controle, ano, sequencial, orgao_cnpj, orgao_nome, unidade,
             modalidade_id, modalidade_nome, situacao, objeto,
-            valor_estimado, valor_homologado, data_publicacao, data_atualizacao,
-            raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            valor_estimado, valor_homologado, data_encerramento_proposta,
+            data_publicacao, data_atualizacao, raw, sync_em)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (numero, item.get("anoCompra"), item.get("sequencialCompra"),
          orgao.get("cnpj"), orgao.get("razaoSocial"), unidade.get("nomeUnidade"),
          item.get("modalidadeId"), item.get("modalidadeNome"),
          item.get("situacaoCompraNome"), item.get("objetoCompra"),
          item.get("valorTotalEstimado"), item.get("valorTotalHomologado"),
+         item.get("dataEncerramentoProposta"),
          item.get("dataPublicacaoPncp"), item.get("dataAtualizacao"),
          json.dumps(item, ensure_ascii=False), datetime.now().isoformat()))
     return True
