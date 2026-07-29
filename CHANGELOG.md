@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-07-29
+
+- Nova tentativa de arquivamento no Zenodo após reset do vínculo GitHub↔Zenodo
+  (indisponibilidade do serviço travou o arquivamento das v0.1.0/v0.1.1 —
+  afetou também os demais sistemas da família no mesmo período).
+
 ## 0.1.1 — 2026-07-29
 
 - Versão no título do MANUAL.html (nome sugerido do PDF na impressão) e no
