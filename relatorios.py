@@ -27,7 +27,13 @@ ESTANDARTE = """<svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="tru
 TITULOS = {"contratacoes": "Relação de Contratações",
            "contratos": "Relação de Contratos",
            "atas": "Relação de Atas de Registro de Preços",
-           "executivo": "Resumo Executivo de Contratações"}
+           "executivo": "Resumo Executivo de Contratações",
+           "fracionamento": "Alerta de Fracionamento — Dispensas × Limites"}
+
+# Valores do art. 75, I e II, da Lei 14.133/2021 conforme Decreto de
+# atualização — parametrizáveis nas configurações (confira o decreto vigente)
+LIMITE_PADRAO_OBRAS = 125279.84
+LIMITE_PADRAO_COMPRAS = 62639.92
 
 
 def _e(v):
@@ -173,6 +179,37 @@ def dados_executivo(db, ano, orgao=None):
             "meses": meses, "fornecedores": fornecedores, "vencendo": vencendo}
 
 
+def dados_fracionamento(db, ano, orgao=None, limites=None):
+    """Dispensas do exercício somadas por unidade, contra os limites do art. 75.
+
+    O agrupamento legal correto é por "objeto de mesma natureza" — juízo do
+    gestor; aqui a soma por unidade é um termômetro de autocontrole.
+    """
+    ano = int(ano)
+    limites = limites or {}
+    limite_compras = float(limites.get("compras") or LIMITE_PADRAO_COMPRAS)
+    limite_obras = float(limites.get("obras") or LIMITE_PADRAO_OBRAS)
+    og = " AND orgao_cnpj=?" if orgao else ""
+    og_args = [orgao] if orgao else []
+    unidades = [dict(r) for r in db.execute(
+        f"""SELECT COALESCE(unidade,'(sem unidade)') unidade, COUNT(*) n,
+                   SUM(COALESCE(valor_homologado, valor_estimado, 0)) total
+            FROM contratacoes WHERE ano=? AND modalidade_id=8{og}
+            GROUP BY 1 ORDER BY total DESC""", [ano] + og_args)]
+    for u in unidades:
+        u["pct"] = u["total"] / limite_compras * 100 if limite_compras else 0
+    dispensas = [dict(r) for r in db.execute(
+        f"""SELECT sequencial, ano, unidade, objeto,
+                   COALESCE(valor_homologado, valor_estimado) valor,
+                   data_publicacao
+            FROM contratacoes WHERE ano=? AND modalidade_id=8{og}
+            ORDER BY unidade, data_publicacao""", [ano] + og_args)]
+    return {"ano": ano, "unidades": unidades, "dispensas": dispensas,
+            "limite_compras": limite_compras, "limite_obras": limite_obras,
+            "total": sum(d["valor"] or 0 for d in dispensas),
+            "n": len(dispensas)}
+
+
 # ── render ──────────────────────────────────────────────────────────────────
 
 def _css(paisagem):
@@ -218,6 +255,10 @@ def _css(paisagem):
               color:#6f5b3e; margin-top:2px; }}
   .barra {{ background:#b08d3e; height:10px; display:inline-block;
             vertical-align:middle; border-radius:2px; }}
+  .caixa-aviso {{ background:#fbf7ee; border:1px solid #d9cbaa;
+                  border-left:4px solid #8b2e2e; border-radius:3px;
+                  padding:10px 14px; font-size:11.5px; margin-bottom:12px;
+                  break-inside:avoid; }}
   footer {{ margin-top:22px; padding-top:10px; border-top:3px double #b08d3e;
             font-size:10.5px; color:#6f5b3e; display:flex;
             justify-content:space-between; }}
@@ -315,6 +356,49 @@ def render_atas(d, municipio, uf, periodo_txt):
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True)
 
 
+def render_fracionamento(d, municipio, uf):
+    def farol(pct):
+        if pct >= 100:
+            return '<span style="color:#8b2e2e;font-weight:600">ACIMA DO LIMITE</span>'
+        if pct >= 75:
+            return '<span style="color:#8a6d1f;font-weight:600">Atenção</span>'
+        return "ok"
+    unid = "".join(f"""<tr><td>{_e(u['unidade'])}</td>
+      <td class="num">{u['n']}</td>
+      <td class="num">{moeda(u['total'])}</td>
+      <td class="num">{u['pct']:.0f}%</td>
+      <td class="ctr">{farol(u['pct'])}</td></tr>""" for u in d["unidades"])
+    disp = "".join(f"""<tr><td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
+      <td class="ctr">{_e(l['unidade'])}</td>
+      <td class="obj">{_e(l['objeto'])}</td>
+      <td class="num">{moeda(l['valor'])}</td>
+      <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
+      for l in d["dispensas"])
+    corpo = f"""<div class="caixa-aviso">Instrumento de <b>autocontrole
+interno</b>. A soma por unidade é um termômetro: o enquadramento legal do
+fracionamento considera despesas de <b>mesma natureza</b> (art. 75, §1º, Lei
+14.133/2021), avaliação que cabe ao gestor. Limites parametrizados nas
+configurações — confira o decreto de atualização vigente.
+Limite adotado para compras/serviços: <b>{moeda(d['limite_compras'])}</b> ·
+obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
+<div class="cards">
+<div class="card"><div class="n">{d['n']}</div><div class="l">dispensas no exercício</div></div>
+<div class="card"><div class="n">{moeda(d['total'])}</div><div class="l">total em dispensas</div></div>
+</div>
+<h2>Soma de dispensas por unidade × limite de compras/serviços</h2>
+<table><thead><tr><th>Unidade</th><th class="num">Dispensas</th>
+<th class="num">Total</th><th class="num">% do limite</th>
+<th class="ctr">Situação</th></tr></thead>
+<tbody>{unid or '<tr><td colspan="5">Nenhuma dispensa no exercício.</td></tr>'}</tbody></table>
+<h2>Dispensas do exercício (para agrupamento por natureza pelo gestor)</h2>
+<table><thead><tr><th class="ctr">Processo</th><th class="ctr">Unidade</th>
+<th>Objeto</th><th class="num">Valor</th><th class="num">Publicação</th></tr></thead>
+<tbody>{disp or '<tr><td colspan="5">Nenhuma dispensa no exercício.</td></tr>'}</tbody></table>"""
+    titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
+    return _pagina(titulo, corpo, municipio, uf,
+                   f"Exercício {d['ano']} · uso interno", paisagem=False)
+
+
 MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
               "jul", "ago", "set", "out", "nov", "dez"]
 
@@ -392,6 +476,13 @@ def gerar(db, tipo, params, municipio, uf, destino):
         conteudo = render_executivo(d, municipio, uf)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
+    elif tipo == "fracionamento":
+        if not ano:
+            ano = date.today().year
+        d = dados_fracionamento(db, ano, orgao, params.get("limites"))
+        conteudo = render_fracionamento(d, municipio, uf)
+        nome = f"alerta_fracionamento_{ano}"
+        linhas_csv = d["dispensas"]
     else:
         periodo_txt = ("Vigentes em " + date.today().strftime("%d/%m/%Y")) \
             if vigentes else (f"Exercício {ano}" if ano else "Todo o período")

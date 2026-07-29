@@ -152,6 +152,12 @@ class Api:
                     "ibge": cfg.get("municipio_ibge"),
                     "tema": cfg.get("tema", "portal"),
                     "largura": cfg.get("largura", "compacta"),
+                    "limite_dispensa_compras":
+                        cfg.get("limite_dispensa_compras",
+                                str(relatorios.LIMITE_PADRAO_COMPRAS)),
+                    "limite_dispensa_obras":
+                        cfg.get("limite_dispensa_obras",
+                                str(relatorios.LIMITE_PADRAO_OBRAS)),
                     "last_sync": cfg.get("last_sync_contratacoes"),
                     "kpis": self._kpis(db)}
         finally:
@@ -183,7 +189,8 @@ class Api:
                 "propostas_abertas": propostas_abertas}
 
     def set_config(self, chave, valor):
-        if chave not in ("tema", "largura"):
+        if chave not in ("tema", "largura", "limite_dispensa_compras",
+                         "limite_dispensa_obras"):
             return False
         db = abrir_db()
         try:
@@ -460,6 +467,11 @@ class Api:
                     (params["orgao"],)).fetchone()
                 if linha:
                     params["orgao_nome"] = linha[0]
+            if tipo == "fracionamento":
+                params = params or {}
+                params["limites"] = {
+                    "compras": pncp._config(db, "limite_dispensa_compras"),
+                    "obras": pncp._config(db, "limite_dispensa_obras")}
             resultado = relatorios.gerar(db, tipo, params, municipio, uf,
                                          DIR_DADOS / "relatorios")
         except ValueError as e:

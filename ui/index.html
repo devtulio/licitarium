@@ -305,6 +305,7 @@
         <option value="contratos">Relação de Contratos</option>
         <option value="atas">Relação de Atas de Registro de Preços</option>
         <option value="executivo">Resumo Executivo Anual</option>
+        <option value="fracionamento">Alerta de Fracionamento (uso interno)</option>
       </select>
       <label for="rel-ano">Período</label>
       <select id="rel-ano" style="width:100%"></select>
@@ -368,6 +369,21 @@
         <input type="text" id="novo-nome" placeholder="Nome do órgão">
         <button class="btn ghost" id="btn-add-orgao">+ Adicionar</button>
       </div>
+    </div>
+    <div class="card cfg">
+      <h2>Limites de dispensa — art. 75, Lei 14.133</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <div style="flex:1; min-width:180px">
+          <label for="cfg-lim-compras">Compras e serviços (inciso II)</label>
+          <input type="number" step="0.01" id="cfg-lim-compras" style="width:100%">
+        </div>
+        <div style="flex:1; min-width:180px">
+          <label for="cfg-lim-obras">Obras/eng. (inciso I)</label>
+          <input type="number" step="0.01" id="cfg-lim-obras" style="width:100%">
+        </div>
+      </div>
+      <div class="aviso">Usados no Alerta de Fracionamento. Atualizados por
+        decreto federal — confira o valor vigente.</div>
     </div>
     <div class="card cfg">
       <h2>Sincronizações recentes</h2>
@@ -731,12 +747,13 @@ async function montarOpcoesRelatorio() {
   const f = await api.filtros_disponiveis();
   const sel = $("rel-ano");
   sel.length = 0;
-  if (tipo !== "executivo") {
+  const soExercicio = ["executivo", "fracionamento"].includes(tipo);
+  if (!soExercicio) {
     if (tipo !== "contratacoes") sel.add(new Option("Vigentes hoje", "vigentes"));
     sel.add(new Option("Todo o período", "todos"));
   }
   f.anos.forEach(a => sel.add(new Option(`Exercício ${a}`, `ano:${a}`)));
-  if (tipo === "executivo" && !f.anos.length)
+  if (soExercicio && !f.anos.length)
     sel.add(new Option(`Exercício ${new Date().getFullYear()}`,
                        `ano:${new Date().getFullYear()}`));
   const modCaixa = $("rel-mod-caixa");
@@ -787,6 +804,8 @@ $("btn-config").addEventListener("click", async () => {
   $("cfg-orgaos").querySelectorAll("input[data-cnpj]").forEach(c =>
     c.addEventListener("change", () =>
       api.set_orgao_ativo(c.dataset.cnpj, c.checked)));
+  $("cfg-lim-compras").value = e.limite_dispensa_compras;
+  $("cfg-lim-obras").value = e.limite_dispensa_obras;
   const log = await api.ultimo_log();
   $("cfg-log").innerHTML = log.map(l =>
     `<div class="logline">${esc(l.iniciado_em?.slice(0,16).replace("T"," "))} ·
@@ -795,6 +814,10 @@ $("btn-config").addEventListener("click", async () => {
     .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
   $("veu-config").classList.remove("oculto");
 });
+$("cfg-lim-compras").addEventListener("change", () =>
+  api.set_config("limite_dispensa_compras", $("cfg-lim-compras").value));
+$("cfg-lim-obras").addEventListener("change", () =>
+  api.set_config("limite_dispensa_obras", $("cfg-lim-obras").value));
 $("btn-trocar").addEventListener("click", () => {
   $("veu-config").classList.add("oculto");
   iniciarWizard();

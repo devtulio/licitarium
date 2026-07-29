@@ -102,6 +102,21 @@ def test_filtro_orgao_nos_relatorios(db, tmp_path):
     assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_fracionamento(db, tmp_path):
+    db.execute("UPDATE contratacoes SET modalidade_id=8, unidade='Sec. Adm'"
+               " WHERE ano=2026")
+    db.commit()
+    d = relatorios.dados_fracionamento(db, 2026, limites={"compras": 100})
+    # A: homologado 80; B: sem homologado, cai no estimado 200 -> total 280
+    assert d["n"] == 2 and d["total"] == 280.0
+    assert d["unidades"][0]["pct"] == 280.0
+    r = relatorios.gerar(db, "fracionamento", {"ano": 2026},
+                         "Testópolis", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Alerta de Fracionamento" in html and "autocontrole" in html
+    assert r["csv"] and Path(r["csv"]).exists()
+
+
 def test_tipo_desconhecido(db, tmp_path):
     with pytest.raises(ValueError):
         relatorios.gerar(db, "xxx", {}, "T", "SP", tmp_path)
