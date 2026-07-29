@@ -149,13 +149,16 @@ def _upsert_contrato(db, item):
     db.execute(
         """INSERT OR REPLACE INTO contratos
            (numero_controle, contratacao_controle, orgao_cnpj,
+            numero_contrato, ano_contrato, sequencial_contrato,
             fornecedor_ni, fornecedor_nome, objeto, valor_global,
             vigencia_inicio, vigencia_fim, data_publicacao, data_atualizacao,
             raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (numero,
          _primeiro(item, "numeroControlePncpCompra", "numeroControlePNCPCompra"),
          orgao.get("cnpj"),
+         item.get("numeroContratoEmpenho"), item.get("anoContrato"),
+         item.get("sequencialContrato"),
          item.get("niFornecedor"), item.get("nomeRazaoSocialFornecedor"),
          item.get("objetoContrato"), item.get("valorGlobal"),
          _primeiro(item, "dataVigenciaInicio", "vigenciaInicio"),

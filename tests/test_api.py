@@ -93,10 +93,26 @@ def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):
                 (json.dumps({"numeroAtaRegistroPreco": "13", "anoAta": 2026}),))
     con.commit()
     con.close()
+    con = sq.connect(tmp_path / "m.db")
+    con.execute("CREATE TABLE contratos (numero_controle TEXT PRIMARY KEY,"
+                " contratacao_controle TEXT, orgao_cnpj TEXT,"
+                " fornecedor_ni TEXT, fornecedor_nome TEXT, objeto TEXT,"
+                " valor_global REAL, vigencia_inicio TEXT, vigencia_fim TEXT,"
+                " data_publicacao TEXT, data_atualizacao TEXT, raw TEXT,"
+                " sync_em TEXT)")
+    con.execute("INSERT INTO contratos (numero_controle, raw) VALUES ('Y', ?)",
+                (json.dumps({"numeroContratoEmpenho": "0033/26",
+                             "anoContrato": 2026, "sequencialContrato": 35}),))
+    con.commit()
+    con.close()
     db = licitarium.abrir_db()
     r = db.execute("SELECT numero_ata, ano_ata FROM atas").fetchone()
+    c = db.execute("SELECT numero_contrato, ano_contrato, sequencial_contrato"
+                   " FROM contratos").fetchone()
     db.close()
     assert (r["numero_ata"], r["ano_ata"]) == ("13", 2026)
+    assert (c["numero_contrato"], c["ano_contrato"],
+            c["sequencial_contrato"]) == ("0033/26", 2026, 35)
 
 
 def test_filtro_por_orgao(api):

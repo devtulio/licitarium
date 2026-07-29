@@ -95,6 +95,7 @@ def dados_contratos(db, ano=None, vigentes=False, orgao=None):
     linhas = [dict(r) for r in db.execute(
         f"""SELECT numero_controle,
                    json_extract(raw, '$.numeroContratoEmpenho') numero,
+                   json_extract(raw, '$.anoContrato') ano_contrato,
                    fornecedor_ni, fornecedor_nome, objeto, valor_global,
                    vigencia_inicio, vigencia_fim, data_publicacao
             FROM contratos{sql_where}
@@ -276,7 +277,8 @@ def render_contratacoes(d, municipio, uf, periodo_txt):
 
 def render_contratos(d, municipio, uf, periodo_txt):
     linhas = "".join(f"""<tr>
-      <td class="ctr">{_e(l['numero'] or l['numero_controle'])}</td>
+      <td class="ctr">{(_e(l['numero']) + "/" + _e(l['ano_contrato']))
+                       if l['numero'] else _e(l['numero_controle'])}</td>
       <td class="ctr">{_e(l['fornecedor_nome'])}<br>
           <small>{_e(l['fornecedor_ni'])}</small></td>
       <td class="obj">{_e(l['objeto'])}</td>

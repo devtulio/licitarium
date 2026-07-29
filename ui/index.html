@@ -107,7 +107,7 @@
          color:var(--muted); cursor:default; background:var(--surface2); }
   .cab:hover { background:var(--surface2); }
   .g-contratacoes { grid-template-columns:80px 135px 1fr 120px 120px; }
-  .g-contratos    { grid-template-columns:150px 1fr 160px 110px; }
+  .g-contratos    { grid-template-columns:110px 1fr 160px 110px; }
   .g-atas         { grid-template-columns:90px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
   .cab span[data-ord] { cursor:pointer; user-select:none; }
@@ -124,7 +124,7 @@
   .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
   .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(3),
   .g-pca > :nth-child(1), .g-pca > :nth-child(3) { text-align:center; }
-  .linha .obj { text-align:justify; hyphens:auto; }
+  .linha .obj { display:block; text-align:justify; hyphens:auto; }
   .vazio { padding:34px; text-align:center; color:var(--muted); font-size:13px; }
 
   .rodape { display:flex; justify-content:space-between; align-items:center;
@@ -525,7 +525,7 @@ const COLUNAS = {
   contratacoes: [["Número","numero"], ["Modalidade","modalidade"],
                  ["Objeto","objeto"], ["Valor","valor"],
                  ["Situação","situacao"]],
-  contratos:    [["Número","numero"], ["Objeto / Fornecedor","objeto"],
+  contratos:    [["Contrato","numero"], ["Objeto / Fornecedor","objeto"],
                  ["Vigência","vigencia"], ["Valor","valor"]],
   atas:         [["Ata","numero"], ["Contratação de origem","origem"],
                  ["Vigência","vigencia"]],
@@ -549,7 +549,8 @@ function renderLinha(tipo, d) {
       <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
       <span style="justify-self:center">${badgeSituacao(d.situacao)}</span>`;
   if (tipo === "contratos")
-    return `<span class="dim">${esc(d.numero_controle)}</span>
+    return `<span class="dim">${esc(d.numero_contrato
+        ? `${d.numero_contrato}/${d.ano_contrato ?? ""}` : d.numero_controle)}</span>
       <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
       <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
@@ -630,6 +631,7 @@ $("pag-prox").addEventListener("click", () => {
 // ── detalhe ───────────────────────────────────────────────────────────────
 const ROTULOS = {
   numero_ata:"Ata nº", ano_ata:"Ano da ata",
+  numero_contrato:"Contrato nº", ano_contrato:"Ano do contrato",
   numero_item:"Item nº", categoria:"Categoria", grupo:"Grupo de contratação",
   quantidade:"Quantidade estimada", valor_total:"Valor total",
   id_pca:"Plano (id PNCP)", ano:"Ano",

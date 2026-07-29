@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS contratacoes (
   data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS contratos (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
+  numero_contrato TEXT, ano_contrato INTEGER, sequencial_contrato INTEGER,
   fornecedor_ni TEXT, fornecedor_nome TEXT, objeto TEXT, valor_global REAL,
   vigencia_inicio TEXT, vigencia_fim TEXT,
   data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
@@ -68,7 +69,9 @@ ORDENAVEIS = {
                      "modalidade": "modalidade_nome", "objeto": "objeto",
                      "valor": "COALESCE(valor_homologado, valor_estimado)",
                      "situacao": "situacao"},
-    "contratos": {"numero": "numero_controle", "objeto": "objeto",
+    "contratos": {"numero":
+                  "(COALESCE(ano_contrato,0)*100000+COALESCE(sequencial_contrato,0))",
+                  "objeto": "objeto",
                   "vigencia": "vigencia_fim", "valor": "valor_global"},
     "atas": {"numero":
              "(COALESCE(ano_ata,0)*100000+CAST(COALESCE(numero_ata,'0') AS INTEGER))",
@@ -89,8 +92,8 @@ def abrir_db():
     DIR_DADOS.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(ARQUIVO_DB)
     db.row_factory = sqlite3.Row
-    # migração: atas ganharam numero_ata/ano_ata como colunas (0.2.x);
-    # bancos antigos são reprojetados a partir do raw (fonte da verdade)
+    # migrações: atas e contratos ganharam o número humano como colunas
+    # (0.2.x); bancos antigos são reprojetados do raw (fonte da verdade)
     colunas_atas = {r[1] for r in db.execute("PRAGMA table_info(atas)")}
     if colunas_atas and "numero_ata" not in colunas_atas:
         db.execute("ALTER TABLE atas ADD COLUMN numero_ata TEXT")
@@ -98,6 +101,16 @@ def abrir_db():
         db.execute("UPDATE atas SET"
                    " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
                    " ano_ata=json_extract(raw,'$.anoAta')")
+        db.commit()
+    colunas_ct = {r[1] for r in db.execute("PRAGMA table_info(contratos)")}
+    if colunas_ct and "numero_contrato" not in colunas_ct:
+        db.execute("ALTER TABLE contratos ADD COLUMN numero_contrato TEXT")
+        db.execute("ALTER TABLE contratos ADD COLUMN ano_contrato INTEGER")
+        db.execute("ALTER TABLE contratos ADD COLUMN sequencial_contrato INTEGER")
+        db.execute("UPDATE contratos SET"
+                   " numero_contrato=json_extract(raw,'$.numeroContratoEmpenho'),"
+                   " ano_contrato=json_extract(raw,'$.anoContrato'),"
+                   " sequencial_contrato=json_extract(raw,'$.sequencialContrato')")
         db.commit()
     # WAL + busy_timeout: a thread de sync grava enquanto a ponte JS lê/grava
     # config — sem isso, "database is locked" na primeira concorrência
@@ -260,7 +273,7 @@ class Api:
         if f.get("busca"):
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",
-                                    "numero_controle"],
+                                    "numero_controle", "numero_contrato"],
                       "atas": ["numero_controle", "numero_ata"],
                       "pca": ["descricao", "grupo"]}[tipo]
             where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
