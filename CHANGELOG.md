@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 — 2026-07-29
+
+- **PCA corrigido**: o endpoint rejeita datas anteriores a 01/04/2021 (422) e
+  responde 200 com corpo vazio quando não há dados — os dois casos derrubavam
+  a sincronização. PCAs da Câmara de Orindiúva (2025/2026) agora sincronizam.
+- **Relatórios seguem o tema** do app (Portal/Pergaminho/Observatório); a
+  impressão usa sempre a paleta clara, seja qual for o tema.
+- **Atas com coluna de objeto** (reprojetada do raw com migração automática),
+  ordenável e coberta pela busca.
+- **Número do contrato normalizado** para numero/ano (0033/26 → 33/2026) na
+  lista, no detalhe e na relação.
+- **Tamanho da fonte** nas configurações (Pequena a Extra grande).
+- **Máscara de dinheiro** nos limites de dispensa.
+- **JSON do detalhe formatado e colorido** conforme o tema; objeto do detalhe
+  justificado.
+
 ## 0.4.0 — 2026-07-29
 
 - **Alerta de Fracionamento** (relatório de uso interno): dispensas somadas
