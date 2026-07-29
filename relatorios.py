@@ -193,13 +193,15 @@ def _css(paisagem):
   /* colunas curtas (valores, datas, qtde): centro nos dois eixos */
   td.num, th.num {{ text-align:center; font-variant-numeric:tabular-nums;
                     white-space:nowrap; }}
+  /* centro com quebra de linha permitida (textos curtos não-numéricos) */
+  td.ctr, th.ctr {{ text-align:center; }}
   tfoot td {{ background:#efe6d2; font-weight:600; }}
   .obj {{ text-transform:uppercase; text-align:justify; hyphens:auto; }}
-  .cards {{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px;
-            margin-bottom:6px; }}
+  .cards {{ display:flex; gap:10px; margin-bottom:6px; }}
   .card {{ background:#fbf7ee; border:1px solid #d9cbaa; border-radius:3px;
-           padding:10px 12px; break-inside:avoid; }}
-  .card .n {{ font-family:Georgia,serif; font-size:19px; color:#8b2e2e; }}
+           padding:10px 12px; break-inside:avoid; flex:1 1 auto; }}
+  .card .n {{ font-family:Georgia,serif; font-size:17px; color:#8b2e2e;
+              white-space:nowrap; }}
   .card .l {{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase;
               color:#6f5b3e; margin-top:2px; }}
   .barra {{ background:#b08d3e; height:10px; display:inline-block;
@@ -320,7 +322,7 @@ def render_executivo(d, municipio, uf):
       <td class="num">{moeda(m['homologado'])}</td></tr>"""
       for m in d["modalidades"])
     maior = max((v["valor"] for v in d["meses"].values()), default=0) or 1
-    meses = "".join(f"""<tr><td>{MESES_NOME[i-1]}</td>
+    meses = "".join(f"""<tr><td class="ctr">{MESES_NOME[i-1]}</td>
       <td class="num">{d['meses'].get(f'{i:02d}', {}).get('n', 0)}</td>
       <td class="num">{moeda(d['meses'].get(f'{i:02d}', {}).get('valor')) if f'{i:02d}' in d['meses'] else '–'}</td>
       <td><span class="barra" style="width:{round(d['meses'].get(f'{i:02d}', {}).get('valor', 0) / maior * 220)}px"></span></td></tr>"""
@@ -329,7 +331,8 @@ def render_executivo(d, municipio, uf):
       <small>{_e(f['fornecedor_ni'])}</small></td>
       <td class="num">{f['n']}</td><td class="num">{moeda(f['total'])}</td></tr>"""
       for f in d["fornecedores"])
-    venc = "".join(f"""<tr><td>{_e(v['tipo'])}</td><td>{_e(v['nome'])}</td>
+    venc = "".join(f"""<tr><td class="ctr">{_e(v['tipo'])}</td>
+      <td class="ctr">{_e(v['nome'])}</td>
       <td class="obj">{_e(v['objeto'])}</td>
       <td class="num">{data_br(v['vigencia_fim'])}</td>
       <td class="num">{v['dias']} dias</td></tr>"""
@@ -340,14 +343,14 @@ def render_executivo(d, municipio, uf):
 <th class="num">Estimado</th><th class="num">Homologado</th></tr></thead>
 <tbody>{mod or '<tr><td colspan="4">Sem dados.</td></tr>'}</tbody></table>
 <h2>Evolução mensal (valor homologado/estimado publicado)</h2>
-<table><thead><tr><th>Mês</th><th class="num">Processos</th>
+<table><thead><tr><th class="ctr">Mês</th><th class="num">Processos</th>
 <th class="num">Valor</th><th></th></tr></thead><tbody>{meses}</tbody></table>
 <h2>Maiores fornecedores contratados no ano</h2>
 <table><thead><tr><th>Fornecedor</th><th class="num">Contratos</th>
 <th class="num">Valor</th></tr></thead>
 <tbody>{forn or '<tr><td colspan="3">Sem contratos no ano.</td></tr>'}</tbody></table>
 <h2>Vigências a vencer nos próximos 90 dias</h2>
-<table><thead><tr><th>Tipo</th><th>Contrato/Ata</th><th>Objeto</th>
+<table><thead><tr><th class="ctr">Tipo</th><th class="ctr">Contrato/Ata</th><th>Objeto</th>
 <th class="num">Fim</th><th class="num">Prazo</th></tr></thead>
 <tbody>{venc or '<tr><td colspan="5">Nada vence nos próximos 90 dias.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['executivo']} {d['ano']} — {municipio}"
