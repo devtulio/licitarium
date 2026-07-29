@@ -19,6 +19,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: testes
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,7 +28,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pyinstaller
       - run: pyinstaller --clean Licitarium.spec
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Licitarium
-          path: dist/Licitarium.exe
+      - name: Anexar exe à release
+        run: gh release upload ${{ github.ref_name }} dist/Licitarium.exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
