@@ -185,14 +185,16 @@ def _css(paisagem):
         color:#8b2e2e; margin:20px 0 8px; break-after:avoid; }}
   table {{ border-collapse:collapse; width:100%; font-size:11.5px; }}
   th, td {{ border:1px solid #d9cbaa; padding:5px 8px; text-align:left;
-            vertical-align:top; }}
+            vertical-align:middle; }}
   th {{ background:#efe6d2; font-size:10px; letter-spacing:.05em;
         text-transform:uppercase; }}
   tr {{ break-inside:avoid; }}
-  td.num, th.num {{ text-align:right; font-variant-numeric:tabular-nums;
+  tbody tr:nth-child(even) td {{ background:#faf6ec; }}
+  /* colunas curtas (valores, datas, qtde): centro nos dois eixos */
+  td.num, th.num {{ text-align:center; font-variant-numeric:tabular-nums;
                     white-space:nowrap; }}
   tfoot td {{ background:#efe6d2; font-weight:600; }}
-  .obj {{ text-transform:uppercase; }}
+  .obj {{ text-transform:uppercase; text-align:justify; hyphens:auto; }}
   .cards {{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px;
             margin-bottom:6px; }}
   .card {{ background:#fbf7ee; border:1px solid #d9cbaa; border-radius:3px;
