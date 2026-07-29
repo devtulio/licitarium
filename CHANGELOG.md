@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-07-29
+
+- **Relatórios** (botão próprio): Relação de Contratações (TCE, com amparo
+  legal e deságio), Relação de Contratos, Relação de Atas e Resumo Executivo
+  Anual — HTML timbrado imprimível (nome do PDF correto) + CSV nas relações.
+- **Filtro por órgão** na listagem (4 abas) e nos relatórios — prefeitura,
+  câmara e demais órgãos separáveis; nome do órgão no cabeçalho e no nome do
+  arquivo dos relatórios filtrados.
+- **Números humanos**: contratações (nº/ano em coluna própria), contratos
+  (0033/26/2026) e atas (13/2026) exibem o número do instrumento em vez do id
+  longo do PNCP, com ordenação cronológica real; migração automática reprojeta
+  bancos existentes a partir do raw.
+- **Tratamento estético** nas listas e relatórios: colunas curtas
+  centralizadas nos dois eixos, objeto justificado com hifenização, zebra
+  sutil, dígitos tabulares.
+- **Largura da página** (Compacta/Expandida) nas configurações, como no SGCD.
+- Link "Ver no PNCP" das atas abre a página da própria ata (antes era
+  genérico); busca ampliada (fornecedor e números de instrumento).
+
 ## 0.2.0 — 2026-07-29
 
 - **PCA**: 4ª aba com os itens do Plano de Contratações Anual por órgão

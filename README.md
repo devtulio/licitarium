@@ -21,8 +21,11 @@ guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
   automaticamente a partir das contratações; você pode adicionar outros por CNPJ.
 - Tudo fica num banco SQLite local. Nenhum dado seu é enviado a lugar algum —
   o Licitarium apenas **lê** dados públicos.
-- Busca, filtros por ano/modalidade/situação, detalhe completo de cada registro,
-  link para a página oficial no PNCP e exportação CSV.
+- Busca, filtros por ano/modalidade/situação/órgão, detalhe completo de cada
+  registro, link para a página oficial no PNCP e exportação CSV.
+- **Relatórios timbrados** prontos para o Tribunal de Contas: relações de
+  contratações (com amparo legal e deságio), contratos e atas, além de um
+  resumo executivo anual com indicadores e vigências a vencer.
 - Três temas: Portal (padrão), Pergaminho e Observatório.
 
 ## Instalação
