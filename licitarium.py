@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.3.0
+Versão 0.4.0
 """
 import csv
 import json
@@ -20,7 +20,7 @@ import webview
 import pncp
 import relatorios
 
-VERSAO = "0.3.0"
+VERSAO = "0.4.0"
 DIR_APP = Path(__file__).resolve().parent
 DIR_DADOS = Path.home() / "AppData" / "Local" / "Licitarium"
 ARQUIVO_DB = DIR_DADOS / "licitarium.db"

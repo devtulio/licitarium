@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual do Licitarium v0.3.0</title>
+<title>Manual do Licitarium v0.4.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Manual do Licitarium v0.3.0"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Manual do Licitarium v0.4.0"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -70,7 +70,7 @@
           fill="#2b2115" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.3.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.4.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -113,9 +113,14 @@ por qualquer pessoa.</div>
 </ol>
 
 <h2>4. A tela principal</h2>
-<h3>Indicadores</h3>
+<h3>Indicadores e alertas</h3>
 <p>Três painéis no topo resumem o acervo: total de contratações, valor
-homologado no ano corrente e contratos vigentes hoje.</p>
+homologado no ano corrente e contratos vigentes hoje — <b>clique em qualquer
+um</b> para abrir a lista correspondente. Abaixo deles aparecem alertas quando
+houver: contratos/atas <b>vencendo nos próximos 60 dias</b> e processos com
+<b>propostas abertas</b> (também clicáveis).</p>
+<p>Filtros extras: <b>Propostas abertas</b> (contratações com prazo de
+proposta correndo) e <b>Vigentes</b> (contratos e atas).</p>
 <h3>Abas e filtros</h3>
 <table>
   <tr><th>Aba</th><th>Conteúdo</th></tr>
@@ -149,8 +154,10 @@ processo no seu navegador.</p>
 <p>O histórico das sincronizações (com eventuais erros) fica em
 <b>Configurações → Sincronizações recentes</b>.</p>
 <p><b>Atualização do programa:</b> ao abrir, o Licitarium confere se há versão
-nova publicada e, se houver, mostra um aviso no rodapé com link para o
-download. A checagem falha em silêncio sem internet — nunca atrapalha o uso.</p>
+nova publicada. Usando o executável, o aviso no rodapé <b>baixa e instala
+sozinho</b> (o programa fecha e reabre já atualizado); rodando pelo
+código-fonte, o aviso leva à página da release. A checagem falha em silêncio
+sem internet — nunca atrapalha o uso.</p>
 
 <h2>6. Configurações</h2>
 <h3>Aparência</h3>
@@ -164,6 +171,9 @@ Compacta (margens laterais confortáveis) ou Expandida (aproveita toda a tela
 órgão ainda não publicou nenhuma contratação, adicione-o manualmente pelo CNPJ
 para que seus contratos e atas também sejam baixados. Desmarcar um órgão
 suspende a busca de novos dados dele.</p>
+<h3>Limites de dispensa</h3>
+<p>Os valores do art. 75, I e II, usados pelo Alerta de Fracionamento. São
+atualizados por decreto federal — confira e ajuste o valor vigente.</p>
 <h3>Trocar de município</h3>
 <p>Disponível nas Configurações. A troca <b>reinicia o acervo</b> — os dados do
 município anterior são apagados e o histórico do novo é baixado do zero (os
@@ -190,6 +200,11 @@ de Contas e para prestação de contas interna:</p>
   <tr><td>Resumo Executivo Anual</td><td>Indicadores do exercício, quadro por
     modalidade, evolução mensal, maiores fornecedores e vigências a vencer em
     90 dias</td></tr>
+  <tr><td>Alerta de Fracionamento</td><td><b>Uso interno</b>: soma das
+    dispensas por unidade comparada aos limites do art. 75 (parametrizáveis
+    nas configurações), com farol de atenção e a lista completa para o gestor
+    avaliar o agrupamento por natureza — o enquadramento legal é sempre
+    avaliação do gestor</td></tr>
 </table>
 <p>O relatório abre no navegador (🖨 para imprimir; o nome do PDF já vem
 correto). As relações geram também um <b>CSV</b> na mesma pasta

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 — 2026-07-29
+
+- **Alerta de Fracionamento** (relatório de uso interno): dispensas somadas
+  por unidade × limites do art. 75, parametrizáveis nas configurações, com
+  farol de atenção e lista completa para avaliação do gestor.
+- **KPIs clicáveis e alertas na home**: cards navegam para as listas; chips
+  de contratos/atas vencendo em 60 dias e de processos com propostas abertas.
+- **Filtros novos**: "Propostas abertas" (contratações) e "Vigentes"
+  (contratos/atas).
+- **Atualização automática**: rodando pelo executável, o aviso de versão nova
+  baixa, instala e reabre o programa sozinho.
+- **Acessibilidade**: auditoria de contraste (21/21 pares AA nos 3 temas) e
+  nomes acessíveis nos diálogos.
+- **Qualidade**: suíte E2E (Playwright) com a ponte mockada no CI;
+  screenshots dos 3 temas no README.
+
 ## 0.3.0 — 2026-07-29
 
 - **Relatórios** (botão próprio): Relação de Contratações (TCE, com amparo
