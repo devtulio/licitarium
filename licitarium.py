@@ -130,6 +130,7 @@ class Api:
                     "uf": cfg.get("municipio_uf"),
                     "ibge": cfg.get("municipio_ibge"),
                     "tema": cfg.get("tema", "portal"),
+                    "largura": cfg.get("largura", "compacta"),
                     "last_sync": cfg.get("last_sync_contratacoes"),
                     "kpis": self._kpis(db)}
         finally:
@@ -150,7 +151,7 @@ class Api:
                 "homologado_ano": homologado_ano, "vigentes": vigentes}
 
     def set_config(self, chave, valor):
-        if chave not in ("tema",):
+        if chave not in ("tema", "largura"):
             return False
         db = abrir_db()
         try:

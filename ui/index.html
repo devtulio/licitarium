@@ -76,6 +76,7 @@
   header .mark small { display:block; font-family:var(--font-ui); font-size:10.5px;
     letter-spacing:.05em; color:var(--muted); margin-top:2px; }
   main { max-width:1000px; margin:0 auto; padding:18px 22px 30px; }
+  [data-largura="expandida"] main { max-width:none; }
 
   .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
   .kpi { padding:13px 16px; }
@@ -322,6 +323,11 @@
         <button class="tcard" data-tema="observatorio">
           <div class="sw" style="background:linear-gradient(135deg,#10151c 60%,#f0a836 60%)"></div>Observatório</button>
       </div>
+      <label for="cfg-largura">Largura da página</label>
+      <select id="cfg-largura" style="width:100%">
+        <option value="compacta">Compacta — margens laterais confortáveis</option>
+        <option value="expandida">Expandida — aproveita toda a tela útil</option>
+      </select>
     </div>
     <div class="card cfg">
       <h2>Município</h2>
@@ -393,6 +399,7 @@ window.addEventListener("pywebviewready", async () => {
     .forEach(s => s.innerHTML = ESTANDARTE);
   const e = await api.get_estado();
   aplicarTema(e.tema || "portal", false);
+  aplicarLargura(e.largura || "compacta", false);
   $("sobre-versao").textContent = e.versao;
   $("rodape-versao").textContent = `PNCP · dados públicos · v${e.versao}`;
   if (!e.ibge) { iniciarWizard(); return; }
@@ -407,6 +414,14 @@ function aplicarTema(tema, salvar = true) {
 }
 document.querySelectorAll(".tcard").forEach(c =>
   c.addEventListener("click", () => aplicarTema(c.dataset.tema)));
+
+function aplicarLargura(v, salvar = true) {
+  document.documentElement.dataset.largura = v;
+  $("cfg-largura").value = v;
+  if (salvar && api) api.set_config("largura", v);
+}
+$("cfg-largura").addEventListener("change",
+  () => aplicarLargura($("cfg-largura").value));
 
 // ── wizard ────────────────────────────────────────────────────────────────
 let wizEscolha = null;
