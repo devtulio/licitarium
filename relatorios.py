@@ -6,6 +6,7 @@ PDF) e CSV para as relações. Só stdlib.
 import csv
 import html
 import json
+import re
 from datetime import date, datetime
 
 # fonte da verdade da arte: design/estandarte-t3.svg
@@ -45,6 +46,15 @@ def moeda(v):
         return "–"
     inteiro, decimal = f"{v:,.2f}".split(".")
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
+
+
+def num_contrato(numero, ano):
+    """PNCP grava '0033/26'; padrão de exibição é numero/ano: 33/2026."""
+    if not numero:
+        return None
+    m = re.match(r"0*(\d+)", str(numero))
+    n = m.group(1) if m else str(numero)
+    return f"{n}/{ano}" if ano else str(n)
 
 
 def data_br(s):
@@ -324,8 +334,8 @@ def render_contratacoes(d, municipio, uf, periodo_txt):
 
 def render_contratos(d, municipio, uf, periodo_txt):
     linhas = "".join(f"""<tr>
-      <td class="ctr">{(_e(l['numero']) + "/" + _e(l['ano_contrato']))
-                       if l['numero'] else _e(l['numero_controle'])}</td>
+      <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
+                          or l['numero_controle'])}</td>
       <td class="ctr">{_e(l['fornecedor_nome'])}<br>
           <small>{_e(l['fornecedor_ni'])}</small></td>
       <td class="obj">{_e(l['objeto'])}</td>

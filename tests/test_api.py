@@ -99,7 +99,8 @@ def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):
                 " vigencia_inicio TEXT, vigencia_fim TEXT,"
                 " data_atualizacao TEXT, raw TEXT, sync_em TEXT)")
     con.execute("INSERT INTO atas (numero_controle, raw) VALUES ('X', ?)",
-                (json.dumps({"numeroAtaRegistroPreco": "13", "anoAta": 2026}),))
+                (json.dumps({"numeroAtaRegistroPreco": "13", "anoAta": 2026,
+                             "objetoContratacao": "RP de teste"}),))
     con.commit()
     con.close()
     con = sq.connect(tmp_path / "m.db")
@@ -115,11 +116,12 @@ def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):
     con.commit()
     con.close()
     db = licitarium.abrir_db()
-    r = db.execute("SELECT numero_ata, ano_ata FROM atas").fetchone()
+    r = db.execute("SELECT numero_ata, ano_ata, objeto FROM atas").fetchone()
     c = db.execute("SELECT numero_contrato, ano_contrato, sequencial_contrato"
                    " FROM contratos").fetchone()
     db.close()
     assert (r["numero_ata"], r["ano_ata"]) == ("13", 2026)
+    assert r["objeto"] == "RP de teste"
     assert (c["numero_contrato"], c["ano_contrato"],
             c["sequencial_contrato"]) == ("0033/26", 2026, 35)
 

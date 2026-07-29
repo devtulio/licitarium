@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS contratos (
   data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS atas (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
-  numero_ata TEXT, ano_ata INTEGER,
+  numero_ata TEXT, ano_ata INTEGER, objeto TEXT,
   vigencia_inicio TEXT, vigencia_fim TEXT, data_atualizacao TEXT,
   raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS pca_itens (
@@ -78,7 +78,8 @@ ORDENAVEIS = {
                   "vigencia": "vigencia_fim", "valor": "valor_global"},
     "atas": {"numero":
              "(COALESCE(ano_ata,0)*100000+CAST(COALESCE(numero_ata,'0') AS INTEGER))",
-             "origem": "contratacao_controle", "vigencia": "vigencia_fim"},
+             "origem": "contratacao_controle", "objeto": "objeto",
+             "vigencia": "vigencia_fim"},
     "pca": {"item": "numero_item", "descricao": "descricao",
             "categoria": "categoria", "quantidade": "quantidade",
             "valor": "valor_total"},
@@ -104,6 +105,12 @@ def abrir_db():
         db.execute("UPDATE atas SET"
                    " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
                    " ano_ata=json_extract(raw,'$.anoAta')")
+        db.commit()
+    colunas_a = {r[1] for r in db.execute("PRAGMA table_info(atas)")}
+    if colunas_a and "objeto" not in colunas_a:
+        db.execute("ALTER TABLE atas ADD COLUMN objeto TEXT")
+        db.execute("UPDATE atas SET"
+                   " objeto=json_extract(raw,'$.objetoContratacao')")
         db.commit()
     colunas_c = {r[1] for r in db.execute("PRAGMA table_info(contratacoes)")}
     if colunas_c and "data_encerramento_proposta" not in colunas_c:
@@ -154,6 +161,7 @@ class Api:
                     "ibge": cfg.get("municipio_ibge"),
                     "tema": cfg.get("tema", "portal"),
                     "largura": cfg.get("largura", "compacta"),
+                    "fonte": cfg.get("fonte", "normal"),
                     "limite_dispensa_compras":
                         cfg.get("limite_dispensa_compras",
                                 str(relatorios.LIMITE_PADRAO_COMPRAS)),
@@ -191,7 +199,7 @@ class Api:
                 "propostas_abertas": propostas_abertas}
 
     def set_config(self, chave, valor):
-        if chave not in ("tema", "largura", "limite_dispensa_compras",
+        if chave not in ("tema", "largura", "fonte", "limite_dispensa_compras",
                          "limite_dispensa_obras"):
             return False
         db = abrir_db()
@@ -307,7 +315,7 @@ class Api:
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",
                                     "numero_controle", "numero_contrato"],
-                      "atas": ["numero_controle", "numero_ata"],
+                      "atas": ["numero_controle", "numero_ata", "objeto"],
                       "pca": ["descricao", "grupo"]}[tipo]
             where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
             args += [f"%{f['busca']}%"] * len(campos)

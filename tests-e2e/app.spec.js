@@ -33,7 +33,7 @@ test("abas trocam colunas e detalhe abre ao clicar na linha",
   await page.locator('nav.abas button[data-tipo="contratos"]').click();
   await expect(page.locator(".cab")).toContainText("Contrato");
   await expect(page.locator(".linha:not(.cab)").first())
-    .toContainText("0033/26/2026");
+    .toContainText("33/2026");   // "0033/26" normalizado para numero/ano
   await page.locator(".linha:not(.cab)").first().click();
   await expect(page.locator("#veu-detalhe")).toBeVisible();
   // JSON bruto formatado e colorido (chave + booleano do mock)
@@ -52,6 +52,15 @@ test("tema troca via configurações e persiste via set_config",
   const salvo = await page.evaluate(() =>
     window.__chamadas.find(c => c.metodo === "set_config" && c.k === "tema"));
   expect(salvo.v).toBe("observatorio");
+});
+
+test("tamanho da fonte aplica zoom e persiste", async ({ page }) => {
+  await page.locator("#btn-config").click();
+  await page.locator("#cfg-fonte").selectOption("grande");
+  await expect(page.locator("html")).toHaveAttribute("data-fonte", "grande");
+  const salvo = await page.evaluate(() =>
+    window.__chamadas.find(c => c.metodo === "set_config" && c.k === "fonte"));
+  expect(salvo.v).toBe("grande");
 });
 
 test("limites de dispensa usam máscara de dinheiro e salvam número puro",

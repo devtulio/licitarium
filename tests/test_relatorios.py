@@ -102,6 +102,14 @@ def test_filtro_orgao_nos_relatorios(db, tmp_path):
     assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_num_contrato_normaliza():
+    assert relatorios.num_contrato("0033/26", 2026) == "33/2026"
+    assert relatorios.num_contrato("35", 2026) == "35/2026"
+    assert relatorios.num_contrato("7/2026", 2026) == "7/2026"
+    assert relatorios.num_contrato(None, 2026) is None
+    assert relatorios.num_contrato("0042/25", None) == "42"
+
+
 def test_fracionamento(db, tmp_path):
     db.execute("UPDATE contratacoes SET modalidade_id=8, unidade='Sec. Adm'"
                " WHERE ano=2026")

@@ -120,12 +120,17 @@
   .cab:hover { background:var(--surface2); }
   .g-contratacoes { grid-template-columns:80px 135px 1fr 120px 120px; }
   .g-contratos    { grid-template-columns:110px 1fr 160px 110px; }
-  .g-atas         { grid-template-columns:90px 1fr 170px; }
+  .g-atas         { grid-template-columns:90px 210px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
   .cab span[data-ord] { cursor:pointer; user-select:none; }
   .cab span[data-ord]:hover { color:var(--accent); }
   .cab .seta { font-size:9px; }
   .obj, #det-titulo { text-transform:uppercase; }
+  #det-titulo { text-align:justify; hyphens:auto; }
+  /* tamanho da fonte (zoom escala a UI inteira, preservando o layout) */
+  [data-fonte="pequena"] body { zoom:0.9; }
+  [data-fonte="grande"]  body { zoom:1.12; }
+  [data-fonte="extra"]   body { zoom:1.25; }
   .num { text-align:center; font-variant-numeric:tabular-nums;
          white-space:nowrap; }
   [data-theme="pergaminho"] .num { font-family:Georgia,serif; }
@@ -134,7 +139,7 @@
   .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(2),
   .g-contratacoes > :nth-child(5),
   .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
-  .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(3),
+  .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(4),
   .g-pca > :nth-child(1), .g-pca > :nth-child(3) { text-align:center; }
   .linha .obj { display:block; text-align:justify; hyphens:auto; }
   .vazio { padding:34px; text-align:center; color:var(--muted); font-size:13px; }
@@ -359,6 +364,13 @@
         <option value="compacta">Compacta — margens laterais confortáveis</option>
         <option value="expandida">Expandida — aproveita toda a tela útil</option>
       </select>
+      <label for="cfg-fonte">Tamanho da fonte</label>
+      <select id="cfg-fonte" style="width:100%">
+        <option value="pequena">Pequena</option>
+        <option value="normal">Normal</option>
+        <option value="grande">Grande</option>
+        <option value="extra">Extra grande</option>
+      </select>
     </div>
     <div class="card cfg">
       <h2>Município</h2>
@@ -446,6 +458,7 @@ window.addEventListener("pywebviewready", async () => {
   const e = await api.get_estado();
   aplicarTema(e.tema || "portal", false);
   aplicarLargura(e.largura || "compacta", false);
+  aplicarFonte(e.fonte || "normal", false);
   $("sobre-versao").textContent = e.versao;
   $("rodape-versao").textContent = `PNCP · dados públicos · v${e.versao}`;
   if (!e.ibge) { iniciarWizard(); return; }
@@ -468,6 +481,14 @@ function aplicarLargura(v, salvar = true) {
 }
 $("cfg-largura").addEventListener("change",
   () => aplicarLargura($("cfg-largura").value));
+
+function aplicarFonte(v, salvar = true) {
+  document.documentElement.dataset.fonte = v;
+  $("cfg-fonte").value = v;
+  if (salvar && api) api.set_config("fonte", v);
+}
+$("cfg-fonte").addEventListener("change",
+  () => aplicarFonte($("cfg-fonte").value));
 
 // ── wizard ────────────────────────────────────────────────────────────────
 let wizEscolha = null;
@@ -597,11 +618,20 @@ const COLUNAS = {
   contratos:    [["Contrato","numero"], ["Objeto / Fornecedor","objeto"],
                  ["Vigência","vigencia"], ["Valor","valor"]],
   atas:         [["Ata","numero"], ["Contratação de origem","origem"],
-                 ["Vigência","vigencia"]],
+                 ["Objeto","objeto"], ["Vigência","vigencia"]],
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
 };
+
+// nº do contrato no padrão numero/ano (PNCP grava "0033/26" — normaliza
+// para 33/2026 usando o ano de 4 dígitos)
+function numContrato(d) {
+  if (!d.numero_contrato) return d.numero_controle;
+  const m = String(d.numero_contrato).match(/^0*(\d+)/);
+  const n = m ? m[1] : d.numero_contrato;
+  return d.ano_contrato ? `${n}/${d.ano_contrato}` : String(n);
+}
 
 function badgeSituacao(s) {
   if (!s) return `<span class="badge mut">–</span>`;
@@ -618,8 +648,7 @@ function renderLinha(tipo, d) {
       <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
       <span style="justify-self:center">${badgeSituacao(d.situacao)}</span>`;
   if (tipo === "contratos")
-    return `<span class="dim">${esc(d.numero_contrato
-        ? `${d.numero_contrato}/${d.ano_contrato ?? ""}` : d.numero_controle)}</span>
+    return `<span class="dim">${esc(numContrato(d))}</span>
       <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
       <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
@@ -632,6 +661,7 @@ function renderLinha(tipo, d) {
       <span class="num">${dinheiro(d.valor_total)}</span>`;
   return `<span class="dim">${esc(d.numero_ata ?? "–")}/${esc(d.ano_ata ?? "")}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
+    <span class="obj">${esc(d.objeto ?? "–")}</span>
     <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
 }
 
@@ -760,6 +790,7 @@ async function abrirDetalhe(nc) {
     .map(([campo, rotulo]) => {
       let v = d[campo];
       if (campo.startsWith("valor")) v = dinheiro(v);
+      else if (campo === "numero_contrato") v = numContrato(d);
       else if (/^(data|vigencia)/.test(campo)) v = dataBr(v);
       return `<div><div class="k">${rotulo}</div><div class="v">${esc(v)}</div></div>`;
     }).join("");

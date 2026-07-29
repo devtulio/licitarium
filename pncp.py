@@ -17,6 +17,9 @@ from datetime import date, datetime, timedelta
 BASE = "https://pncp.gov.br/api/consulta"
 USER_AGENT = "Licitarium/0.1 (repositorio local de contratacoes; open-source)"
 DATA_INICIO_PNCP = date(2021, 1, 1)  # portal entrou no ar em ago/2021
+# /v1/pca/atualizacao rejeita dataInicio anterior a 01/04/2021 (HTTP 422
+# "Data inicial inválida ou anterior a 20210401" — verificado 2026-07-29)
+DATA_INICIO_PCA = date(2021, 4, 1)
 JANELA_MAX_DIAS = 364  # API limita o range de datas por consulta
 
 # Tabela de domínio do PNCP — modalidades da Lei 14.133/2021.
@@ -176,13 +179,14 @@ def _upsert_ata(db, item):
     db.execute(
         """INSERT OR REPLACE INTO atas
            (numero_controle, contratacao_controle, orgao_cnpj,
-            numero_ata, ano_ata,
+            numero_ata, ano_ata, objeto,
             vigencia_inicio, vigencia_fim, data_atualizacao, raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
         (numero,
          _primeiro(item, "numeroControlePNCPCompra", "numeroControlePncpCompra"),
          _primeiro(item, "cnpjOrgao", "cnpj"),
          item.get("numeroAtaRegistroPreco"), item.get("anoAta"),
+         item.get("objetoContratacao"),
          _primeiro(item, "vigenciaInicio", "dataVigenciaInicio"),
          _primeiro(item, "vigenciaFim", "dataVigenciaFim"),
          _primeiro(item, "dataAtualizacao", "dataAtualizacaoGlobal"),
@@ -278,6 +282,9 @@ def sync_pca(db, cnpj, inicio, fim, progresso=None):
     dataInicial/dataFinal (verificado contra a API real em 2026-07-29).
     """
     total = 0
+    inicio = max(inicio, DATA_INICIO_PCA)  # endpoint rejeita datas anteriores
+    if inicio > fim:
+        return 0
     for a, b in _janelas(inicio, fim):
         for plano in _paginar("/v1/pca/atualizacao",
                               {"dataInicio": _amd(a), "dataFim": _amd(b),

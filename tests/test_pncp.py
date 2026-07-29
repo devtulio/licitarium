@@ -156,6 +156,18 @@ def test_sync_pca_idempotente_e_parametros(db, monkeypatch):
                for p in params_vistos)
 
 
+def test_sync_pca_respeita_data_minima(db, monkeypatch):
+    """Endpoint rejeita dataInicio < 2021-04-01; janela deve ser cortada."""
+    datas = []
+    monkeypatch.setattr(pncp, "_get",
+                        lambda c, p: datas.append(p["dataInicio"]))
+    pncp.sync_pca(db, "1", date(2021, 1, 1), date(2021, 6, 1))
+    assert datas and min(datas) == "20210401"
+    datas.clear()
+    assert pncp.sync_pca(db, "1", date(2021, 1, 1), date(2021, 3, 1)) == 0
+    assert datas == []  # janela inteira antes do mínimo: nenhuma chamada
+
+
 def test_sync_incremental_com_sobreposicao(db, monkeypatch):
     """Segunda rodada parte de last_sync - 1 dia (catch-up seguro)."""
     chamadas = []

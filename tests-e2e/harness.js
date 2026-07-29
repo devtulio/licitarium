@@ -28,6 +28,7 @@ const DADOS = {
   ],
   atas: [
     { numero_controle: "Z-1", numero_ata: "13", ano_ata: 2026,
+      objeto: "Registro de preços de óleos lubrificantes para a frota",
       contratacao_controle: "45148970000177-1-000061/2025",
       vigencia_inicio: "2026-04-10", vigencia_fim: "2027-04-10" },
   ],
