@@ -36,6 +36,9 @@ test("abas trocam colunas e detalhe abre ao clicar na linha",
     .toContainText("0033/26/2026");
   await page.locator(".linha:not(.cab)").first().click();
   await expect(page.locator("#veu-detalhe")).toBeVisible();
+  // JSON bruto formatado e colorido (chave + booleano do mock)
+  await expect(page.locator("#det-raw .j-chave").first()).toContainText("exemplo");
+  await expect(page.locator("#det-raw .j-bool")).toHaveText("true");
   await page.keyboard.press("Escape");
   await expect(page.locator("#veu-detalhe")).toBeHidden();
 });
