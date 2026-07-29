@@ -86,6 +86,22 @@ def test_gerar_executivo_sem_csv(db, tmp_path):
     assert "Resumo Executivo" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_filtro_orgao_nos_relatorios(db, tmp_path):
+    db.execute("UPDATE contratacoes SET orgao_cnpj='111'")
+    db.execute("UPDATE contratacoes SET orgao_cnpj='222'"
+               " WHERE numero_controle='A'")
+    db.commit()
+    assert relatorios.dados_contratacoes(db, ano=2026,
+                                         orgao="222")["totais"]["n"] == 1
+    assert relatorios.dados_executivo(db, 2026, orgao="222")["cards"]["n"] == 1
+    r = relatorios.gerar(db, "contratacoes",
+                         {"ano": 2026, "orgao": "222",
+                          "orgao_nome": "Câmara de Testópolis"},
+                         "Testópolis", "SP", tmp_path)
+    assert "orgao_222" in r["html"]
+    assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
+
+
 def test_tipo_desconhecido(db, tmp_path):
     with pytest.raises(ValueError):
         relatorios.gerar(db, "xxx", {}, "T", "SP", tmp_path)

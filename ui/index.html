@@ -221,6 +221,8 @@
         <option value="">Todas as modalidades</option></select>
       <select id="f-situacao" aria-label="Situação">
         <option value="">Todas as situações</option></select>
+      <select id="f-orgao" aria-label="Órgão">
+        <option value="">Todos os órgãos</option></select>
       <input type="search" id="f-busca" placeholder="Buscar no objeto…"
              aria-label="Buscar">
       <button class="btn ghost" id="btn-csv">Exportar CSV</button>
@@ -278,6 +280,10 @@
           <option value="">Todas</option>
         </select>
       </div>
+      <label for="rel-orgao">Órgão (opcional)</label>
+      <select id="rel-orgao" style="width:100%">
+        <option value="">Todos os órgãos</option>
+      </select>
       <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
         <button class="btn" id="rel-gerar">Gerar e abrir</button>
         <span class="dim" id="rel-status" style="font-size:12px"></span>
@@ -476,12 +482,15 @@ async function carregarFiltros() {
   preencher($("f-ano"), f.anos);
   preencher($("f-modalidade"), f.modalidades);
   preencher($("f-situacao"), f.situacoes);
+  preencher($("f-orgao"),
+            f.orgaos.map(o => ({nome: o.nome ?? o.cnpj, id: o.cnpj})));
 }
 
 function filtrosAtuais() {
   return { ano: $("f-ano").value || null,
            modalidade: $("f-modalidade").value || null,
            situacao: $("f-situacao").value || null,
+           orgao: $("f-orgao").value || null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
@@ -580,7 +589,7 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("f-situacao").classList.toggle("oculto", !soContratacoes);
     carregarLista();
   }));
-["f-ano","f-modalidade","f-situacao"].forEach(id =>
+["f-ano","f-modalidade","f-situacao","f-orgao"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 let buscaTimer;
 $("f-busca").addEventListener("input", () => {
@@ -646,6 +655,9 @@ async function montarOpcoesRelatorio() {
   const modSel = $("rel-modalidade");
   modSel.length = 1;
   f.modalidades.forEach(m => modSel.add(new Option(m.nome, m.id)));
+  const orgSel = $("rel-orgao");
+  orgSel.length = 1;
+  f.orgaos.forEach(o => orgSel.add(new Option(o.nome ?? o.cnpj, o.cnpj)));
 }
 $("btn-relatorios").addEventListener("click", async () => {
   await montarOpcoesRelatorio();
@@ -659,6 +671,7 @@ $("rel-gerar").addEventListener("click", async () => {
     ano: periodo.startsWith("ano:") ? +periodo.slice(4) : null,
     vigentes: periodo === "vigentes",
     modalidade: $("rel-modalidade").value || null,
+    orgao: $("rel-orgao").value || null,
   };
   $("rel-gerar").disabled = true;
   $("rel-status").textContent = "Gerando…";

@@ -240,6 +240,9 @@ class Api:
         if f.get("situacao") and tipo == "contratacoes":
             where.append("situacao=?")
             args.append(f["situacao"])
+        if f.get("orgao"):
+            where.append("orgao_cnpj=?")
+            args.append(f["orgao"])
         if f.get("busca"):
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",
@@ -300,8 +303,10 @@ class Api:
             modalidades = [{"id": r[0], "nome": r[1]} for r in db.execute(
                 "SELECT DISTINCT modalidade_id, modalidade_nome FROM contratacoes"
                 " WHERE modalidade_id IS NOT NULL ORDER BY 2")]
+            orgaos = [{"cnpj": r[0], "nome": r[1]} for r in db.execute(
+                "SELECT cnpj, razao_social FROM orgaos ORDER BY razao_social")]
             return {"anos": anos, "situacoes": situacoes,
-                    "modalidades": modalidades}
+                    "modalidades": modalidades, "orgaos": orgaos}
         finally:
             db.close()
 
@@ -398,6 +403,12 @@ class Api:
         try:
             municipio = pncp._config(db, "municipio_nome") or "Município"
             uf = pncp._config(db, "municipio_uf") or ""
+            if params and params.get("orgao"):
+                linha = db.execute(
+                    "SELECT razao_social FROM orgaos WHERE cnpj=?",
+                    (params["orgao"],)).fetchone()
+                if linha:
+                    params["orgao_nome"] = linha[0]
             resultado = relatorios.gerar(db, tipo, params, municipio, uf,
                                          DIR_DADOS / "relatorios")
         except ValueError as e:

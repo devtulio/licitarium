@@ -20,6 +20,10 @@ def api(tmp_path, monkeypatch):
         [("A", 2026, "Zebra", 10.0, None, "2026-01-01"),
          ("B", 2026, "Arroz", 30.0, 25.0, "2026-02-01"),
          ("C", 2025, "Milho", 20.0, 15.0, "2025-06-01")])
+    db.execute("UPDATE contratacoes SET orgao_cnpj='111' WHERE"
+               " numero_controle IN ('A','B')")
+    db.execute("UPDATE contratacoes SET orgao_cnpj='222' WHERE"
+               " numero_controle='C'")
     db.executemany(
         "INSERT INTO pca_itens (id, id_pca, ano, numero_item, descricao,"
         " valor_total) VALUES (?,?,?,?,?,?)",
@@ -69,6 +73,12 @@ def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
     db.close()
     assert not api.abrir_pncp("atas", "X")
     assert len(urls) == 1
+
+
+def test_filtro_por_orgao(api):
+    assert api.listar("contratacoes", {"orgao": "111"})["total"] == 2
+    assert api.listar("contratacoes", {"orgao": "222"})["total"] == 1
+    assert api.listar("contratacoes", {"orgao": "999"})["total"] == 0
 
 
 def test_filtro_ano_pca(api):

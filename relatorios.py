@@ -50,7 +50,7 @@ def data_br(s):
 
 # ── consultas ───────────────────────────────────────────────────────────────
 
-def dados_contratacoes(db, ano=None, modalidade=None):
+def dados_contratacoes(db, ano=None, modalidade=None, orgao=None):
     where, args = [], []
     if ano:
         where.append("ano=?")
@@ -58,6 +58,9 @@ def dados_contratacoes(db, ano=None, modalidade=None):
     if modalidade:
         where.append("modalidade_id=?")
         args.append(modalidade)
+    if orgao:
+        where.append("orgao_cnpj=?")
+        args.append(orgao)
     sql_where = (" WHERE " + " AND ".join(where)) if where else ""
     linhas = [dict(r) for r in db.execute(
         f"""SELECT sequencial, ano, modalidade_nome,
@@ -78,13 +81,16 @@ def dados_contratacoes(db, ano=None, modalidade=None):
                        "homologado": tot_hom, "desagio": desagio}}
 
 
-def dados_contratos(db, ano=None, vigentes=False):
+def dados_contratos(db, ano=None, vigentes=False, orgao=None):
     where, args = [], []
     if vigentes:
         where.append("date(vigencia_fim) >= date('now')")
     elif ano:
         where.append("substr(data_publicacao,1,4)=?")
         args.append(str(ano))
+    if orgao:
+        where.append("orgao_cnpj=?")
+        args.append(orgao)
     sql_where = (" WHERE " + " AND ".join(where)) if where else ""
     linhas = [dict(r) for r in db.execute(
         f"""SELECT numero_controle,
@@ -98,13 +104,16 @@ def dados_contratos(db, ano=None, vigentes=False):
                        "valor": sum(l["valor_global"] or 0 for l in linhas)}}
 
 
-def dados_atas(db, ano=None, vigentes=False):
+def dados_atas(db, ano=None, vigentes=False, orgao=None):
     where, args = [], []
     if vigentes:
         where.append("date(vigencia_fim) >= date('now')")
     elif ano:
         where.append("substr(vigencia_inicio,1,4)=?")
         args.append(str(ano))
+    if orgao:
+        where.append("orgao_cnpj=?")
+        args.append(orgao)
     sql_where = (" WHERE " + " AND ".join(where)) if where else ""
     linhas = [dict(r) for r in db.execute(
         f"""SELECT numero_controle,
@@ -118,45 +127,47 @@ def dados_atas(db, ano=None, vigentes=False):
     return {"linhas": linhas, "totais": {"n": len(linhas)}}
 
 
-def dados_executivo(db, ano):
+def dados_executivo(db, ano, orgao=None):
     ano = int(ano)
+    og = " AND orgao_cnpj=?" if orgao else ""
+    og_args = [orgao] if orgao else []
     modalidades = [dict(r) for r in db.execute(
-        """SELECT modalidade_nome, COUNT(*) n,
+        f"""SELECT modalidade_nome, COUNT(*) n,
                   SUM(valor_estimado) estimado, SUM(valor_homologado) homologado
-           FROM contratacoes WHERE ano=? GROUP BY 1
+           FROM contratacoes WHERE ano=?{og} GROUP BY 1
            ORDER BY COALESCE(SUM(COALESCE(valor_homologado, valor_estimado)),0)
-           DESC""", (ano,))]
+           DESC""", [ano] + og_args)]
     meses = {r[0]: {"n": r[1], "valor": r[2] or 0} for r in db.execute(
-        """SELECT substr(data_publicacao,6,2), COUNT(*),
+        f"""SELECT substr(data_publicacao,6,2), COUNT(*),
                   SUM(COALESCE(valor_homologado, valor_estimado))
-           FROM contratacoes WHERE ano=? AND data_publicacao IS NOT NULL
-           GROUP BY 1""", (ano,))}
+           FROM contratacoes WHERE ano=? AND data_publicacao IS NOT NULL{og}
+           GROUP BY 1""", [ano] + og_args)}
     fornecedores = [dict(r) for r in db.execute(
-        """SELECT fornecedor_nome, fornecedor_ni, COUNT(*) n,
+        f"""SELECT fornecedor_nome, fornecedor_ni, COUNT(*) n,
                   SUM(COALESCE(valor_global,0)) total
-           FROM contratos WHERE substr(data_publicacao,1,4)=?
+           FROM contratos WHERE substr(data_publicacao,1,4)=?{og}
            GROUP BY fornecedor_ni ORDER BY total DESC LIMIT 10""",
-        (str(ano),))]
+        [str(ano)] + og_args)]
     vencendo = [dict(r) for r in db.execute(
-        """SELECT 'Contrato' tipo, fornecedor_nome nome, objeto, vigencia_fim,
+        f"""SELECT 'Contrato' tipo, fornecedor_nome nome, objeto, vigencia_fim,
                   CAST(julianday(vigencia_fim) - julianday('now') AS INTEGER) dias
            FROM contratos
-           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day')
+           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day'){og}
            UNION ALL
            SELECT 'Ata', json_extract(raw,'$.numeroAtaRegistroPreco') || '/' ||
                   json_extract(raw,'$.anoAta'),
                   json_extract(raw,'$.objetoContratacao'), vigencia_fim,
                   CAST(julianday(vigencia_fim) - julianday('now') AS INTEGER)
            FROM atas
-           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day')
-           ORDER BY vigencia_fim""")]
-    cards = dados_contratacoes(db, ano)["totais"]
+           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day'){og}
+           ORDER BY vigencia_fim""", og_args + og_args)]
+    cards = dados_contratacoes(db, ano, orgao=orgao)["totais"]
     cards["contratos_vigentes"] = db.execute(
-        "SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)>=date('now')"
-    ).fetchone()[0]
+        f"SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)>=date('now')"
+        f"{og}", og_args).fetchone()[0]
     cards["atas_vigentes"] = db.execute(
-        "SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)>=date('now')"
-    ).fetchone()[0]
+        f"SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)>=date('now')"
+        f"{og}", og_args).fetchone()[0]
     return {"ano": ano, "cards": cards, "modalidades": modalidades,
             "meses": meses, "fornecedores": fornecedores, "vencendo": vencendo}
 
@@ -366,11 +377,16 @@ def gerar(db, tipo, params, municipio, uf, destino):
     params = params or {}
     ano = params.get("ano")
     vigentes = bool(params.get("vigentes"))
+    orgao = params.get("orgao")
+    # com filtro de órgão, o nome dele entra no cabeçalho, no título
+    # (= nome do PDF) e no nome do arquivo
+    if orgao and params.get("orgao_nome"):
+        municipio = f"{municipio} · {params['orgao_nome']}"
     destino.mkdir(parents=True, exist_ok=True)
     if tipo == "executivo":
         if not ano:
             ano = date.today().year
-        d = dados_executivo(db, ano)
+        d = dados_executivo(db, ano, orgao)
         conteudo = render_executivo(d, municipio, uf)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
@@ -378,19 +394,21 @@ def gerar(db, tipo, params, municipio, uf, destino):
         periodo_txt = ("Vigentes em " + date.today().strftime("%d/%m/%Y")) \
             if vigentes else (f"Exercício {ano}" if ano else "Todo o período")
         if tipo == "contratacoes":
-            d = dados_contratacoes(db, ano, params.get("modalidade"))
+            d = dados_contratacoes(db, ano, params.get("modalidade"), orgao)
             conteudo = render_contratacoes(d, municipio, uf, periodo_txt)
         elif tipo == "contratos":
-            d = dados_contratos(db, ano, vigentes)
+            d = dados_contratos(db, ano, vigentes, orgao)
             conteudo = render_contratos(d, municipio, uf, periodo_txt)
         elif tipo == "atas":
-            d = dados_atas(db, ano, vigentes)
+            d = dados_atas(db, ano, vigentes, orgao)
             conteudo = render_atas(d, municipio, uf, periodo_txt)
         else:
             raise ValueError(f"tipo de relatório desconhecido: {tipo}")
         sufixo = "vigentes" if vigentes else (str(ano) if ano else "completo")
         nome = f"relacao_{tipo}_{sufixo}"
         linhas_csv = d["linhas"]
+    if orgao:
+        nome += f"_orgao_{orgao}"
     caminho_html = destino / f"{nome}.html"
     caminho_html.write_text(conteudo, encoding="utf-8")
     caminho_csv = None
