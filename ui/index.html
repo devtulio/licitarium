@@ -195,6 +195,7 @@
   <header>
     <div class="mark">LICITARI<b>V</b>M<small id="sub-municipio"></small></div>
     <div style="display:flex; gap:8px">
+      <button class="btn ghost" id="btn-relatorios">Relatórios</button>
       <button class="btn ghost" id="btn-config">Configurações</button>
       <button class="btn" id="btn-sync">Sincronizar</button>
     </div>
@@ -251,6 +252,41 @@
     </div>
     <details class="raw"><summary>Dados completos (JSON do PNCP)</summary>
       <pre id="det-raw"></pre></details>
+  </div>
+</div>
+
+<!-- ═══ RELATÓRIOS ═══ -->
+<div id="veu-relatorios" class="veu oculto" role="dialog" aria-modal="true">
+  <div class="card modal" style="max-width:480px">
+    <div class="mhead">
+      <h1>Relatórios</h1>
+      <button class="fechar" data-fecha="veu-relatorios" aria-label="Fechar">×</button>
+    </div>
+    <div style="padding:0 20px 20px">
+      <label for="rel-tipo">Relatório</label>
+      <select id="rel-tipo" style="width:100%">
+        <option value="contratacoes">Relação de Contratações (TCE)</option>
+        <option value="contratos">Relação de Contratos</option>
+        <option value="atas">Relação de Atas de Registro de Preços</option>
+        <option value="executivo">Resumo Executivo Anual</option>
+      </select>
+      <label for="rel-ano">Período</label>
+      <select id="rel-ano" style="width:100%"></select>
+      <div id="rel-mod-caixa">
+        <label for="rel-modalidade">Modalidade (opcional)</label>
+        <select id="rel-modalidade" style="width:100%">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
+        <button class="btn" id="rel-gerar">Gerar e abrir</button>
+        <span class="dim" id="rel-status" style="font-size:12px"></span>
+      </div>
+      <div class="dim" style="font-size:11.5px; margin-top:12px">
+        O relatório abre no navegador, pronto para imprimir ou salvar em PDF
+        (🖨). As relações também geram CSV na mesma pasta.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -590,6 +626,48 @@ async function abrirDetalhe(nc) {
 }
 $("det-pncp").addEventListener("click", () =>
   api.abrir_pncp(estado.tipo, detalheAtual));
+
+// ── relatórios ────────────────────────────────────────────────────────────
+async function montarOpcoesRelatorio() {
+  const tipo = $("rel-tipo").value;
+  const f = await api.filtros_disponiveis();
+  const sel = $("rel-ano");
+  sel.length = 0;
+  if (tipo !== "executivo") {
+    if (tipo !== "contratacoes") sel.add(new Option("Vigentes hoje", "vigentes"));
+    sel.add(new Option("Todo o período", "todos"));
+  }
+  f.anos.forEach(a => sel.add(new Option(`Exercício ${a}`, `ano:${a}`)));
+  if (tipo === "executivo" && !f.anos.length)
+    sel.add(new Option(`Exercício ${new Date().getFullYear()}`,
+                       `ano:${new Date().getFullYear()}`));
+  const modCaixa = $("rel-mod-caixa");
+  modCaixa.classList.toggle("oculto", tipo !== "contratacoes");
+  const modSel = $("rel-modalidade");
+  modSel.length = 1;
+  f.modalidades.forEach(m => modSel.add(new Option(m.nome, m.id)));
+}
+$("btn-relatorios").addEventListener("click", async () => {
+  await montarOpcoesRelatorio();
+  $("rel-status").textContent = "";
+  $("veu-relatorios").classList.remove("oculto");
+});
+$("rel-tipo").addEventListener("change", montarOpcoesRelatorio);
+$("rel-gerar").addEventListener("click", async () => {
+  const periodo = $("rel-ano").value;
+  const params = {
+    ano: periodo.startsWith("ano:") ? +periodo.slice(4) : null,
+    vigentes: periodo === "vigentes",
+    modalidade: $("rel-modalidade").value || null,
+  };
+  $("rel-gerar").disabled = true;
+  $("rel-status").textContent = "Gerando…";
+  const r = await api.gerar_relatorio($("rel-tipo").value, params);
+  $("rel-gerar").disabled = false;
+  $("rel-status").textContent = r.ok
+    ? "Aberto no navegador" + (r.csv ? " · CSV gerado ao lado" : "")
+    : (r.erro || "Falha ao gerar");
+});
 
 // ── config ────────────────────────────────────────────────────────────────
 $("btn-config").addEventListener("click", async () => {

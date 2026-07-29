@@ -16,6 +16,7 @@ from pathlib import Path
 import webview
 
 import pncp
+import relatorios
 
 VERSAO = "0.2.0"
 DIR_APP = Path(__file__).resolve().parent
@@ -389,6 +390,22 @@ class Api:
                 "SELECT * FROM sync_log ORDER BY id DESC LIMIT 10")]
         finally:
             db.close()
+
+    # ── relatórios ──────────────────────────────────────────────────────
+
+    def gerar_relatorio(self, tipo, params=None):
+        db = abrir_db()
+        try:
+            municipio = pncp._config(db, "municipio_nome") or "Município"
+            uf = pncp._config(db, "municipio_uf") or ""
+            resultado = relatorios.gerar(db, tipo, params, municipio, uf,
+                                         DIR_DADOS / "relatorios")
+        except ValueError as e:
+            return {"ok": False, "erro": str(e)}
+        finally:
+            db.close()
+        webbrowser.open(resultado["html"])
+        return {"ok": True, **resultado}
 
     # ── atualização do aplicativo ───────────────────────────────────────
 

@@ -172,13 +172,34 @@ dados continuam disponíveis no PNCP; nada público se perde).</p>
 atual mostra (todas as páginas), pronto para abrir no Excel ou LibreOffice —
 separador ponto e vírgula, acentuação correta.</p>
 
-<h2>8. Onde ficam os dados</h2>
+<h2>8. Relatórios</h2>
+<p>O botão <b>Relatórios</b> no topo gera documentos timbrados prontos para
+imprimir ou salvar em PDF — pensados para responder solicitações do Tribunal
+de Contas e para prestação de contas interna:</p>
+<table>
+  <tr><th>Relatório</th><th>Conteúdo</th></tr>
+  <tr><td>Relação de Contratações</td><td>Processo, modalidade, amparo legal,
+    objeto, valores estimado e homologado, unidade e data — com totais e
+    deságio médio no rodapé. Filtro por exercício e modalidade</td></tr>
+  <tr><td>Relação de Contratos</td><td>Contrato, fornecedor (CNPJ), objeto,
+    valor global e vigência — por exercício ou somente vigentes</td></tr>
+  <tr><td>Relação de Atas</td><td>Ata, contratação de origem, objeto e
+    vigência — por exercício ou somente vigentes</td></tr>
+  <tr><td>Resumo Executivo Anual</td><td>Indicadores do exercício, quadro por
+    modalidade, evolução mensal, maiores fornecedores e vigências a vencer em
+    90 dias</td></tr>
+</table>
+<p>O relatório abre no navegador (🖨 para imprimir; o nome do PDF já vem
+correto). As relações geram também um <b>CSV</b> na mesma pasta
+(<code>%LOCALAPPDATA%\Licitarium\relatorios</code>), para planilha.</p>
+
+<h2>9. Onde ficam os dados</h2>
 <p>Em <code>%LOCALAPPDATA%\Licitarium\licitarium.db</code> (banco SQLite).
 O banco é um <b>espelho reconstruível</b>: se for apagado ou corromper, basta
 abrir o programa e refazer o download — a fonte oficial é sempre o PNCP.
 Por isso o Licitarium não precisa de sistema de backup próprio.</p>
 
-<h2>9. Perguntas frequentes</h2>
+<h2>10. Perguntas frequentes</h2>
 <h3>Um processo aparece com situação diferente da plataforma de pregão
 (BLL, BNC, Compras.gov…)</h3>
 <p>O Licitarium espelha o <b>PNCP</b>. Se um processo foi suspenso na plataforma
@@ -195,7 +216,7 @@ erro em Configurações → Sincronizações recentes.</p>
 <h3>O programa não abre no Windows 10</h3>
 <p>Instale o WebView2 Runtime (seção 2).</p>
 
-<h2>10. Sobre</h2>
+<h2>11. Sobre</h2>
 <p><b>Licitarium</b> — do latim <i>licitatio</i> (lance em leilão) +
 <i>-arium</i> (lugar que guarda): o lugar que guarda as licitações. A divisa
 <i>SVB HASTA PVBLICA</i> vem do leilão público romano, anunciado com uma lança
