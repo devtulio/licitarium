@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-07-29
+
+- Versão no título do MANUAL.html (nome sugerido do PDF na impressão) e no
+  cabeçalho impresso de página.
+- `.zenodo.json` com metadados explícitos (o arquivamento automático da
+  v0.1.0 no Zenodo falhou por metadados).
+
 ## 0.1.0 — 2026-07-29
 
 Primeira versão funcional.
