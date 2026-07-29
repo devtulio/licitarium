@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Licitarium — Opções de selo/ícone</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e8e8ea; font-family:system-ui,'Segoe UI',sans-serif; padding:24px; color:#222; }
+  h1 { font-size:20px; } .sub { color:#666; font-size:13px; margin:4px 0 22px; }
+  .opt { background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.12);
+         max-width:860px; margin:0 auto 22px; overflow:hidden; }
+  .opt h2 { font-size:15px; padding:14px 18px 2px; }
+  .opt p { font-size:12.5px; color:#555; padding:0 18px 12px; line-height:1.45; }
+  .tiles { display:flex; }
+  .tile { flex:1; display:flex; align-items:flex-end; gap:18px; padding:16px 18px 20px; }
+  .tile.light { background:#f2f2f2; }
+  .tile.dark  { background:#181c22; }
+  .slot { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .slot em { font-style:normal; font-size:10px; color:#888; }
+  .tile.dark .slot em { color:#777; }
+  template { display:none; }
+</style>
+</head>
+<body>
+<h1>Selo do Licitarium — 5 opções</h1>
+<p class="sub">Cada uma em 96 / 48 / 24 / 16 px, fundo claro e escuro. Ícone bom é o que sobrevive aos 16 px.</p>
+
+<!-- ═══ 1. SELO DE CERA ═══ -->
+<div class="opt" data-svg="s1">
+  <h2>1 · Selo de cera</h2>
+  <p>Círculo vermelho-selo, anel interno, L capitular serifado. A metáfora do documento oficial lacrado — e a mais robusta no encolhimento.</p>
+  <template id="s1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#8b2e2e"/>
+    <circle cx="32" cy="32" r="24.5" fill="none" stroke="#f5efe2" stroke-width="1.8" opacity=".55"/>
+    <text x="32" y="43.5" font-family="Georgia, 'Times New Roman', serif" font-size="33"
+          fill="#f5efe2" text-anchor="middle">L</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<!-- ═══ 2. ANEL EPIGRÁFICO ═══ -->
+<div class="opt" data-svg="s2">
+  <h2>2 · Anel epigráfico</h2>
+  <p>Moeda/medalha: inscrição LICITARIVM · RES PVBLICA circundando o L. Rica nos tamanhos grandes (splash, README); o texto some nos pequenos — o anel vira textura.</p>
+  <template id="s2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#f5efe2" stroke="#2b2115" stroke-width="2"/>
+    <circle cx="32" cy="32" r="21" fill="none" stroke="#b08d3e" stroke-width="1"/>
+    <defs><path id="tp" d="M32,7.5 a24.5,24.5 0 1,1 -0.01,0"/></defs>
+    <text font-family="Georgia, serif" font-size="6.4" letter-spacing="1.6" fill="#2b2115">
+      <textPath href="#tp">LICITARIVM · RES PVBLICA · </textPath></text>
+    <text x="32" y="41.5" font-family="Georgia, serif" font-size="26"
+          fill="#8b2e2e" text-anchor="middle">L</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<!-- ═══ 3. TABULA ANSATA ═══ -->
+<div class="opt" data-svg="s3">
+  <h2>3 · Tabula ansata</h2>
+  <p>A placa romana com alças laterais onde se gravavam inscrições públicas — o formato histórico do "aviso oficial". LVM gravado (Licitarium abreviado à romana).</p>
+  <template id="s3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <polygon points="10,26 2,20 2,44 10,38" fill="#b08d3e"/>
+    <polygon points="54,26 62,20 62,44 54,38" fill="#b08d3e"/>
+    <rect x="8" y="18" width="48" height="28" fill="#ded5c2" stroke="#2b2115" stroke-width="2"/>
+    <rect x="11.5" y="21.5" width="41" height="21" fill="none" stroke="#b08d3e" stroke-width="1"/>
+    <text x="32" y="39" font-family="Georgia, serif" font-size="15" letter-spacing="1.5"
+          fill="#2b2115" text-anchor="middle">LVM</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<!-- ═══ 4. COLUNA ═══ -->
+<div class="opt" data-svg="s4">
+  <h2>4 · Coluna</h2>
+  <p>Instituição pública em símbolo puro, sem letra. Dourado sobre disco escuro — funciona igual nos dois fundos. Menos "Licitarium", mais "governo" genérico.</p>
+  <template id="s4"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#2b2115"/>
+    <rect x="17" y="14" width="30" height="5" fill="#b08d3e"/>
+    <rect x="20" y="19" width="24" height="3" fill="#b08d3e"/>
+    <rect x="23" y="24" width="4.4" height="22" fill="#b08d3e"/>
+    <rect x="29.8" y="24" width="4.4" height="22" fill="#b08d3e"/>
+    <rect x="36.6" y="24" width="4.4" height="22" fill="#b08d3e"/>
+    <rect x="20" y="46" width="24" height="3" fill="#b08d3e"/>
+    <rect x="17" y="49" width="30" height="5" fill="#b08d3e"/>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<!-- ═══ 5. ROLO LACRADO ═══ -->
+<div class="opt" data-svg="s5">
+  <h2>5 · Rolo lacrado</h2>
+  <p>Pergaminho enrolado com lacre vermelho: o documento em si. Conta a história completa (acervo + oficial), mas dois elementos disputam espaço nos 16 px.</p>
+  <template id="s5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect x="12" y="10" width="40" height="44" rx="3" fill="#f5efe2" stroke="#2b2115" stroke-width="2.4"/>
+    <circle cx="12" cy="14" r="4.6" fill="#ded5c2" stroke="#2b2115" stroke-width="2"/>
+    <circle cx="52" cy="14" r="4.6" fill="#ded5c2" stroke="#2b2115" stroke-width="2"/>
+    <line x1="20" y1="26" x2="44" y2="26" stroke="#6f5b3e" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="20" y1="33" x2="44" y2="33" stroke="#6f5b3e" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="20" y1="40" x2="36" y2="40" stroke="#6f5b3e" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="45" cy="47" r="9.5" fill="#8b2e2e"/>
+    <text x="45" y="51.5" font-family="Georgia, serif" font-size="12" fill="#f5efe2" text-anchor="middle">L</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<script>
+  const SIZES = [96, 48, 24, 16];
+  document.querySelectorAll('.opt').forEach(opt => {
+    const svg = document.getElementById(opt.dataset.svg).content.firstElementChild;
+    opt.querySelectorAll('.tile').forEach(tile => {
+      SIZES.forEach(s => {
+        const slot = document.createElement('div'); slot.className = 'slot';
+        const c = svg.cloneNode(true); c.setAttribute('width', s); c.setAttribute('height', s);
+        slot.appendChild(c);
+        const em = document.createElement('em'); em.textContent = s + 'px';
+        slot.appendChild(em);
+        tile.appendChild(slot);
+      });
+    });
+  });
+</script>
+</body>
+</html>

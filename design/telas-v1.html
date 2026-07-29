@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="portal">
+<head>
+<meta charset="utf-8">
+<title>Licitarium — Telas: wizard, detalhe, config</title>
+<style>
+  :root, [data-theme="portal"] {
+    --bg:#f8f9fa; --surface:#ffffff; --surface2:#f1f3f5;
+    --text:#1b1b1b; --muted:#5c6670; --border:#e3e6e8;
+    --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#a26a00;
+    --radius:8px; --pill:99px; --font-ui:system-ui,'Segoe UI',sans-serif;
+    --shadow:0 1px 3px rgba(0,0,0,.08); --mark-v:var(--accent);
+  }
+  [data-theme="pergaminho"] {
+    --bg:#f5efe2; --surface:#fbf7ee; --surface2:#efe6d2;
+    --text:#2b2115; --muted:#6f5b3e; --border:#d9cbaa;
+    --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#8a6d1f;
+    --radius:3px; --pill:3px; --shadow:0 1px 2px rgba(43,33,21,.12); --mark-v:#8b2e2e;
+  }
+  [data-theme="observatorio"] {
+    --bg:#10151c; --surface:#1a212b; --surface2:#141a23;
+    --text:#dce3ec; --muted:#8b97a7; --border:#232c38;
+    --accent:#f0a836; --accent-fg:#10151c; --ok:#2dd4a7; --warn:#f0a836;
+    --radius:8px; --pill:6px; --shadow:0 1px 4px rgba(0,0,0,.4); --mark-v:#f0a836;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font-ui); font-size:14px;
+         transition:background .25s,color .25s; }
+  .mark { font-family:Georgia,serif; letter-spacing:.16em; }
+  .mark b { color:var(--mark-v); font-weight:400; }
+
+  /* barra do protótipo (não faz parte do app) */
+  .protobar { background:#333; color:#eee; padding:10px 16px; display:flex; gap:14px;
+              align-items:center; font-size:12px; }
+  .protobar .grp { display:flex; gap:4px; background:#444; border-radius:99px; padding:3px; }
+  .protobar button { border:none; background:transparent; color:#bbb; cursor:pointer;
+                     font-size:12px; padding:4px 12px; border-radius:99px; }
+  .protobar button.on { background:#eee; color:#222; }
+
+  .screen { display:none; } .screen.on { display:block; }
+
+  .btn { background:var(--accent); color:var(--accent-fg); border:none; cursor:pointer;
+         padding:10px 22px; font-size:13.5px; font-weight:600; border-radius:var(--pill); }
+  .btn.ghost { background:transparent; color:var(--text); border:1px solid var(--border); font-weight:400; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+          box-shadow:var(--shadow); }
+  input, select { background:var(--surface); color:var(--text); border:1px solid var(--border);
+          border-radius:var(--radius); padding:9px 11px; font-size:13.5px; font-family:var(--font-ui); }
+  .badge { font-size:10.5px; padding:3px 10px; border-radius:var(--pill); letter-spacing:.04em; }
+  .badge.ok { background:color-mix(in srgb, var(--ok) 15%, transparent); color:var(--ok); }
+  label { font-size:12px; color:var(--muted); display:block; margin:14px 0 5px; }
+
+  /* ══ WIZARD ══ */
+  #wizard { min-height:calc(100vh - 41px); display:flex; align-items:center; justify-content:center; }
+  .wcard { width:420px; padding:34px 38px 30px; text-align:center; }
+  .wcard svg { width:110px; height:110px; }
+  .wcard .mark { font-size:26px; margin-top:8px; }
+  .wcard .sub { font-size:12px; color:var(--muted); margin-top:4px; }
+  .wcard .fields { text-align:left; margin-top:18px; }
+  .wcard select, .wcard input { width:100%; }
+  .check { display:flex; gap:8px; align-items:flex-start; text-align:left; margin:16px 0 20px;
+           font-size:12.5px; color:var(--muted); }
+  .check input { width:auto; margin-top:2px; }
+  .dots { margin-top:18px; color:var(--muted); font-size:11px; }
+
+  /* ══ DETALHE ══ */
+  #detalhe main, #config main { max-width:820px; margin:0 auto; padding:22px; }
+  .crumb { font-size:12px; color:var(--muted); margin-bottom:12px; }
+  .crumb a { color:var(--accent); text-decoration:none; }
+  .dhead { padding:20px; display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+  .dhead h1 { font-size:17px; line-height:1.4; font-weight:600; }
+  .dhead .mod { font-size:12px; color:var(--muted); margin-top:4px; }
+  .meta { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border);
+          border-top:1px solid var(--border); }
+  .meta div { background:var(--surface); padding:12px 20px; }
+  .meta .k { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+  .meta .v { font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .sec { margin-top:18px; }
+  .sec h2 { font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
+            margin-bottom:8px; }
+  .itens .row { display:grid; grid-template-columns:1fr 90px 110px; gap:12px; padding:10px 16px;
+                font-size:13px; }
+  .itens .row + .row { border-top:1px solid var(--border); }
+  .itens .num { text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* ══ CONFIG ══ */
+  .cfg { padding:20px; margin-bottom:16px; }
+  .cfg h2 { font-size:14px; margin-bottom:12px; }
+  .tcards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tcard { border:2px solid var(--border); border-radius:var(--radius); padding:12px; cursor:pointer;
+           text-align:center; font-size:12.5px; }
+  .tcard.on { border-color:var(--accent); }
+  .tcard .sw { height:34px; border-radius:4px; margin-bottom:8px; border:1px solid rgba(0,0,0,.1); }
+  .orgrow { display:flex; justify-content:space-between; align-items:center; padding:9px 0;
+            font-size:13px; border-bottom:1px solid var(--border); }
+  .orgrow small { color:var(--muted); display:block; font-size:11px; }
+  .aviso { font-size:12px; color:var(--warn); margin-top:8px; }
+  .sobre { display:flex; gap:18px; align-items:center; }
+  .sobre svg { width:84px; height:84px; flex:none; }
+  .sobre p { font-size:12.5px; color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div class="protobar">
+  <span>PROTÓTIPO</span>
+  <div class="grp" id="screens">
+    <button data-s="wizard" class="on">Wizard</button>
+    <button data-s="detalhe">Detalhe</button>
+    <button data-s="config">Config</button>
+  </div>
+  <div class="grp" id="themes">
+    <button data-t="pergaminho">Pergaminho</button>
+    <button data-t="portal" class="on">Portal</button>
+    <button data-t="observatorio">Observatório</button>
+  </div>
+</div>
+
+<!-- ═══════════ WIZARD ═══════════ -->
+<div class="screen on" id="wizard">
+  <div class="card wcard">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
+      <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
+      <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+      <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+      <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+      <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
+            text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
+      <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
+            text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
+      <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
+      <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
+            fill="#2b2115" text-anchor="middle">MMXXVI</text>
+    </svg>
+    <div class="mark">LICITARI<b>V</b>M</div>
+    <div class="sub">Repositório municipal de contratações públicas</div>
+    <div class="fields">
+      <label>Estado</label>
+      <select><option>São Paulo</option></select>
+      <label>Município</label>
+      <input type="text" value="Orindiúva" placeholder="Digite para buscar…">
+      <div class="check">
+        <input type="checkbox" checked id="hist">
+        <label for="hist" style="margin:0">Baixar histórico completo desde 2021 (recomendado —
+        alguns minutos na primeira vez)</label>
+      </div>
+    </div>
+    <button class="btn" style="width:100%">Começar</button>
+    <div class="dots">passo 1 de 1 · dados públicos do PNCP · nada é enviado a terceiros</div>
+  </div>
+</div>
+
+<!-- ═══════════ DETALHE ═══════════ -->
+<div class="screen" id="detalhe">
+  <main>
+    <div class="crumb"><a href="#">Contratações</a> › Dispensa 12/2026</div>
+    <div class="card">
+      <div class="dhead">
+        <div>
+          <h1>Aquisição de gêneros alimentícios para merenda escolar das unidades da rede municipal</h1>
+          <div class="mod">Dispensa eletrônica 12/2026 · Processo 0451/2026</div>
+        </div>
+        <span class="badge ok">Homologada</span>
+      </div>
+      <div class="meta">
+        <div><div class="k">Valor estimado</div><div class="v">R$ 52.000,00</div></div>
+        <div><div class="k">Valor homologado</div><div class="v">R$ 48.230,00</div></div>
+        <div><div class="k">Economia</div><div class="v">7,3%</div></div>
+        <div><div class="k">Publicação</div><div class="v">14/03/2026</div></div>
+        <div><div class="k">Encerramento</div><div class="v">28/03/2026</div></div>
+        <div><div class="k">Última atualização</div><div class="v">02/04/2026</div></div>
+        <div><div class="k">Órgão</div><div class="v">Prefeitura de Orindiúva</div></div>
+        <div><div class="k">Unidade</div><div class="v">Secretaria de Educação</div></div>
+        <div><div class="k">Amparo legal</div><div class="v">Art. 75, II — Lei 14.133</div></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Itens (3)</h2>
+      <div class="card itens">
+        <div class="row"><span>Arroz agulhinha tipo 1 — pacote 5 kg</span><span class="num">800 un</span><span class="num">R$ 18.400,00</span></div>
+        <div class="row"><span>Feijão carioca tipo 1 — pacote 1 kg</span><span class="num">1.200 un</span><span class="num">R$ 10.680,00</span></div>
+        <div class="row"><span>Óleo de soja refinado — 900 ml</span><span class="num">2.400 un</span><span class="num">R$ 19.150,00</span></div>
+      </div>
+    </div>
+    <div class="sec" style="display:flex; gap:10px">
+      <button class="btn">Ver no PNCP ↗</button>
+      <button class="btn ghost">Exportar CSV</button>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════ CONFIG ═══════════ -->
+<div class="screen" id="config">
+  <main>
+    <div class="card cfg">
+      <h2>Aparência</h2>
+      <div class="tcards">
+        <div class="tcard" data-t="pergaminho"><div class="sw" style="background:linear-gradient(135deg,#f5efe2 60%,#8b2e2e 60%)"></div>Pergaminho</div>
+        <div class="tcard on" data-t="portal"><div class="sw" style="background:linear-gradient(135deg,#ffffff 60%,#1351b4 60%)"></div>Portal</div>
+        <div class="tcard" data-t="observatorio"><div class="sw" style="background:linear-gradient(135deg,#10151c 60%,#f0a836 60%)"></div>Observatório</div>
+      </div>
+    </div>
+    <div class="card cfg">
+      <h2>Município</h2>
+      <div style="font-size:13.5px">Orindiúva — SP <small style="color:var(--muted)">(IBGE 3534203)</small></div>
+      <button class="btn ghost" style="margin-top:10px">Trocar município…</button>
+      <div class="aviso">⚠ Trocar município reinicia o acervo e refaz o download histórico.</div>
+    </div>
+    <div class="card cfg">
+      <h2>Órgãos monitorados</h2>
+      <div class="orgrow"><span>Prefeitura Municipal de Orindiúva<small>45.146.734/0001-00 · descoberto automaticamente</small></span><input type="checkbox" checked></div>
+      <div class="orgrow"><span>Câmara Municipal de Orindiúva<small>51.842.219/0001-00 · adicionado manualmente</small></span><input type="checkbox" checked></div>
+      <button class="btn ghost" style="margin-top:12px">+ Adicionar CNPJ</button>
+    </div>
+    <div class="card cfg sobre">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
+        <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
+        <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+        <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+        <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+        <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
+              text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
+        <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
+              text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
+        <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
+              fill="#2b2115" text-anchor="middle">MMXXVI</text>
+      </svg>
+      <p><b style="color:var(--text)">Licitarium 1.0.0</b><br>
+      Repositório local de contratações públicas, espelhando o PNCP.<br>
+      Código aberto (MIT) · dados públicos · github.com/…/licitarium</p>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('#screens button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id===b.dataset.s));
+    document.querySelectorAll('#screens button').forEach(x => x.classList.toggle('on', x===b));
+  });
+  function setTheme(t){
+    document.documentElement.dataset.theme = t;
+    document.querySelectorAll('#themes button').forEach(x => x.classList.toggle('on', x.dataset.t===t));
+    document.querySelectorAll('.tcard').forEach(x => x.classList.toggle('on', x.dataset.t===t));
+  }
+  document.querySelectorAll('#themes button').forEach(b => b.onclick = () => setTheme(b.dataset.t));
+  document.querySelectorAll('.tcard').forEach(c => c.onclick = () => setTheme(c.dataset.t));
+</script>
+</body>
+</html>

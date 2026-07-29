@@ -1,0 +1,375 @@
+"""Licitarium — repositório local de contratações públicas municipais (PNCP).
+
+Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
+Versão 0.1.0
+"""
+import csv
+import json
+import sqlite3
+import threading
+import webbrowser
+from datetime import date, datetime
+from pathlib import Path
+
+import webview
+
+import pncp
+
+VERSAO = "0.1.0"
+DIR_APP = Path(__file__).resolve().parent
+DIR_DADOS = Path.home() / "AppData" / "Local" / "Licitarium"
+ARQUIVO_DB = DIR_DADOS / "licitarium.db"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);
+CREATE TABLE IF NOT EXISTS orgaos (
+  cnpj TEXT PRIMARY KEY, razao_social TEXT, ativo INTEGER DEFAULT 1,
+  origem TEXT DEFAULT 'descoberto');
+CREATE TABLE IF NOT EXISTS contratacoes (
+  numero_controle TEXT PRIMARY KEY, ano INTEGER, sequencial INTEGER,
+  orgao_cnpj TEXT, orgao_nome TEXT, unidade TEXT,
+  modalidade_id INTEGER, modalidade_nome TEXT, situacao TEXT, objeto TEXT,
+  valor_estimado REAL, valor_homologado REAL,
+  data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS contratos (
+  numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
+  fornecedor_ni TEXT, fornecedor_nome TEXT, objeto TEXT, valor_global REAL,
+  vigencia_inicio TEXT, vigencia_fim TEXT,
+  data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS atas (
+  numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
+  vigencia_inicio TEXT, vigencia_fim TEXT, data_atualizacao TEXT,
+  raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS sync_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, iniciado_em TEXT, tipo TEXT,
+  janela_ini TEXT, janela_fim TEXT, registros INTEGER, status TEXT, erro TEXT);
+CREATE INDEX IF NOT EXISTS ix_contratacoes_pub ON contratacoes (data_publicacao);
+CREATE INDEX IF NOT EXISTS ix_contratacoes_mod ON contratacoes (modalidade_id);
+CREATE INDEX IF NOT EXISTS ix_contratos_pub ON contratos (data_publicacao);
+CREATE INDEX IF NOT EXISTS ix_atas_vig ON atas (vigencia_fim);
+"""
+
+TABELAS = {"contratacoes", "contratos", "atas"}  # whitelist p/ tipo vindo do JS
+
+
+def abrir_db():
+    # ponytail: conexão nova por operação — chamadas vêm de threads distintas
+    # (js bridge + thread de sync) e o volume municipal não justifica pool
+    DIR_DADOS.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(ARQUIVO_DB)
+    db.row_factory = sqlite3.Row
+    db.executescript(SCHEMA)
+    return db
+
+
+class Api:
+    """Métodos chamados do JS via window.pywebview.api.*"""
+
+    def __init__(self):
+        self.janela = None  # definida em main()
+        self._sync_ativo = threading.Lock()
+        self._status = {"rodando": False, "msg": "", "resumo": None, "erro": None}
+        self._municipios = None
+
+    # ── estado e configuração ───────────────────────────────────────────
+
+    def get_estado(self):
+        db = abrir_db()
+        try:
+            cfg = {r["chave"]: r["valor"] for r in
+                   db.execute("SELECT chave, valor FROM config")}
+            return {"versao": VERSAO,
+                    "municipio": cfg.get("municipio_nome"),
+                    "uf": cfg.get("municipio_uf"),
+                    "ibge": cfg.get("municipio_ibge"),
+                    "tema": cfg.get("tema", "portal"),
+                    "last_sync": cfg.get("last_sync_contratacoes"),
+                    "kpis": self._kpis(db)}
+        finally:
+            db.close()
+
+    def _kpis(self, db):
+        ano = str(date.today().year)
+        hoje = date.today().isoformat()
+        n_contratacoes = db.execute(
+            "SELECT COUNT(*) FROM contratacoes").fetchone()[0]
+        homologado_ano = db.execute(
+            "SELECT COALESCE(SUM(valor_homologado),0) FROM contratacoes "
+            "WHERE substr(data_publicacao,1,4)=?", (ano,)).fetchone()[0]
+        vigentes = db.execute(
+            "SELECT COUNT(*) FROM contratos WHERE substr(vigencia_fim,1,10)>=?",
+            (hoje,)).fetchone()[0]
+        return {"contratacoes": n_contratacoes,
+                "homologado_ano": homologado_ano, "vigentes": vigentes}
+
+    def set_config(self, chave, valor):
+        if chave not in ("tema",):
+            return False
+        db = abrir_db()
+        try:
+            pncp._config(db, chave, valor)
+            return True
+        finally:
+            db.close()
+
+    # ── wizard / município ──────────────────────────────────────────────
+
+    def municipios(self, texto, uf=None):
+        if self._municipios is None:
+            with open(DIR_APP / "ui" / "municipios.json", encoding="utf-8") as f:
+                self._municipios = json.load(f)
+        texto = (texto or "").strip().lower()
+        achados = [m for m in self._municipios
+                   if texto in m["n"].lower() and (not uf or m["uf"] == uf)]
+        return achados[:12]
+
+    def configurar_municipio(self, codigo, nome, uf):
+        db = abrir_db()
+        try:
+            pncp._config(db, "municipio_ibge", str(codigo))
+            pncp._config(db, "municipio_nome", nome)
+            pncp._config(db, "municipio_uf", uf)
+        finally:
+            db.close()
+        return True
+
+    def trocar_municipio(self, codigo, nome, uf):
+        """Troca = reinicia o acervo (banco é cache reconstruível)."""
+        db = abrir_db()
+        try:
+            for tabela in ("contratacoes", "contratos", "atas", "orgaos",
+                           "sync_log"):
+                db.execute(f"DELETE FROM {tabela}")
+            db.execute("DELETE FROM config WHERE chave LIKE 'last_sync_%'")
+            db.commit()
+        finally:
+            db.close()
+        return self.configurar_municipio(codigo, nome, uf)
+
+    # ── órgãos ──────────────────────────────────────────────────────────
+
+    def listar_orgaos(self):
+        db = abrir_db()
+        try:
+            return [dict(r) for r in db.execute(
+                "SELECT cnpj, razao_social, ativo, origem FROM orgaos "
+                "ORDER BY razao_social")]
+        finally:
+            db.close()
+
+    def set_orgao_ativo(self, cnpj, ativo):
+        db = abrir_db()
+        try:
+            db.execute("UPDATE orgaos SET ativo=? WHERE cnpj=?",
+                       (1 if ativo else 0, cnpj))
+            db.commit()
+            return True
+        finally:
+            db.close()
+
+    def add_orgao(self, cnpj, nome):
+        cnpj = "".join(c for c in (cnpj or "") if c.isdigit())
+        if len(cnpj) != 14:
+            return {"ok": False, "erro": "CNPJ deve ter 14 dígitos"}
+        db = abrir_db()
+        try:
+            db.execute(
+                "INSERT OR IGNORE INTO orgaos (cnpj, razao_social, ativo, origem)"
+                " VALUES (?,?,1,'manual')", (cnpj, nome or cnpj))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    # ── listagem e detalhe ──────────────────────────────────────────────
+
+    def listar(self, tipo, filtros=None, pagina=1):
+        if tipo not in TABELAS:
+            return {"itens": [], "total": 0}
+        f = filtros or {}
+        where, args = [], []
+        if f.get("ano"):
+            coluna = "vigencia_inicio" if tipo == "atas" else "data_publicacao"
+            where.append(f"substr({coluna},1,4)=?")
+            args.append(str(f["ano"]))
+        if f.get("modalidade") and tipo == "contratacoes":
+            where.append("modalidade_id=?")
+            args.append(f["modalidade"])
+        if f.get("situacao") and tipo == "contratacoes":
+            where.append("situacao=?")
+            args.append(f["situacao"])
+        if f.get("busca"):
+            where.append("(objeto LIKE ? OR numero_controle LIKE ?)"
+                         if tipo != "atas" else "numero_controle LIKE ?")
+            termo = f"%{f['busca']}%"
+            args += [termo, termo] if tipo != "atas" else [termo]
+        sql_where = (" WHERE " + " AND ".join(where)) if where else ""
+        ordem = {"contratacoes": "data_publicacao DESC",
+                 "contratos": "data_publicacao DESC",
+                 "atas": "vigencia_fim DESC"}[tipo]
+        db = abrir_db()
+        try:
+            total = db.execute(
+                f"SELECT COUNT(*) FROM {tipo}{sql_where}", args).fetchone()[0]
+            linhas = db.execute(
+                f"SELECT * FROM {tipo}{sql_where} ORDER BY {ordem} "
+                f"LIMIT 50 OFFSET ?", args + [(max(1, pagina) - 1) * 50])
+            itens = []
+            for r in linhas:
+                d = dict(r)
+                d.pop("raw", None)  # listagem não precisa do JSON completo
+                itens.append(d)
+            return {"itens": itens, "total": total}
+        finally:
+            db.close()
+
+    def detalhe(self, tipo, numero_controle):
+        if tipo not in TABELAS:
+            return None
+        db = abrir_db()
+        try:
+            r = db.execute(f"SELECT * FROM {tipo} WHERE numero_controle=?",
+                           (numero_controle,)).fetchone()
+            if not r:
+                return None
+            d = dict(r)
+            d["raw"] = json.loads(d["raw"]) if d.get("raw") else {}
+            return d
+        finally:
+            db.close()
+
+    def filtros_disponiveis(self):
+        db = abrir_db()
+        try:
+            anos = [r[0] for r in db.execute(
+                "SELECT DISTINCT substr(data_publicacao,1,4) FROM contratacoes "
+                "WHERE data_publicacao IS NOT NULL ORDER BY 1 DESC")]
+            situacoes = [r[0] for r in db.execute(
+                "SELECT DISTINCT situacao FROM contratacoes "
+                "WHERE situacao IS NOT NULL ORDER BY 1")]
+            modalidades = [{"id": r[0], "nome": r[1]} for r in db.execute(
+                "SELECT DISTINCT modalidade_id, modalidade_nome FROM contratacoes"
+                " WHERE modalidade_id IS NOT NULL ORDER BY 2")]
+            return {"anos": anos, "situacoes": situacoes,
+                    "modalidades": modalidades}
+        finally:
+            db.close()
+
+    # ── link oficial ────────────────────────────────────────────────────
+
+    def abrir_pncp(self, tipo, numero_controle):
+        d = self.detalhe(tipo, numero_controle)
+        if not d:
+            return False
+        raw = d["raw"]
+        orgao = (raw.get("orgaoEntidade") or {}).get("cnpj")
+        if tipo == "contratacoes" and orgao:
+            url = (f"https://pncp.gov.br/app/editais/{orgao}/"
+                   f"{raw.get('anoCompra')}/{raw.get('sequencialCompra')}")
+        elif tipo == "contratos" and orgao:
+            url = (f"https://pncp.gov.br/app/contratos/{orgao}/"
+                   f"{raw.get('anoContrato')}/{raw.get('sequencialContrato')}")
+        else:
+            # ata: página da contratação-mãe é o destino mais estável
+            url = "https://pncp.gov.br/app/atas"
+        webbrowser.open(url)
+        return True
+
+    # ── sincronização ───────────────────────────────────────────────────
+
+    def sincronizar(self):
+        if not self._sync_ativo.acquire(blocking=False):
+            return False  # já rodando
+        threading.Thread(target=self._rodar_sync, daemon=True).start()
+        return True
+
+    def _rodar_sync(self):
+        try:
+            self._status.update(rodando=True, msg="Conectando ao PNCP…",
+                                resumo=None, erro=None)
+            self._avisar_ui()
+            db = abrir_db()
+            try:
+                ibge = pncp._config(db, "municipio_ibge")
+                if not ibge:
+                    return
+                resumo = pncp.sincronizar_tudo(db, ibge, self._progresso)
+                self._status.update(resumo=resumo)
+            finally:
+                db.close()
+        except Exception as e:  # nunca derrubar a thread silenciosamente
+            self._status.update(erro=str(e))
+        finally:
+            self._status.update(rodando=False, msg="")
+            self._sync_ativo.release()
+            self._avisar_ui(fim=True)
+
+    def _progresso(self, msg):
+        self._status["msg"] = msg
+        self._avisar_ui()
+
+    def _avisar_ui(self, fim=False):
+        if not self.janela:
+            return
+        evento = "onSyncFim" if fim else "onSyncProgresso"
+        payload = json.dumps(self._status, ensure_ascii=False)
+        try:
+            self.janela.evaluate_js(f"window.{evento} && {evento}({payload})")
+        except Exception:
+            pass  # janela fechando
+
+    def status_sync(self):
+        return self._status
+
+    def ultimo_log(self):
+        db = abrir_db()
+        try:
+            return [dict(r) for r in db.execute(
+                "SELECT * FROM sync_log ORDER BY id DESC LIMIT 10")]
+        finally:
+            db.close()
+
+    # ── exportação ──────────────────────────────────────────────────────
+
+    def exportar_csv(self, tipo, filtros=None):
+        if tipo not in TABELAS:
+            return {"ok": False, "erro": "tipo inválido"}
+        destino = self.janela.create_file_dialog(
+            webview.SAVE_DIALOG, save_filename=f"{tipo}.csv",
+            file_types=("CSV (*.csv)",))
+        if not destino:
+            return {"ok": False, "erro": None}  # cancelado
+        caminho = destino if isinstance(destino, str) else destino[0]
+        # exporta o filtro atual completo, sem paginação
+        db = abrir_db()
+        try:
+            resultado = self.listar(tipo, filtros, pagina=1)
+            total = resultado["total"]
+            itens, pagina = [], 1
+            while len(itens) < total:
+                lote = self.listar(tipo, filtros, pagina)["itens"]
+                if not lote:
+                    break
+                itens += lote
+                pagina += 1
+            if not itens:
+                return {"ok": False, "erro": "nada a exportar"}
+            with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.DictWriter(f, fieldnames=itens[0].keys(), delimiter=";")
+                w.writeheader()
+                w.writerows(itens)
+            return {"ok": True, "arquivo": caminho, "linhas": len(itens)}
+        finally:
+            db.close()
+
+
+def main():
+    api = Api()
+    api.janela = webview.create_window(
+        "Licitarium", str(DIR_APP / "ui" / "index.html"), js_api=api,
+        width=1100, height=740, min_size=(900, 600))
+    webview.start()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="portal">
+<head>
+<meta charset="utf-8">
+<title>Licitarium</title>
+<style>
+  :root, [data-theme="portal"] {
+    --bg:#f8f9fa; --surface:#ffffff; --surface2:#f1f3f5;
+    --text:#1b1b1b; --muted:#5c6670; --border:#e3e6e8;
+    --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#a26a00;
+    --radius:8px; --pill:99px; --font-ui:system-ui,'Segoe UI',sans-serif;
+    --shadow:0 1px 3px rgba(0,0,0,.08); --mark-v:var(--accent);
+  }
+  [data-theme="pergaminho"] {
+    --bg:#f5efe2; --surface:#fbf7ee; --surface2:#efe6d2;
+    --text:#2b2115; --muted:#6f5b3e; --border:#d9cbaa;
+    --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#8a6d1f;
+    --radius:3px; --pill:3px; --shadow:0 1px 2px rgba(43,33,21,.12); --mark-v:#8b2e2e;
+  }
+  [data-theme="observatorio"] {
+    --bg:#10151c; --surface:#1a212b; --surface2:#141a23;
+    --text:#dce3ec; --muted:#8b97a7; --border:#232c38;
+    --accent:#f0a836; --accent-fg:#10151c; --ok:#2dd4a7; --warn:#f0a836;
+    --radius:8px; --pill:6px; --shadow:0 1px 4px rgba(0,0,0,.4); --mark-v:#f0a836;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font-ui);
+         font-size:14px; transition:background .25s,color .25s; }
+  .oculto { display:none !important; }
+
+  .mark { font-family:Georgia,'Times New Roman',serif; letter-spacing:.16em; }
+  .mark b { color:var(--mark-v); font-weight:400; }
+
+  button { font-family:var(--font-ui); cursor:pointer; }
+  .btn { background:var(--accent); color:var(--accent-fg); border:none;
+         padding:9px 18px; font-size:13px; font-weight:600; border-radius:var(--pill); }
+  .btn:disabled { opacity:.55; cursor:default; }
+  .btn.ghost { background:transparent; color:var(--text);
+               border:1px solid var(--border); font-weight:400; }
+  input, select { background:var(--surface); color:var(--text);
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:8px 10px; font-size:13px; font-family:var(--font-ui); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .card { background:var(--surface); border:1px solid var(--border);
+          border-radius:var(--radius); box-shadow:var(--shadow); }
+  .badge { font-size:10.5px; padding:3px 10px; border-radius:var(--pill);
+           letter-spacing:.04em; white-space:nowrap; }
+  .badge.ok   { background:color-mix(in srgb, var(--ok) 15%, transparent); color:var(--ok); }
+  .badge.warn { background:color-mix(in srgb, var(--warn) 15%, transparent); color:var(--warn); }
+  .badge.mut  { background:var(--surface2); color:var(--muted); }
+  [data-theme="pergaminho"] .badge.ok { background:var(--ok); color:var(--accent-fg); }
+  label { font-size:12px; color:var(--muted); display:block; margin:12px 0 5px; }
+
+  /* ══ WIZARD ══ */
+  #wizard { min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .wcard { width:430px; padding:32px 36px 28px; text-align:center; }
+  .wcard svg { width:105px; height:105px; }
+  .wcard .mark { font-size:26px; margin-top:6px; }
+  .wcard .sub { font-size:12px; color:var(--muted); margin-top:4px; }
+  .wcard .campos { text-align:left; margin-top:14px; }
+  .wcard select, .wcard input { width:100%; }
+  #wiz-sugestoes { text-align:left; border:1px solid var(--border);
+    border-radius:var(--radius); margin-top:4px; max-height:160px; overflow-y:auto; }
+  #wiz-sugestoes button { display:block; width:100%; text-align:left; border:none;
+    background:var(--surface); color:var(--text); padding:8px 10px; font-size:13px; }
+  #wiz-sugestoes button:hover, #wiz-sugestoes button:focus { background:var(--surface2); }
+  .wnota { margin:16px 0 18px; font-size:12px; color:var(--muted); text-align:left; }
+
+  /* ══ APP ══ */
+  header { background:var(--surface); border-bottom:1px solid var(--border);
+           padding:12px 22px; display:flex; align-items:center;
+           justify-content:space-between; gap:12px; }
+  [data-theme="pergaminho"] header { border-bottom:3px double #b08d3e; }
+  header .mark { font-size:22px; }
+  header .mark small { display:block; font-family:var(--font-ui); font-size:10.5px;
+    letter-spacing:.05em; color:var(--muted); margin-top:2px; }
+  main { max-width:1000px; margin:0 auto; padding:18px 22px 30px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+  .kpi { padding:13px 16px; }
+  .kpi .n { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;
+            color:var(--accent); }
+  [data-theme="pergaminho"] .kpi .n { font-family:Georgia,serif; font-weight:400; }
+  .kpi .l { font-size:10.5px; color:var(--muted); letter-spacing:.07em;
+            text-transform:uppercase; margin-top:3px; }
+
+  nav.abas { display:flex; gap:2px; border-bottom:2px solid var(--border); margin-bottom:12px; }
+  nav.abas button { padding:9px 16px; color:var(--muted); background:none; border:none;
+                    font-size:13.5px; border-bottom:3px solid transparent; margin-bottom:-2px; }
+  nav.abas button.on { color:var(--accent); font-weight:600;
+                       border-bottom-color:var(--accent); }
+
+  .filtros { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filtros input[type=search] { flex:1; min-width:170px; }
+
+  .lista { overflow:hidden; }
+  .linha { display:grid; gap:12px; padding:11px 16px; align-items:center;
+           font-size:13px; cursor:pointer; border:none; background:none;
+           width:100%; text-align:left; color:var(--text); }
+  .linha:hover, .linha:focus { background:var(--surface2); }
+  .linha + .linha { border-top:1px solid var(--border); }
+  .cab { font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+         color:var(--muted); cursor:default; background:var(--surface2); }
+  .cab:hover { background:var(--surface2); }
+  .g-contratacoes { grid-template-columns:150px 1fr 120px 120px; }
+  .g-contratos    { grid-template-columns:150px 1fr 160px 110px; }
+  .g-atas         { grid-template-columns:200px 1fr 170px; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  [data-theme="pergaminho"] .num { font-family:Georgia,serif; }
+  .dim { color:var(--muted); font-size:12px; }
+  .vazio { padding:34px; text-align:center; color:var(--muted); font-size:13px; }
+
+  .rodape { display:flex; justify-content:space-between; align-items:center;
+            margin-top:12px; font-size:12px; color:var(--muted); gap:10px; flex-wrap:wrap; }
+  .rodape .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+                 background:var(--ok); margin-right:6px; }
+  .rodape .dot.rodando { background:var(--warn); animation:pulsa 1s infinite; }
+  @keyframes pulsa { 50% { opacity:.35; } }
+  .paginacao { display:flex; gap:6px; align-items:center; }
+
+  /* ══ MODAIS ══ */
+  .veu { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+         align-items:flex-start; justify-content:center; padding:36px 16px; overflow-y:auto; }
+  .modal { width:min(760px, 100%); padding:0; }
+  .mhead { padding:18px 20px; display:flex; justify-content:space-between;
+           gap:14px; align-items:flex-start; }
+  .mhead h1 { font-size:16px; line-height:1.4; font-weight:600; }
+  .mhead .dim { margin-top:4px; }
+  .fechar { background:none; border:none; color:var(--muted); font-size:20px;
+            line-height:1; padding:2px 6px; }
+  .meta { display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
+          background:var(--border); border-top:1px solid var(--border); }
+  .meta > div { background:var(--surface); padding:11px 18px; }
+  .meta .k { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase;
+             color:var(--muted); }
+  .meta .v { font-size:13.5px; margin-top:3px; font-variant-numeric:tabular-nums;
+             overflow-wrap:break-word; }
+  .macoes { display:flex; gap:10px; padding:16px 20px; flex-wrap:wrap; }
+  details.raw { margin:0 20px 18px; font-size:12px; }
+  details.raw pre { background:var(--surface2); border-radius:var(--radius);
+    padding:12px; margin-top:8px; overflow-x:auto; max-height:320px; font-size:11.5px; }
+
+  .cfg { padding:18px 20px; margin-bottom:14px; }
+  .cfg h2 { font-size:14px; margin-bottom:10px; }
+  .tcards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tcard { border:2px solid var(--border); border-radius:var(--radius);
+           padding:10px; background:var(--surface); color:var(--text);
+           text-align:center; font-size:12.5px; }
+  .tcard.on { border-color:var(--accent); }
+  .tcard .sw { height:30px; border-radius:4px; margin-bottom:7px;
+               border:1px solid rgba(0,0,0,.12); }
+  .orgrow { display:flex; justify-content:space-between; align-items:center;
+            gap:10px; padding:9px 0; font-size:13px;
+            border-bottom:1px solid var(--border); }
+  .orgrow small { color:var(--muted); display:block; font-size:11px; }
+  .aviso { font-size:12px; color:var(--warn); margin-top:8px; }
+  .sobre { display:flex; gap:16px; align-items:center; }
+  .sobre svg { width:80px; height:80px; flex:none; }
+  .sobre p { font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .logline { font-size:11.5px; color:var(--muted); padding:4px 0;
+             border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- ═══ WIZARD ═══ -->
+<div id="wizard" class="oculto">
+  <div class="card wcard">
+    <svg viewBox="0 0 64 64" aria-hidden="true" id="svg-estandarte-wiz"></svg>
+    <div class="mark">LICITARI<b>V</b>M</div>
+    <div class="sub">Repositório municipal de contratações públicas</div>
+    <div class="campos">
+      <label for="wiz-uf">Estado</label>
+      <select id="wiz-uf"><option value="">Todos</option></select>
+      <label for="wiz-busca">Município</label>
+      <input type="text" id="wiz-busca" placeholder="Digite para buscar…"
+             autocomplete="off">
+      <div id="wiz-sugestoes" class="oculto" role="listbox"></div>
+    </div>
+    <div class="wnota">O histórico completo desde 2021 será baixado do PNCP na
+      primeira sincronização — pode levar alguns minutos. Nada é enviado a
+      terceiros: o Licitarium apenas lê dados públicos.</div>
+    <button class="btn" id="wiz-ok" style="width:100%" disabled>Começar</button>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app" class="oculto">
+  <header>
+    <div class="mark">LICITARI<b>V</b>M<small id="sub-municipio"></small></div>
+    <div style="display:flex; gap:8px">
+      <button class="btn ghost" id="btn-config">Configurações</button>
+      <button class="btn" id="btn-sync">Sincronizar</button>
+    </div>
+  </header>
+  <main>
+    <div class="kpis">
+      <div class="card kpi"><div class="n" id="kpi-contratacoes">–</div>
+        <div class="l">contratações</div></div>
+      <div class="card kpi"><div class="n" id="kpi-homologado">–</div>
+        <div class="l" id="kpi-homologado-l">homologado</div></div>
+      <div class="card kpi"><div class="n" id="kpi-vigentes">–</div>
+        <div class="l">contratos vigentes</div></div>
+    </div>
+    <nav class="abas" role="tablist">
+      <button data-tipo="contratacoes" class="on" role="tab">Contratações</button>
+      <button data-tipo="contratos" role="tab">Contratos</button>
+      <button data-tipo="atas" role="tab">Atas</button>
+    </nav>
+    <div class="filtros">
+      <select id="f-ano" aria-label="Ano"><option value="">Todos os anos</option></select>
+      <select id="f-modalidade" aria-label="Modalidade">
+        <option value="">Todas as modalidades</option></select>
+      <select id="f-situacao" aria-label="Situação">
+        <option value="">Todas as situações</option></select>
+      <input type="search" id="f-busca" placeholder="Buscar no objeto…"
+             aria-label="Buscar">
+      <button class="btn ghost" id="btn-csv">Exportar CSV</button>
+    </div>
+    <div class="card lista" id="lista"></div>
+    <div class="rodape">
+      <span id="sync-status"><span class="dot" id="sync-dot"></span>
+        <span id="sync-msg">–</span></span>
+      <div class="paginacao">
+        <button class="btn ghost" id="pag-ant" aria-label="Página anterior">‹</button>
+        <span id="pag-info" class="dim"></span>
+        <button class="btn ghost" id="pag-prox" aria-label="Próxima página">›</button>
+      </div>
+      <span id="rodape-versao">PNCP · dados públicos</span>
+    </div>
+  </main>
+</div>
+
+<!-- ═══ DETALHE ═══ -->
+<div id="veu-detalhe" class="veu oculto" role="dialog" aria-modal="true">
+  <div class="card modal">
+    <div class="mhead">
+      <div><h1 id="det-titulo"></h1><div class="dim" id="det-sub"></div></div>
+      <button class="fechar" data-fecha="veu-detalhe" aria-label="Fechar">×</button>
+    </div>
+    <div class="meta" id="det-meta"></div>
+    <div class="macoes">
+      <button class="btn" id="det-pncp">Ver no PNCP ↗</button>
+    </div>
+    <details class="raw"><summary>Dados completos (JSON do PNCP)</summary>
+      <pre id="det-raw"></pre></details>
+  </div>
+</div>
+
+<!-- ═══ CONFIG ═══ -->
+<div id="veu-config" class="veu oculto" role="dialog" aria-modal="true">
+  <div class="modal" style="background:none; border:none; box-shadow:none">
+    <div class="card cfg">
+      <div style="display:flex; justify-content:space-between">
+        <h2>Aparência</h2>
+        <button class="fechar" data-fecha="veu-config" aria-label="Fechar">×</button>
+      </div>
+      <div class="tcards">
+        <button class="tcard" data-tema="pergaminho">
+          <div class="sw" style="background:linear-gradient(135deg,#f5efe2 60%,#8b2e2e 60%)"></div>Pergaminho</button>
+        <button class="tcard" data-tema="portal">
+          <div class="sw" style="background:linear-gradient(135deg,#ffffff 60%,#1351b4 60%)"></div>Portal</button>
+        <button class="tcard" data-tema="observatorio">
+          <div class="sw" style="background:linear-gradient(135deg,#10151c 60%,#f0a836 60%)"></div>Observatório</button>
+      </div>
+    </div>
+    <div class="card cfg">
+      <h2>Município</h2>
+      <div style="font-size:13.5px" id="cfg-municipio"></div>
+      <div class="aviso">Para trocar de município, use o assistente inicial:
+        a troca reinicia o acervo e refaz o download histórico.
+        <button class="btn ghost" id="btn-trocar" style="margin-left:8px">Trocar…</button>
+      </div>
+    </div>
+    <div class="card cfg">
+      <h2>Órgãos monitorados</h2>
+      <div id="cfg-orgaos"></div>
+      <div style="display:flex; gap:8px; margin-top:12px">
+        <input type="text" id="novo-cnpj" placeholder="CNPJ (14 dígitos)">
+        <input type="text" id="novo-nome" placeholder="Nome do órgão">
+        <button class="btn ghost" id="btn-add-orgao">+ Adicionar</button>
+      </div>
+    </div>
+    <div class="card cfg">
+      <h2>Sincronizações recentes</h2>
+      <div id="cfg-log"></div>
+    </div>
+    <div class="card cfg sobre">
+      <svg viewBox="0 0 64 64" aria-hidden="true" id="svg-estandarte-sobre"></svg>
+      <p><b style="color:var(--text)">Licitarium <span id="sobre-versao"></span></b><br>
+      Repositório local de contratações públicas, espelhando o PNCP.<br>
+      Código aberto (MIT) · sub hasta publica · MMXXVI</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl = new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"});
+const dinheiro = v => v == null ? "–" : brl.format(v);
+const dataBr = s => {
+  if (!s) return "–";
+  const d = String(s).slice(0, 10).split("-");
+  return d.length === 3 ? `${d[2]}/${d[1]}/${d[0]}` : s;
+};
+const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG",
+  "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
+const ESTANDARTE = `
+  <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
+  <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
+  <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
+        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
+  <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
+        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
+  <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
+  <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
+        fill="#2b2115" text-anchor="middle">MMXXVI</text>`;
+
+const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null };
+let api = null;
+
+// ── boot ──────────────────────────────────────────────────────────────────
+window.addEventListener("pywebviewready", async () => {
+  api = window.pywebview.api;
+  document.querySelectorAll("#svg-estandarte-wiz, #svg-estandarte-sobre")
+    .forEach(s => s.innerHTML = ESTANDARTE);
+  const e = await api.get_estado();
+  aplicarTema(e.tema || "portal", false);
+  $("sobre-versao").textContent = e.versao;
+  $("rodape-versao").textContent = `PNCP · dados públicos · v${e.versao}`;
+  if (!e.ibge) { iniciarWizard(); return; }
+  iniciarApp(e);
+});
+
+function aplicarTema(tema, salvar = true) {
+  document.documentElement.dataset.theme = tema;
+  document.querySelectorAll(".tcard").forEach(c =>
+    c.classList.toggle("on", c.dataset.tema === tema));
+  if (salvar && api) api.set_config("tema", tema);
+}
+document.querySelectorAll(".tcard").forEach(c =>
+  c.addEventListener("click", () => aplicarTema(c.dataset.tema)));
+
+// ── wizard ────────────────────────────────────────────────────────────────
+let wizEscolha = null;
+function iniciarWizard() {
+  $("wizard").classList.remove("oculto");
+  $("app").classList.add("oculto");
+  const sel = $("wiz-uf");
+  if (sel.options.length === 1)
+    UFS.forEach(uf => sel.add(new Option(uf, uf)));
+}
+$("wiz-busca").addEventListener("input", async () => {
+  wizEscolha = null; $("wiz-ok").disabled = true;
+  const texto = $("wiz-busca").value.trim();
+  const caixa = $("wiz-sugestoes");
+  if (texto.length < 2) { caixa.classList.add("oculto"); return; }
+  const achados = await api.municipios(texto, $("wiz-uf").value || null);
+  caixa.innerHTML = achados.map(m =>
+    `<button role="option" data-c="${m.c}" data-n="${esc(m.n)}" data-uf="${m.uf}">
+       ${esc(m.n)} — ${m.uf}</button>`).join("") ||
+    `<button disabled>nenhum município encontrado</button>`;
+  caixa.classList.remove("oculto");
+  caixa.querySelectorAll("button[data-c]").forEach(b =>
+    b.addEventListener("click", () => {
+      wizEscolha = { c:+b.dataset.c, n:b.dataset.n, uf:b.dataset.uf };
+      $("wiz-busca").value = `${b.dataset.n} — ${b.dataset.uf}`;
+      caixa.classList.add("oculto");
+      $("wiz-ok").disabled = false;
+    }));
+});
+$("wiz-ok").addEventListener("click", async () => {
+  if (!wizEscolha) return;
+  $("wiz-ok").disabled = true;
+  $("wiz-ok").textContent = "Preparando…";
+  const trocando = !!estado.municipio;
+  if (trocando) await api.trocar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
+  else await api.configurar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
+  iniciarApp(await api.get_estado());
+});
+
+// ── app ───────────────────────────────────────────────────────────────────
+async function iniciarApp(e) {
+  estado.municipio = e.municipio;
+  $("wizard").classList.add("oculto");
+  $("app").classList.remove("oculto");
+  $("sub-municipio").textContent =
+    `Contratações públicas de ${e.municipio} · ${e.uf}`;
+  renderKpis(e.kpis);
+  await carregarFiltros();
+  await carregarLista();
+  api.sincronizar();  // sync ao abrir (catch-up incremental)
+}
+
+function renderKpis(k) {
+  $("kpi-contratacoes").textContent =
+    new Intl.NumberFormat("pt-BR").format(k.contratacoes);
+  $("kpi-homologado").textContent = k.homologado_ano >= 1e6
+    ? "R$ " + (k.homologado_ano / 1e6).toLocaleString("pt-BR",
+        {maximumFractionDigits:1}) + " mi"
+    : dinheiro(k.homologado_ano);
+  $("kpi-homologado-l").textContent =
+    `homologado em ${new Date().getFullYear()}`;
+  $("kpi-vigentes").textContent = k.vigentes;
+}
+
+async function carregarFiltros() {
+  const f = await api.filtros_disponiveis();
+  const preencher = (sel, itens, rotulo) => {
+    const atual = sel.value;
+    sel.length = 1;
+    itens.forEach(i => sel.add(typeof i === "object"
+      ? new Option(i.nome, i.id) : new Option(i, i)));
+    sel.value = atual;
+  };
+  preencher($("f-ano"), f.anos);
+  preencher($("f-modalidade"), f.modalidades);
+  preencher($("f-situacao"), f.situacoes);
+}
+
+function filtrosAtuais() {
+  return { ano: $("f-ano").value || null,
+           modalidade: $("f-modalidade").value || null,
+           situacao: $("f-situacao").value || null,
+           busca: $("f-busca").value.trim() || null };
+}
+
+const COLUNAS = {
+  contratacoes: ["Modalidade", "Objeto", "Valor", "Situação"],
+  contratos:    ["Número", "Objeto / Fornecedor", "Vigência", "Valor"],
+  atas:         ["Número", "Contratação de origem", "Vigência"],
+};
+
+function badgeSituacao(s) {
+  if (!s) return `<span class="badge mut">–</span>`;
+  const cl = /homolog/i.test(s) ? "ok" : /divulgad|aberta|andamento/i.test(s)
+    ? "warn" : "mut";
+  return `<span class="badge ${cl}">${esc(s)}</span>`;
+}
+
+function renderLinha(tipo, d) {
+  if (tipo === "contratacoes")
+    return `<span class="dim">${esc(d.modalidade_nome ?? "–")}<br>
+        ${d.sequencial ?? ""}/${d.ano ?? ""}</span>
+      <span>${esc(d.objeto ?? "–")}</span>
+      <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
+      <span style="justify-self:end">${badgeSituacao(d.situacao)}</span>`;
+  if (tipo === "contratos")
+    return `<span class="dim">${esc(d.numero_controle)}</span>
+      <span>${esc(d.objeto ?? "–")}<br>
+        <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
+      <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
+      <span class="num">${dinheiro(d.valor_global)}</span>`;
+  return `<span class="dim">${esc(d.numero_controle)}</span>
+    <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
+    <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
+}
+
+async function carregarLista() {
+  const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
+  estado.total = r.total;
+  const g = `g-${estado.tipo}`;
+  const cab = `<div class="linha cab ${g}">` +
+    COLUNAS[estado.tipo].map(c => `<span>${c}</span>`).join("") + `</div>`;
+  const linhas = r.itens.map(d =>
+    `<button class="linha ${g}" data-nc="${esc(d.numero_controle)}">` +
+    renderLinha(estado.tipo, d) + `</button>`).join("");
+  $("lista").innerHTML = cab + (linhas ||
+    `<div class="vazio">Nenhum registro. Sincronize ou ajuste os filtros.</div>`);
+  $("lista").querySelectorAll("button.linha[data-nc]").forEach(b =>
+    b.addEventListener("click", () => abrirDetalhe(b.dataset.nc)));
+  const paginas = Math.max(1, Math.ceil(r.total / 50));
+  $("pag-info").textContent = `${estado.pagina}/${paginas} · ${r.total} registros`;
+  $("pag-ant").disabled = estado.pagina <= 1;
+  $("pag-prox").disabled = estado.pagina >= paginas;
+}
+
+document.querySelectorAll("nav.abas button").forEach(b =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll("nav.abas button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    estado.tipo = b.dataset.tipo;
+    estado.pagina = 1;
+    const soContratacoes = estado.tipo === "contratacoes";
+    $("f-modalidade").classList.toggle("oculto", !soContratacoes);
+    $("f-situacao").classList.toggle("oculto", !soContratacoes);
+    carregarLista();
+  }));
+["f-ano","f-modalidade","f-situacao"].forEach(id =>
+  $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
+let buscaTimer;
+$("f-busca").addEventListener("input", () => {
+  clearTimeout(buscaTimer);
+  buscaTimer = setTimeout(() => { estado.pagina = 1; carregarLista(); }, 300);
+});
+$("pag-ant").addEventListener("click", () => {
+  estado.pagina--; carregarLista(); });
+$("pag-prox").addEventListener("click", () => {
+  estado.pagina++; carregarLista(); });
+
+// ── detalhe ───────────────────────────────────────────────────────────────
+const ROTULOS = {
+  modalidade_nome:"Modalidade", situacao:"Situação", orgao_nome:"Órgão",
+  unidade:"Unidade", valor_estimado:"Valor estimado",
+  valor_homologado:"Valor homologado", valor_global:"Valor global",
+  fornecedor_nome:"Fornecedor", fornecedor_ni:"CNPJ/CPF fornecedor",
+  data_publicacao:"Publicação", data_atualizacao:"Última atualização",
+  vigencia_inicio:"Início da vigência", vigencia_fim:"Fim da vigência",
+  contratacao_controle:"Contratação de origem", orgao_cnpj:"CNPJ do órgão",
+};
+let detalheAtual = null;
+async function abrirDetalhe(nc) {
+  const d = await api.detalhe(estado.tipo, nc);
+  if (!d) return;
+  detalheAtual = nc;
+  $("det-titulo").textContent = d.objeto || d.numero_controle;
+  $("det-sub").textContent = d.numero_controle;
+  $("det-meta").innerHTML = Object.entries(ROTULOS)
+    .filter(([campo]) => d[campo] != null && d[campo] !== "")
+    .map(([campo, rotulo]) => {
+      let v = d[campo];
+      if (campo.startsWith("valor")) v = dinheiro(v);
+      else if (/^(data|vigencia)/.test(campo)) v = dataBr(v);
+      return `<div><div class="k">${rotulo}</div><div class="v">${esc(v)}</div></div>`;
+    }).join("");
+  $("det-raw").textContent = JSON.stringify(d.raw, null, 2);
+  $("veu-detalhe").classList.remove("oculto");
+}
+$("det-pncp").addEventListener("click", () =>
+  api.abrir_pncp(estado.tipo, detalheAtual));
+
+// ── config ────────────────────────────────────────────────────────────────
+$("btn-config").addEventListener("click", async () => {
+  const e = await api.get_estado();
+  $("cfg-municipio").innerHTML = `${esc(e.municipio)} — ${esc(e.uf)}
+    <small class="dim">(IBGE ${esc(e.ibge)})</small>`;
+  const orgaos = await api.listar_orgaos();
+  $("cfg-orgaos").innerHTML = orgaos.map(o =>
+    `<div class="orgrow"><span>${esc(o.razao_social ?? o.cnpj)}
+       <small>${esc(o.cnpj)} · ${o.origem === "manual" ? "adicionado manualmente"
+         : "descoberto automaticamente"}</small></span>
+     <input type="checkbox" data-cnpj="${esc(o.cnpj)}" ${o.ativo ? "checked" : ""}
+       aria-label="Monitorar ${esc(o.razao_social ?? o.cnpj)}"></div>`)
+    .join("") || `<div class="dim">Nenhum órgão ainda — sincronize primeiro.</div>`;
+  $("cfg-orgaos").querySelectorAll("input[data-cnpj]").forEach(c =>
+    c.addEventListener("change", () =>
+      api.set_orgao_ativo(c.dataset.cnpj, c.checked)));
+  const log = await api.ultimo_log();
+  $("cfg-log").innerHTML = log.map(l =>
+    `<div class="logline">${esc(l.iniciado_em?.slice(0,16).replace("T"," "))} ·
+     ${esc(l.tipo)} · ${l.status === "ok" ? `${l.registros} registros`
+       : `<span style="color:var(--warn)">erro: ${esc(l.erro)}</span>`}</div>`)
+    .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
+  $("veu-config").classList.remove("oculto");
+});
+$("btn-trocar").addEventListener("click", () => {
+  $("veu-config").classList.add("oculto");
+  iniciarWizard();
+});
+$("btn-add-orgao").addEventListener("click", async () => {
+  const r = await api.add_orgao($("novo-cnpj").value, $("novo-nome").value);
+  if (r.ok) { $("novo-cnpj").value = ""; $("novo-nome").value = "";
+    $("btn-config").click(); }
+  else if (r.erro) alert(r.erro);
+});
+
+// fechar modais (botão × e tecla Esc)
+document.querySelectorAll("[data-fecha]").forEach(b =>
+  b.addEventListener("click", () => $(b.dataset.fecha).classList.add("oculto")));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape")
+    document.querySelectorAll(".veu").forEach(v => v.classList.add("oculto"));
+});
+
+// ── sincronização ─────────────────────────────────────────────────────────
+$("btn-sync").addEventListener("click", () => api.sincronizar());
+window.onSyncProgresso = st => {
+  $("sync-dot").classList.toggle("rodando", st.rodando);
+  $("sync-msg").textContent = st.rodando ? st.msg : "–";
+  $("btn-sync").disabled = st.rodando;
+};
+window.onSyncFim = async st => {
+  $("sync-dot").classList.remove("rodando");
+  $("btn-sync").disabled = false;
+  if (st.erro) { $("sync-msg").textContent = `Falha na sincronização: ${st.erro}`; }
+  else {
+    const r = st.resumo || {};
+    const partes = Object.entries(r).map(([t, n]) =>
+      n == null ? `${t}: falhou` : `${t}: ${n}`);
+    $("sync-msg").textContent =
+      `Sincronizado ${new Date().toLocaleTimeString("pt-BR",
+        {hour:"2-digit",minute:"2-digit"})} · ` + partes.join(" · ");
+  }
+  const e = await api.get_estado();
+  renderKpis(e.kpis);
+  await carregarFiltros();
+  await carregarLista();
+};
+
+// ── exportação ────────────────────────────────────────────────────────────
+$("btn-csv").addEventListener("click", async () => {
+  const r = await api.exportar_csv(estado.tipo, filtrosAtuais());
+  if (r.ok) $("sync-msg").textContent =
+    `CSV exportado: ${r.linhas} linhas em ${r.arquivo}`;
+  else if (r.erro) alert(r.erro);
+});
+</script>
+</body>
+</html>

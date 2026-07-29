@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Licitarium — frame dedicado 16/24px: tabula cheia, sem filete, L máximo -->
+  <polygon points="10,24 1,17 1,47 10,40" fill="#8b2e2e"/>
+  <polygon points="54,24 63,17 63,47 54,40" fill="#8b2e2e"/>
+  <rect x="8" y="13" width="48" height="38" fill="#8b2e2e"/>
+  <text x="32" y="45" font-family="Georgia, 'Times New Roman', serif" font-size="30"
+        fill="#f5efe2" text-anchor="middle">L</text>
+</svg>

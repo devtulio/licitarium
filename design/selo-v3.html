@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Licitarium — Selo v3 (refino A + B)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e8e8ea; font-family:system-ui,'Segoe UI',sans-serif; padding:24px; color:#222; }
+  h1 { font-size:20px; } .sub { color:#666; font-size:13px; margin:4px 0 22px; max-width:760px; }
+  .opt { background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.12);
+         max-width:860px; margin:0 auto 22px; overflow:hidden; }
+  .opt h2 { font-size:15px; padding:14px 18px 2px; }
+  .opt p { font-size:12.5px; color:#555; padding:0 18px 12px; line-height:1.45; }
+  .tiles { display:flex; }
+  .tile { flex:1; display:flex; align-items:flex-end; gap:18px; padding:16px 18px 20px; }
+  .tile.light { background:#f2f2f2; }
+  .tile.dark  { background:#181c22; }
+  .slot { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .slot em { font-style:normal; font-size:10px; color:#888; text-align:center; }
+  template { display:none; }
+</style>
+</head>
+<body>
+<h1>Selo v3 — A e B refinados</h1>
+<p class="sub">Mudanças: ponta de lança em folha (hasta autêntica) + conteira; exergo com MMXXVI no denário;
+plano multi-frame do .ico (16 px usa arte simplificada — prática padrão de ícone).</p>
+
+<!-- ═══ A′. SINETE COM HASTA ═══ -->
+<div class="opt" data-svg="svA">
+  <h2>A′ · Sinete com hasta — ícone (frames 256–24 px)</h2>
+  <p>Ponta lanceolada, conteira na base da haste, L reequilibrado com a diagonal.</p>
+  <template id="svA"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#8b2e2e"/>
+    <circle cx="32" cy="32" r="26.5" fill="none" stroke="#f5efe2" stroke-width="2.2"
+            stroke-dasharray="0.1 5.2" stroke-linecap="round" opacity=".85"/>
+    <line x1="17" y1="50" x2="43" y2="20" stroke="#b08d3e" stroke-width="3" stroke-linecap="round"/>
+    <line x1="17" y1="50" x2="14.6" y2="52.8" stroke="#b08d3e" stroke-width="4.4" stroke-linecap="round"/>
+    <ellipse cx="46.5" cy="16" rx="2.6" ry="6.2" fill="#b08d3e" transform="rotate(41 46.5 16)"/>
+    <text x="30.5" y="45" font-family="Georgia, 'Times New Roman', serif" font-size="30"
+          fill="#f5efe2" text-anchor="middle">L</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<!-- ═══ FRAME 16px ═══ -->
+<div class="opt" id="frameplan">
+  <h2>Plano multi-frame do .ico — o frame de 16 px</h2>
+  <p>Esquerda: A′ encolhido direto (hasta vira ruído). Direita: frame dedicado de 16 px —
+     sem hasta, L maior, borda simplificada. O .ico carrega os dois; o Windows escolhe o certo por contexto.</p>
+  <template id="sv16"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#8b2e2e"/>
+    <circle cx="32" cy="32" r="25" fill="none" stroke="#f5efe2" stroke-width="3"
+            stroke-dasharray="0.1 7.4" stroke-linecap="round" opacity=".9"/>
+    <text x="32" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="38"
+          fill="#f5efe2" text-anchor="middle">L</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light" id="cmp-light"></div><div class="tile dark" id="cmp-dark"></div></div>
+</div>
+
+<!-- ═══ B′. DENÁRIO ═══ -->
+<div class="opt" data-svg="svB">
+  <h2>B′ · Denário — marca de apresentação</h2>
+  <p>Legenda quebrada no alto (convenção de anverso), hasta com ponta em folha e conteira,
+     letras de campo L·P, exergo com MMXXVI sob a linha de solo.</p>
+  <template id="svB"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="30" fill="#f5efe2" stroke="#2b2115" stroke-width="1.6"/>
+    <circle cx="32" cy="32" r="27.5" fill="none" stroke="#2b2115" stroke-width="1.6"
+            stroke-dasharray="0.1 4.6" stroke-linecap="round"/>
+    <defs><path id="tpB" d="M11.5,44 A22.5,22.5 0 1 1 52.5,44"/></defs>
+    <text font-family="Georgia, serif" font-size="6" letter-spacing="1.1" fill="#2b2115">
+      <textPath href="#tpB" startOffset="4">LICITARIVM · SVB · HASTA · PVBLICA</textPath></text>
+    <line x1="32" y1="46.5" x2="32" y2="22" stroke="#8b2e2e" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="32" y1="46.5" x2="32" y2="48" stroke="#8b2e2e" stroke-width="3.6" stroke-linecap="round"/>
+    <ellipse cx="32" cy="17.5" rx="2.4" ry="5.6" fill="#8b2e2e"/>
+    <text x="24" y="41" font-family="Georgia, serif" font-size="10" fill="#b08d3e" text-anchor="middle">L</text>
+    <text x="40" y="41" font-family="Georgia, serif" font-size="10" fill="#b08d3e" text-anchor="middle">P</text>
+    <line x1="21" y1="50" x2="43" y2="50" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
+    <text x="32" y="56.5" font-family="Georgia, serif" font-size="5.2" letter-spacing="1"
+          fill="#2b2115" text-anchor="middle">MMXXVI</text>
+  </svg></template>
+  <div class="tiles"><div class="tile light"></div><div class="tile dark"></div></div>
+</div>
+
+<script>
+  const SIZES = [96, 48, 24, 16];
+  document.querySelectorAll('.opt[data-svg]').forEach(opt => {
+    const svg = document.getElementById(opt.dataset.svg).content.firstElementChild;
+    opt.querySelectorAll('.tile').forEach(tile => {
+      SIZES.forEach(s => {
+        const slot = document.createElement('div'); slot.className = 'slot';
+        const c = svg.cloneNode(true); c.setAttribute('width', s); c.setAttribute('height', s);
+        slot.appendChild(c);
+        const em = document.createElement('em'); em.textContent = s + 'px';
+        slot.appendChild(em);
+        tile.appendChild(slot);
+      });
+    });
+  });
+  // comparativo 16px: A′ direto vs frame dedicado
+  const a = document.getElementById('svA').content.firstElementChild;
+  const s16 = document.getElementById('sv16').content.firstElementChild;
+  [['cmp-light'],['cmp-dark']].forEach(([id]) => {
+    const tile = document.getElementById(id);
+    [[a,'16px direto (A′)'],[s16,'16px dedicado'],[s16,'32px do dedicado',32]].forEach(([tpl,label,sz]) => {
+      const slot = document.createElement('div'); slot.className = 'slot';
+      const c = tpl.cloneNode(true); c.setAttribute('width', sz||16); c.setAttribute('height', sz||16);
+      slot.appendChild(c);
+      const em = document.createElement('em'); em.textContent = label;
+      slot.appendChild(em);
+      tile.appendChild(slot);
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Licitarium — Exploração de identidade v1</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e8e8ea; font-family:system-ui, 'Segoe UI', sans-serif; padding:24px; color:#222; }
+  h1 { font-size:20px; margin-bottom:4px; }
+  .sub { color:#666; font-size:13px; margin-bottom:24px; }
+  .board { display:flex; flex-direction:column; gap:28px; max-width:860px; margin:0 auto; }
+  .card { border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+  .tag { font-size:11px; letter-spacing:.12em; text-transform:uppercase; opacity:.7; }
+  .chips { display:flex; gap:8px; margin:10px 0; }
+  .chip { width:42px; height:42px; border-radius:6px; border:1px solid rgba(0,0,0,.15); position:relative; }
+  .chip span { position:absolute; bottom:-16px; left:0; font-size:9px; white-space:nowrap; opacity:.65; }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:13px; }
+  .why { padding:12px 18px; font-size:12.5px; background:#fff; color:#444; border-top:1px solid #ddd; line-height:1.5; }
+
+  /* ── A: PERGAMINHO ── */
+  .a { background:#f5efe2; color:#2b2115; }
+  .a .head { padding:22px 18px 14px; border-bottom:3px double #b08d3e; display:flex; align-items:baseline; gap:14px; }
+  .a .mark { font-family:Georgia, 'Times New Roman', serif; font-size:30px; letter-spacing:.18em; font-weight:400; }
+  .a .mark b { color:#8b2e2e; font-weight:400; }
+  .a .motto { font-family:Georgia, serif; font-style:italic; font-size:12px; color:#6f5b3e; }
+  .a .body { padding:16px 18px 26px; }
+  .a .rowdemo { background:#fbf7ee; border:1px solid #d9cbaa; border-radius:4px; margin-top:14px; }
+  .a .rowdemo .row + .row { border-top:1px solid #e7dcc2; }
+  .a .badge { background:#8b2e2e; color:#f5efe2; font-size:10.5px; padding:2px 8px; border-radius:2px; letter-spacing:.05em; }
+  .a .btn { background:#2b2115; color:#f5efe2; border:none; font-family:Georgia, serif; letter-spacing:.1em; padding:8px 18px; font-size:12px; margin-top:14px; border-radius:2px; }
+
+  /* ── B: GOV MODERNO ── */
+  .b { background:#ffffff; color:#1b1b1b; }
+  .b .head { background:#1351b4; color:#fff; padding:16px 18px; display:flex; align-items:center; gap:12px; }
+  .b .mark { font-size:22px; font-weight:700; letter-spacing:-.01em; }
+  .b .mark small { font-weight:400; opacity:.85; font-size:12px; display:block; letter-spacing:0; }
+  .b .body { padding:16px 18px 26px; }
+  .b .tabs { display:flex; gap:4px; margin-top:12px; border-bottom:2px solid #e6e6e6; }
+  .b .tab { padding:8px 14px; font-size:13px; color:#555; }
+  .b .tab.on { color:#1351b4; border-bottom:3px solid #1351b4; font-weight:600; margin-bottom:-2px; }
+  .b .rowdemo { border:1px solid #e6e6e6; border-radius:6px; margin-top:14px; }
+  .b .rowdemo .row + .row { border-top:1px solid #eee; }
+  .b .badge { background:#168821; color:#fff; font-size:10.5px; padding:2px 8px; border-radius:99px; }
+  .b .btn { background:#1351b4; color:#fff; border:none; padding:9px 20px; font-size:13px; font-weight:600; border-radius:99px; margin-top:14px; }
+
+  /* ── C: OBSERVATÓRIO (dark) ── */
+  .c { background:#10151c; color:#dce3ec; }
+  .c .head { padding:18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #232c38; }
+  .c .mark { font-size:22px; font-weight:600; letter-spacing:.04em; }
+  .c .mark i { font-style:normal; color:#f0a836; }
+  .c .body { padding:16px 18px 26px; }
+  .c .kpis { display:flex; gap:10px; margin-top:12px; }
+  .c .kpi { background:#1a212b; border:1px solid #232c38; border-radius:8px; padding:10px 14px; flex:1; }
+  .c .kpi .n { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; color:#f0a836; }
+  .c .kpi .l { font-size:10.5px; color:#8b97a7; letter-spacing:.06em; text-transform:uppercase; margin-top:2px; }
+  .c .rowdemo { background:#1a212b; border:1px solid #232c38; border-radius:8px; margin-top:12px; }
+  .c .rowdemo .row + .row { border-top:1px solid #232c38; }
+  .c .badge { background:rgba(45,212,167,.15); color:#2dd4a7; font-size:10.5px; padding:2px 8px; border-radius:4px; }
+  .c .btn { background:#f0a836; color:#10151c; border:none; padding:9px 20px; font-size:13px; font-weight:700; border-radius:6px; margin-top:14px; }
+</style>
+</head>
+<body>
+<h1>Licitarium — três direções de identidade</h1>
+<p class="sub">Mesmo conteúdo de exemplo nas três. Reaja: qual é a cara do Licitarium?</p>
+
+<div class="board">
+
+  <!-- A -->
+  <div class="card a">
+    <div style="padding:12px 18px 0"><span class="tag">Direção A — Pergaminho · o arquivo</span></div>
+    <div class="head">
+      <div class="mark">LICITARI<b>V</b>M</div>
+      <div class="motto">acervo público de contratações</div>
+    </div>
+    <div class="body">
+      <div class="chips">
+        <div class="chip" style="background:#f5efe2"><span>#f5efe2 papel</span></div>
+        <div class="chip" style="background:#2b2115"><span>#2b2115 tinta</span></div>
+        <div class="chip" style="background:#8b2e2e"><span>#8b2e2e selo</span></div>
+        <div class="chip" style="background:#b08d3e"><span>#b08d3e dourado</span></div>
+      </div>
+      <div class="rowdemo">
+        <div class="row"><span>Dispensa 12/2026 — Aquisição de merenda escolar</span><span class="badge">HOMOLOGADA</span></div>
+        <div class="row"><span>Pregão 4/2026 — Manutenção de vias públicas</span><span style="font-family:Georgia,serif">R$ 182.400,00</span></div>
+      </div>
+      <button class="btn">SINCRONIZAR</button>
+    </div>
+    <div class="why">Abraça o latim do nome: serifas, papel, filete duplo dourado, selo vermelho.
+    O "V" no lugar do U é inscrição romana autêntica — marca registrada instantânea.
+    Risco: parecer antigo demais para um software.</div>
+  </div>
+
+  <!-- B -->
+  <div class="card b">
+    <div style="padding:12px 18px 0"><span class="tag" style="color:#555">Direção B — Institucional moderno · o portal</span></div>
+    <div class="head">
+      <div class="mark">Licitarium<small>Repositório municipal de contratações públicas</small></div>
+    </div>
+    <div class="body">
+      <div class="chips">
+        <div class="chip" style="background:#1351b4"><span>#1351b4 azul gov</span></div>
+        <div class="chip" style="background:#168821"><span>#168821 verde</span></div>
+        <div class="chip" style="background:#ffffff"><span>#ffffff fundo</span></div>
+        <div class="chip" style="background:#1b1b1b"><span>#1b1b1b texto</span></div>
+      </div>
+      <div class="tabs"><div class="tab on">Contratações</div><div class="tab">Contratos</div><div class="tab">Atas</div></div>
+      <div class="rowdemo">
+        <div class="row"><span>Dispensa 12/2026 — Aquisição de merenda escolar</span><span class="badge">Homologada</span></div>
+        <div class="row"><span>Pregão 4/2026 — Manutenção de vias públicas</span><span style="font-weight:600">R$ 182.400,00</span></div>
+      </div>
+      <button class="btn">Sincronizar agora</button>
+    </div>
+    <div class="why">Linguagem do gov.br design system: azul institucional, pílulas, sans limpa.
+    Servidor público se sente em casa no primeiro segundo; adoção fácil em qualquer prefeitura.
+    Risco: genérico — parece mais um portal do governo, sem personalidade própria.</div>
+  </div>
+
+  <!-- C -->
+  <div class="card c">
+    <div style="padding:12px 18px 0"><span class="tag" style="color:#8b97a7">Direção C — Observatório · o painel</span></div>
+    <div class="head">
+      <div class="mark">licitari<i>um</i></div>
+    </div>
+    <div class="body">
+      <div class="chips">
+        <div class="chip" style="background:#10151c; border-color:#333"><span>#10151c fundo</span></div>
+        <div class="chip" style="background:#1a212b; border-color:#333"><span>#1a212b painel</span></div>
+        <div class="chip" style="background:#f0a836"><span>#f0a836 âmbar</span></div>
+        <div class="chip" style="background:#2dd4a7"><span>#2dd4a7 verde</span></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">347</div><div class="l">contratações</div></div>
+        <div class="kpi"><div class="n">R$ 12,4 mi</div><div class="l">em 2026</div></div>
+        <div class="kpi"><div class="n">28</div><div class="l">vigentes</div></div>
+      </div>
+      <div class="rowdemo">
+        <div class="row"><span>Dispensa 12/2026 — Aquisição de merenda escolar</span><span class="badge">Homologada</span></div>
+        <div class="row"><span>Pregão 4/2026 — Manutenção de vias públicas</span><span style="font-variant-numeric:tabular-nums; color:#f0a836">R$ 182.400,00</span></div>
+      </div>
+      <button class="btn">Sincronizar</button>
+    </div>
+    <div class="why">Dados em primeiro plano: KPIs na abertura, dark, números tabulares, âmbar de destaque.
+    Vende o sistema como observatório/radar de gastos, não como arquivo passivo.
+    Risco: dark como padrão pode estranhar usuário de prefeitura acostumado a tela clara.</div>
+  </div>
+
+</div>
+</body>
+</html>

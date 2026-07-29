@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Licitarium — ícone oficial: tabula ansata vermelha (frames 32px+) -->
+  <polygon points="11,25 3,19 3,45 11,39" fill="#8b2e2e"/>
+  <polygon points="53,25 61,19 61,45 53,39" fill="#8b2e2e"/>
+  <rect x="9" y="17" width="46" height="30" fill="#8b2e2e"/>
+  <rect x="12.5" y="20.5" width="39" height="23" fill="none" stroke="#f5efe2" stroke-width="1.4" opacity=".7"/>
+  <text x="32" y="40.5" font-family="Georgia, 'Times New Roman', serif" font-size="21"
+        fill="#f5efe2" text-anchor="middle">L</text>
+</svg>
