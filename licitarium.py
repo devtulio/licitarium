@@ -482,8 +482,9 @@ class Api:
                 params["limites"] = {
                     "compras": pncp._config(db, "limite_dispensa_compras"),
                     "obras": pncp._config(db, "limite_dispensa_obras")}
+            tema = pncp._config(db, "tema") or "pergaminho"
             resultado = relatorios.gerar(db, tipo, params, municipio, uf,
-                                         DIR_DADOS / "relatorios")
+                                         DIR_DADOS / "relatorios", tema)
         except ValueError as e:
             return {"ok": False, "erro": str(e)}
         finally:

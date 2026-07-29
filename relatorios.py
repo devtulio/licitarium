@@ -228,8 +228,38 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
 
 # ── render ──────────────────────────────────────────────────────────────────
 
-def _css(paisagem):
+# paletas espelham os temas do app; impressão força sempre a "pergaminho"
+# (tinta sobre papel — tema escuro não faz sentido impresso)
+PALETAS = {
+    "pergaminho": dict(bg="#f5efe2", superficie="#fbf7ee", zebra="#faf6ec",
+                       cabecalho="#efe6d2", texto="#2b2115", suave="#6f5b3e",
+                       borda="#d9cbaa", acento="#8b2e2e", detalhe="#b08d3e",
+                       alerta="#8b2e2e", atencao="#8a6d1f"),
+    "portal": dict(bg="#f8f9fa", superficie="#ffffff", zebra="#f8f9fa",
+                   cabecalho="#f1f3f5", texto="#1b1b1b", suave="#5c6670",
+                   borda="#e3e6e8", acento="#1351b4", detalhe="#1351b4",
+                   alerta="#b00020", atencao="#a26a00"),
+    "observatorio": dict(bg="#10151c", superficie="#1a212b", zebra="#161d27",
+                         cabecalho="#141a23", texto="#dce3ec", suave="#8b97a7",
+                         borda="#232c38", acento="#f0a836", detalhe="#f0a836",
+                         alerta="#ff8a80", atencao="#f0a836"),
+}
+
+
+def _vars(p):
+    return (f"--bg:{p['bg']}; --superficie:{p['superficie']};"
+            f" --zebra:{p['zebra']}; --cabecalho:{p['cabecalho']};"
+            f" --texto:{p['texto']}; --suave:{p['suave']};"
+            f" --borda:{p['borda']}; --acento:{p['acento']};"
+            f" --detalhe:{p['detalhe']}; --alerta:{p['alerta']};"
+            f" --atencao:{p['atencao']};")
+
+
+def _css(paisagem, tema="pergaminho"):
+    p = PALETAS.get(tema) or PALETAS["pergaminho"]
     return f"""
+  :root {{ {_vars(p)} }}
+  @media print {{ :root {{ {_vars(PALETAS["pergaminho"])} }} }}
   @page {{
     size: A4 {"landscape" if paisagem else "portrait"}; margin: 1.6cm 1.4cm;
     @top-center {{ content: string(titulo); font-size: 8pt; color: #6f5b3e; }}
@@ -237,60 +267,67 @@ def _css(paisagem):
                      font-size: 8pt; color: #6f5b3e; }}
   }}
   * {{ margin:0; padding:0; box-sizing:border-box; }}
-  body {{ font-family:'Segoe UI',system-ui,sans-serif; color:#2b2115;
-          background:#f5efe2; font-size:13px; line-height:1.45; }}
+  body {{ font-family:'Segoe UI',system-ui,sans-serif; color:var(--texto);
+          background:var(--bg); font-size:13px; line-height:1.45; }}
   .pagina {{ max-width:{1080 if paisagem else 820}px; margin:0 auto;
              padding:26px 30px 50px; }}
   header {{ display:flex; align-items:center; gap:18px; padding-bottom:14px;
-            border-bottom:3px double #b08d3e; margin-bottom:16px; }}
+            border-bottom:3px double var(--detalhe); margin-bottom:16px; }}
   h1 {{ font-family:Georgia,serif; font-size:21px; font-weight:400;
         string-set: titulo content(); }}
-  .meta {{ font-size:11.5px; color:#6f5b3e; margin-top:3px; }}
+  .meta {{ font-size:11.5px; color:var(--suave); margin-top:3px; }}
   h2 {{ font-family:Georgia,serif; font-size:15px; font-weight:400;
-        color:#8b2e2e; margin:20px 0 8px; break-after:avoid; }}
+        color:var(--acento); margin:20px 0 8px; break-after:avoid; }}
   table {{ border-collapse:collapse; width:100%; font-size:11.5px; }}
-  th, td {{ border:1px solid #d9cbaa; padding:5px 8px; text-align:left;
+  th, td {{ border:1px solid var(--borda); padding:5px 8px; text-align:left;
             vertical-align:middle; }}
-  th {{ background:#efe6d2; font-size:10px; letter-spacing:.05em;
+  th {{ background:var(--cabecalho); font-size:10px; letter-spacing:.05em;
         text-transform:uppercase; }}
   tr {{ break-inside:avoid; }}
-  tbody tr:nth-child(even) td {{ background:#faf6ec; }}
+  tbody tr:nth-child(even) td {{ background:var(--zebra); }}
   /* colunas curtas (valores, datas, qtde): centro nos dois eixos */
   td.num, th.num {{ text-align:center; font-variant-numeric:tabular-nums;
                     white-space:nowrap; }}
   /* centro com quebra de linha permitida (textos curtos não-numéricos) */
   td.ctr, th.ctr {{ text-align:center; }}
-  tfoot td {{ background:#efe6d2; font-weight:600; }}
+  tfoot td {{ background:var(--cabecalho); font-weight:600; }}
   .obj {{ text-transform:uppercase; text-align:justify; hyphens:auto; }}
   .cards {{ display:flex; gap:10px; margin-bottom:6px; }}
-  .card {{ background:#fbf7ee; border:1px solid #d9cbaa; border-radius:3px;
+  .card {{ background:var(--superficie); border:1px solid var(--borda);
+           border-radius:3px;
            padding:10px 12px; break-inside:avoid; flex:1 1 auto; }}
-  .card .n {{ font-family:Georgia,serif; font-size:17px; color:#8b2e2e;
+  .card .n {{ font-family:Georgia,serif; font-size:17px; color:var(--acento);
               white-space:nowrap; }}
   .card .l {{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase;
-              color:#6f5b3e; margin-top:2px; }}
-  .barra {{ background:#b08d3e; height:10px; display:inline-block;
+              color:var(--suave); margin-top:2px; }}
+  .barra {{ background:var(--detalhe); height:10px; display:inline-block;
             vertical-align:middle; border-radius:2px; }}
-  .caixa-aviso {{ background:#fbf7ee; border:1px solid #d9cbaa;
-                  border-left:4px solid #8b2e2e; border-radius:3px;
+  .caixa-aviso {{ background:var(--superficie); border:1px solid var(--borda);
+                  border-left:4px solid var(--alerta); border-radius:3px;
                   padding:10px 14px; font-size:11.5px; margin-bottom:12px;
                   break-inside:avoid; }}
-  footer {{ margin-top:22px; padding-top:10px; border-top:3px double #b08d3e;
-            font-size:10.5px; color:#6f5b3e; display:flex;
+  .farol-alerta {{ color:var(--alerta); font-weight:600; }}
+  .farol-atencao {{ color:var(--atencao); font-weight:600; }}
+  footer {{ margin-top:22px; padding-top:10px;
+            border-top:3px double var(--detalhe);
+            font-size:10.5px; color:var(--suave); display:flex;
             justify-content:space-between; }}
   .no-print {{ position:fixed; top:14px; right:14px; }}
   .no-print button {{ font-size:14px; padding:8px 14px; cursor:pointer;
-    background:#8b2e2e; color:#f5efe2; border:none; border-radius:3px; }}
+    background:var(--acento); color:var(--superficie); border:none;
+    border-radius:3px; }}
   @media print {{ body {{ background:#fff; font-size:10pt; }}
+    tbody tr:nth-child(even) td {{ background:#faf6ec; }}
     .pagina {{ max-width:none; padding:0; }} .no-print {{ display:none; }} }}
 """
 
 
-def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem):
+def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
+            tema="pergaminho"):
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
-<title>{_e(titulo_doc)}</title><style>{_css(paisagem)}</style></head><body>
+<title>{_e(titulo_doc)}</title><style>{_css(paisagem, tema)}</style></head><body>
 <div class="no-print"><button onclick="print()">🖨 Imprimir</button></div>
 <div class="pagina">
 <header>{ESTANDARTE}
@@ -305,7 +342,7 @@ def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem):
 </div></body></html>"""
 
 
-def render_contratacoes(d, municipio, uf, periodo_txt):
+def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho"):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="ctr">{_e(l['modalidade_nome'])}</td>
@@ -329,10 +366,11 @@ def render_contratacoes(d, municipio, uf, periodo_txt):
 <td class="num">{moeda(t['estimado'])}</td>
 <td class="num">{moeda(t['homologado'])}</td><td></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratacoes']} — {municipio} — {periodo_txt}"
-    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True)
+    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
+                   tema=tema)
 
 
-def render_contratos(d, municipio, uf, periodo_txt):
+def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho"):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
                           or l['numero_controle'])}</td>
@@ -352,10 +390,11 @@ def render_contratos(d, municipio, uf, periodo_txt):
 <tfoot><tr><td colspan="3">Total: {t['n']} contratos</td>
 <td class="num">{moeda(t['valor'])}</td><td colspan="2"></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratos']} — {municipio} — {periodo_txt}"
-    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True)
+    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
+                   tema=tema)
 
 
-def render_atas(d, municipio, uf, periodo_txt):
+def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho"):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
       <td class="ctr">{_e(l['contratacao_controle'])}</td>
@@ -369,15 +408,16 @@ def render_atas(d, municipio, uf, periodo_txt):
 <tbody>{linhas or '<tr><td colspan="5">Nenhum registro no período.</td></tr>'}</tbody>
 <tfoot><tr><td colspan="5">Total: {d['totais']['n']} atas</td></tr></tfoot></table>"""
     titulo = f"{TITULOS['atas']} — {municipio} — {periodo_txt}"
-    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True)
+    return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
+                   tema=tema)
 
 
-def render_fracionamento(d, municipio, uf):
+def render_fracionamento(d, municipio, uf, tema="pergaminho"):
     def farol(pct):
         if pct >= 100:
-            return '<span style="color:#8b2e2e;font-weight:600">ACIMA DO LIMITE</span>'
+            return '<span class="farol-alerta">ACIMA DO LIMITE</span>'
         if pct >= 75:
-            return '<span style="color:#8a6d1f;font-weight:600">Atenção</span>'
+            return '<span class="farol-atencao">Atenção</span>'
         return "ok"
     unid = "".join(f"""<tr><td>{_e(u['unidade'])}</td>
       <td class="num">{u['n']}</td>
@@ -412,14 +452,15 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
 <tbody>{disp or '<tr><td colspan="5">Nenhuma dispensa no exercício.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
-                   f"Exercício {d['ano']} · uso interno", paisagem=False)
+                   f"Exercício {d['ano']} · uso interno", paisagem=False,
+                   tema=tema)
 
 
 MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
               "jul", "ago", "set", "out", "nov", "dez"]
 
 
-def render_executivo(d, municipio, uf):
+def render_executivo(d, municipio, uf, tema="pergaminho"):
     c = d["cards"]
     desagio = f"{c['desagio']:.1f}%".replace(".", ",") \
         if c["desagio"] is not None else "–"
@@ -469,12 +510,12 @@ def render_executivo(d, municipio, uf):
 <tbody>{venc or '<tr><td colspan="5">Nada vence nos próximos 90 dias.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['executivo']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
-                   paisagem=False)
+                   paisagem=False, tema=tema)
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
 
-def gerar(db, tipo, params, municipio, uf, destino):
+def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
     """Gera o relatório e retorna {"html": caminho, "csv": caminho|None}."""
     params = params or {}
     ano = params.get("ano")
@@ -489,14 +530,14 @@ def gerar(db, tipo, params, municipio, uf, destino):
         if not ano:
             ano = date.today().year
         d = dados_executivo(db, ano, orgao)
-        conteudo = render_executivo(d, municipio, uf)
+        conteudo = render_executivo(d, municipio, uf, tema)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
     elif tipo == "fracionamento":
         if not ano:
             ano = date.today().year
         d = dados_fracionamento(db, ano, orgao, params.get("limites"))
-        conteudo = render_fracionamento(d, municipio, uf)
+        conteudo = render_fracionamento(d, municipio, uf, tema)
         nome = f"alerta_fracionamento_{ano}"
         linhas_csv = d["dispensas"]
     else:
@@ -504,13 +545,13 @@ def gerar(db, tipo, params, municipio, uf, destino):
             if vigentes else (f"Exercício {ano}" if ano else "Todo o período")
         if tipo == "contratacoes":
             d = dados_contratacoes(db, ano, params.get("modalidade"), orgao)
-            conteudo = render_contratacoes(d, municipio, uf, periodo_txt)
+            conteudo = render_contratacoes(d, municipio, uf, periodo_txt, tema)
         elif tipo == "contratos":
             d = dados_contratos(db, ano, vigentes, orgao)
-            conteudo = render_contratos(d, municipio, uf, periodo_txt)
+            conteudo = render_contratos(d, municipio, uf, periodo_txt, tema)
         elif tipo == "atas":
             d = dados_atas(db, ano, vigentes, orgao)
-            conteudo = render_atas(d, municipio, uf, periodo_txt)
+            conteudo = render_atas(d, municipio, uf, periodo_txt, tema)
         else:
             raise ValueError(f"tipo de relatório desconhecido: {tipo}")
         sufixo = "vigentes" if vigentes else (str(ano) if ano else "completo")

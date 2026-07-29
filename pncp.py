@@ -64,7 +64,10 @@ def _get(caminho, params, tentativas=5):
             with urllib.request.urlopen(req, timeout=30) as resp:
                 if resp.status == 204:
                     return None
-                return json.load(resp)
+                corpo = resp.read()
+                # alguns endpoints (ex.: PCA) devolvem 200 com corpo vazio
+                # quando não há registros na janela
+                return json.loads(corpo) if corpo.strip() else None
         except urllib.error.HTTPError as e:
             if e.code == 204 or e.code == 404:
                 return None  # sem registros para o filtro
