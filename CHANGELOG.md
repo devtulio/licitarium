@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 — 2026-07-29
+
+- **Valor estimado distinguido do homologado**: processos sem homologação
+  registrada exibem o valor em itálico com "est." — antes um processo em
+  andamento parecia ter valor final.
+- **Diálogos com foco**: abrir Relatórios, Configurações ou o detalhe trava a
+  rolagem do fundo, leva o foco para o diálogo e prende o Tab nele.
+- **Selo no cabeçalho**; barras de rolagem na paleta do tema; badge de
+  situação encurtada; título da janela com o município.
+- **Rodapé informativo**: "Sincronizado hoje às HH:MM" no lugar do traço.
+- **Estado vazio contextual**: oferece sincronizar (acervo vazio) ou limpar
+  filtros (busca sem resultado), com o selo em marca d'água.
+- **Botão "Limpar filtros"** quando há filtro ativo.
+- **Densidade das listas** (Confortável/Compacta) nas configurações.
+- **Atualização automática mais resiliente**: valida o tamanho do download e
+  reabre o programa se a primeira tentativa falhar (o antivírus varrendo o
+  executável recém-escrito podia impedir a abertura).
+
 ## 0.5.0 — 2026-07-29
 
 - **PCA corrigido**: o endpoint rejeita datas anteriores a 01/04/2021 (422) e

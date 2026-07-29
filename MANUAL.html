@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual do Licitarium v0.5.0</title>
+<title>Manual do Licitarium v0.6.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Manual do Licitarium v0.5.0"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Manual do Licitarium v0.6.0"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -70,7 +70,7 @@
           fill="#2b2115" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.5.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.6.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -134,7 +134,13 @@ proposta correndo) e <b>Vigentes</b> (contratos e atas).</p>
 <p>Filtre por <b>ano</b>, <b>modalidade</b>, <b>situação</b> ou digite qualquer
 termo na <b>busca</b> (procura no objeto e no número de controle). Nas
 contratações e no PCA, o ano usado é o <b>ano do processo/plano</b> (ex.: um
-pregão "36/2024" fica em 2024, mesmo que o órgão o atualize depois).</p>
+pregão "36/2024" fica em 2024, mesmo que o órgão o atualize depois). Com algum
+filtro ativo aparece o botão <b>✕ Limpar filtros</b>, que devolve a visão
+completa de uma vez.</p>
+<div class="caixa"><b>Valores estimados.</b> Quando um processo ainda não tem
+homologação registrada no PNCP, a coluna Valor mostra o <b>valor estimado</b>
+em itálico, seguido de <i>est.</i> — não confunda com valor final. Os dois
+valores aparecem separados na tela de detalhe.</div>
 <p><b>Ordenação:</b> clique no cabeçalho de qualquer coluna para ordenar a
 lista por ela; clique de novo para inverter a direção (▲/▼).</p>
 <h3>Detalhe</h3>
@@ -164,8 +170,9 @@ sem internet — nunca atrapalha o uso.</p>
 <h3>Aparência</h3>
 <p>Três temas: <b>Portal</b> (claro, padrão), <b>Pergaminho</b> (claro, estilo
 arquivo histórico) e <b>Observatório</b> (escuro). Também a <b>largura da
-página</b> (Compacta ou Expandida) e o <b>tamanho da fonte</b> (Pequena a
-Extra grande). As escolhas ficam salvas.</p>
+página</b> (Compacta ou Expandida), o <b>tamanho da fonte</b> (Pequena a
+Extra grande) e a <b>densidade das listas</b> (Confortável ou Compacta, para
+caber mais registros na tela). As escolhas ficam salvas.</p>
 <h3>Órgãos monitorados</h3>
 <p>Os órgãos do município (prefeitura, câmara, fundos, autarquias) são
 <b>descobertos automaticamente</b> a partir das contratações publicadas. Se um
