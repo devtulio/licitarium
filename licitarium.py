@@ -5,6 +5,7 @@ Versão 0.2.0
 """
 import csv
 import json
+import re
 import sqlite3
 import threading
 import urllib.request
@@ -319,9 +320,19 @@ class Api:
         elif tipo == "contratos" and orgao:
             url = (f"https://pncp.gov.br/app/contratos/{orgao}/"
                    f"{raw.get('anoContrato')}/{raw.get('sequencialContrato')}")
+        elif tipo == "atas":
+            # numero_controle da ata: CNPJ-1-SEQCOMPRA/ANO-SEQATA
+            # página no portal: /app/atas/{cnpj}/{ano}/{seqCompra}/{seqAta}
+            # (formato verificado contra o portal real em 2026-07-29)
+            m = re.match(r"^(\d{14})-\d+-(\d+)/(\d{4})-(\d+)$",
+                         d.get("numero_controle") or "")
+            if not m:
+                return False
+            cnpj, seq_compra, ano, seq_ata = m.groups()
+            url = (f"https://pncp.gov.br/app/atas/{cnpj}/{ano}/"
+                   f"{int(seq_compra)}/{int(seq_ata)}")
         else:
-            # ata: página da contratação-mãe é o destino mais estável
-            url = "https://pncp.gov.br/app/atas"
+            return False
         webbrowser.open(url)
         return True
 

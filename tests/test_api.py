@@ -51,6 +51,26 @@ def test_listar_e_detalhe_pca(api):
     assert d["descricao"] == "Papel"
 
 
+def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
+    db = licitarium.abrir_db()
+    db.execute(
+        "INSERT INTO atas (numero_controle, raw) VALUES (?, '{}')",
+        ("45148970000177-1-000030/2026-000010",))
+    db.commit()
+    db.close()
+    urls = []
+    monkeypatch.setattr(licitarium.webbrowser, "open", urls.append)
+    assert api.abrir_pncp("atas", "45148970000177-1-000030/2026-000010")
+    assert urls == ["https://pncp.gov.br/app/atas/45148970000177/2026/30/10"]
+    # número fora do padrão não abre link errado
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO atas (numero_controle, raw) VALUES ('X', '{}')")
+    db.commit()
+    db.close()
+    assert not api.abrir_pncp("atas", "X")
+    assert len(urls) == 1
+
+
 def test_filtro_ano_pca(api):
     assert api.listar("pca", {"ano": 2026})["total"] == 2
     assert api.listar("pca", {"ano": 2024})["total"] == 0
