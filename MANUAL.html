@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual do Licitarium v0.1.2</title>
+<title>Manual do Licitarium v0.2.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Manual do Licitarium v0.1.2"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Manual do Licitarium v0.2.0"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -70,7 +70,7 @@
           fill="#2b2115" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.1.2</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 0.2.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -123,11 +123,15 @@ homologado no ano corrente e contratos vigentes hoje.</p>
     inexigibilidades e demais modalidades da Lei 14.133</td></tr>
   <tr><td>Contratos</td><td>Contratos firmados, com fornecedor, valor e vigência</td></tr>
   <tr><td>Atas</td><td>Atas de registro de preços, com vigência</td></tr>
+  <tr><td>PCA</td><td>Itens do Plano de Contratações Anual de cada órgão —
+    o que o município planeja contratar no ano</td></tr>
 </table>
 <p>Filtre por <b>ano</b>, <b>modalidade</b>, <b>situação</b> ou digite qualquer
 termo na <b>busca</b> (procura no objeto e no número de controle). Nas
-contratações, o ano usado é o <b>ano do processo</b> (ex.: um pregão "36/2024"
-fica em 2024, mesmo que o órgão o atualize depois).</p>
+contratações e no PCA, o ano usado é o <b>ano do processo/plano</b> (ex.: um
+pregão "36/2024" fica em 2024, mesmo que o órgão o atualize depois).</p>
+<p><b>Ordenação:</b> clique no cabeçalho de qualquer coluna para ordenar a
+lista por ela; clique de novo para inverter a direção (▲/▼).</p>
 <h3>Detalhe</h3>
 <p>Clique em qualquer linha para abrir o detalhe completo: valores, datas,
 órgão, unidade, amparo legal e o registro integral em formato JSON, exatamente
@@ -144,6 +148,9 @@ processo no seu navegador.</p>
 </ul>
 <p>O histórico das sincronizações (com eventuais erros) fica em
 <b>Configurações → Sincronizações recentes</b>.</p>
+<p><b>Atualização do programa:</b> ao abrir, o Licitarium confere se há versão
+nova publicada e, se houver, mostra um aviso no rodapé com link para o
+download. A checagem falha em silêncio sem internet — nunca atrapalha o uso.</p>
 
 <h2>6. Configurações</h2>
 <h3>Aparência</h3>

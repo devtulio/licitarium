@@ -1,0 +1,56 @@
+"""Testes da ponte Api (listar/ordenação/detalhe) com banco temporário."""
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import licitarium
+
+
+@pytest.fixture
+def api(tmp_path, monkeypatch):
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    db = licitarium.abrir_db()
+    db.executemany(
+        "INSERT INTO contratacoes (numero_controle, ano, objeto,"
+        " valor_estimado, valor_homologado, data_publicacao)"
+        " VALUES (?,?,?,?,?,?)",
+        [("A", 2026, "Zebra", 10.0, None, "2026-01-01"),
+         ("B", 2026, "Arroz", 30.0, 25.0, "2026-02-01"),
+         ("C", 2025, "Milho", 20.0, 15.0, "2025-06-01")])
+    db.executemany(
+        "INSERT INTO pca_itens (id, id_pca, ano, numero_item, descricao,"
+        " valor_total) VALUES (?,?,?,?,?,?)",
+        [("P#1", "P", 2026, 1, "Papel", 100.0),
+         ("P#2", "P", 2026, 2, "Toner", 900.0)])
+    db.commit()
+    db.close()
+    return licitarium.Api()
+
+
+def test_ordenacao_por_coluna(api):
+    r = api.listar("contratacoes", {"ord": "objeto", "dir": "asc"})
+    assert [i["objeto"] for i in r["itens"]] == ["Arroz", "Milho", "Zebra"]
+    r = api.listar("contratacoes", {"ord": "valor", "dir": "desc"})
+    # valor = COALESCE(homologado, estimado): B=25, C=15, A=10
+    assert [i["numero_controle"] for i in r["itens"]] == ["B", "C", "A"]
+
+
+def test_ordenacao_invalida_cai_no_padrao(api):
+    r = api.listar("contratacoes", {"ord": "raw; DROP TABLE config", "dir": "asc"})
+    # coluna fora da whitelist é ignorada -> padrão data_publicacao DESC
+    assert [i["numero_controle"] for i in r["itens"]] == ["B", "A", "C"]
+
+
+def test_listar_e_detalhe_pca(api):
+    r = api.listar("pca", {"ord": "valor", "dir": "desc"})
+    assert [i["descricao"] for i in r["itens"]] == ["Toner", "Papel"]
+    d = api.detalhe("pca", "P#1")
+    assert d["descricao"] == "Papel"
+
+
+def test_filtro_ano_pca(api):
+    assert api.listar("pca", {"ano": 2026})["total"] == 2
+    assert api.listar("pca", {"ano": 2024})["total"] == 0

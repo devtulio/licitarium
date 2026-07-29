@@ -106,6 +106,11 @@
   .g-contratacoes { grid-template-columns:150px 1fr 120px 120px; }
   .g-contratos    { grid-template-columns:150px 1fr 160px 110px; }
   .g-atas         { grid-template-columns:200px 1fr 170px; }
+  .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
+  .cab span[data-ord] { cursor:pointer; user-select:none; }
+  .cab span[data-ord]:hover { color:var(--accent); }
+  .cab .seta { font-size:9px; }
+  .obj, #det-titulo { text-transform:uppercase; }
   .num { text-align:right; font-variant-numeric:tabular-nums; }
   [data-theme="pergaminho"] .num { font-family:Georgia,serif; }
   .dim { color:var(--muted); font-size:12px; }
@@ -207,6 +212,7 @@
       <button data-tipo="contratacoes" class="on" role="tab">Contratações</button>
       <button data-tipo="contratos" role="tab">Contratos</button>
       <button data-tipo="atas" role="tab">Atas</button>
+      <button data-tipo="pca" role="tab">PCA</button>
     </nav>
     <div class="filtros">
       <select id="f-ano" aria-label="Ano"><option value="">Todos os anos</option></select>
@@ -324,7 +330,8 @@ const ESTANDARTE = `
   <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
         fill="#2b2115" text-anchor="middle">MMXXVI</text>`;
 
-const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null };
+const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
+                 ord:null, dir:"desc" };
 let api = null;
 
 // ── boot ──────────────────────────────────────────────────────────────────
@@ -398,6 +405,15 @@ async function iniciarApp(e) {
   await carregarFiltros();
   await carregarLista();
   api.sincronizar();  // sync ao abrir (catch-up incremental)
+  api.checar_atualizacao().then(at => {
+    if (!at) return;
+    const alvo = $("rodape-versao");
+    alvo.innerHTML = `<a href="#" id="link-atualizacao"
+      style="color:var(--accent)">Nova versão ${esc(at.nova)} disponível ↗</a>`;
+    $("link-atualizacao").addEventListener("click", ev => {
+      ev.preventDefault(); api.abrir_atualizacao();
+    });
+  });
 }
 
 function renderKpis(k) {
@@ -430,13 +446,21 @@ function filtrosAtuais() {
   return { ano: $("f-ano").value || null,
            modalidade: $("f-modalidade").value || null,
            situacao: $("f-situacao").value || null,
-           busca: $("f-busca").value.trim() || null };
+           busca: $("f-busca").value.trim() || null,
+           ord: estado.ord, dir: estado.dir };
 }
 
+// [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const COLUNAS = {
-  contratacoes: ["Modalidade", "Objeto", "Valor", "Situação"],
-  contratos:    ["Número", "Objeto / Fornecedor", "Vigência", "Valor"],
-  atas:         ["Número", "Contratação de origem", "Vigência"],
+  contratacoes: [["Modalidade","modalidade"], ["Objeto","objeto"],
+                 ["Valor","valor"], ["Situação","situacao"]],
+  contratos:    [["Número","numero"], ["Objeto / Fornecedor","objeto"],
+                 ["Vigência","vigencia"], ["Valor","valor"]],
+  atas:         [["Número","numero"], ["Contratação de origem","origem"],
+                 ["Vigência","vigencia"]],
+  pca:          [["Item","item"], ["Descrição","descricao"],
+                 ["Categoria","categoria"], ["Qtde","quantidade"],
+                 ["Valor","valor"]],
 };
 
 function badgeSituacao(s) {
@@ -450,15 +474,21 @@ function renderLinha(tipo, d) {
   if (tipo === "contratacoes")
     return `<span class="dim">${esc(d.modalidade_nome ?? "–")}<br>
         ${d.sequencial ?? ""}/${d.ano ?? ""}</span>
-      <span>${esc(d.objeto ?? "–")}</span>
+      <span class="obj">${esc(d.objeto ?? "–")}</span>
       <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
       <span style="justify-self:end">${badgeSituacao(d.situacao)}</span>`;
   if (tipo === "contratos")
     return `<span class="dim">${esc(d.numero_controle)}</span>
-      <span>${esc(d.objeto ?? "–")}<br>
+      <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
       <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
+  if (tipo === "pca")
+    return `<span class="dim">${esc(d.numero_item)}</span>
+      <span class="obj">${esc(d.descricao ?? "–")}</span>
+      <span class="dim">${esc(d.categoria ?? "–")}</span>
+      <span class="num">${d.quantidade ?? "–"}</span>
+      <span class="num">${dinheiro(d.valor_total)}</span>`;
   return `<span class="dim">${esc(d.numero_controle)}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
     <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
@@ -469,14 +499,33 @@ async function carregarLista() {
   estado.total = r.total;
   const g = `g-${estado.tipo}`;
   const cab = `<div class="linha cab ${g}">` +
-    COLUNAS[estado.tipo].map(c => `<span>${c}</span>`).join("") + `</div>`;
+    COLUNAS[estado.tipo].map(([rotulo, chave]) => {
+      const ativa = chave && estado.ord === chave;
+      const seta = ativa ? `<span class="seta">${estado.dir === "asc" ? "▲" : "▼"}</span>` : "";
+      const sort = chave ? ` data-ord="${chave}" role="button" tabindex="0"
+        aria-sort="${ativa ? (estado.dir === "asc" ? "ascending" : "descending") : "none"}"` : "";
+      return `<span${sort}>${rotulo} ${seta}</span>`;
+    }).join("") + `</div>`;
   const linhas = r.itens.map(d =>
-    `<button class="linha ${g}" data-nc="${esc(d.numero_controle)}">` +
+    `<button class="linha ${g}" data-nc="${esc(d.numero_controle ?? d.id)}">` +
     renderLinha(estado.tipo, d) + `</button>`).join("");
   $("lista").innerHTML = cab + (linhas ||
     `<div class="vazio">Nenhum registro. Sincronize ou ajuste os filtros.</div>`);
   $("lista").querySelectorAll("button.linha[data-nc]").forEach(b =>
     b.addEventListener("click", () => abrirDetalhe(b.dataset.nc)));
+  $("lista").querySelectorAll(".cab span[data-ord]").forEach(s => {
+    const ordenar = () => {
+      const chave = s.dataset.ord;
+      if (estado.ord === chave) estado.dir = estado.dir === "asc" ? "desc" : "asc";
+      else { estado.ord = chave; estado.dir = "asc"; }
+      estado.pagina = 1;
+      carregarLista();
+    };
+    s.addEventListener("click", ordenar);
+    s.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ordenar(); }
+    });
+  });
   const paginas = Math.max(1, Math.ceil(r.total / 50));
   $("pag-info").textContent = `${estado.pagina}/${paginas} · ${r.total} registros`;
   $("pag-ant").disabled = estado.pagina <= 1;
@@ -489,6 +538,7 @@ document.querySelectorAll("nav.abas button").forEach(b =>
       x.classList.toggle("on", x === b));
     estado.tipo = b.dataset.tipo;
     estado.pagina = 1;
+    estado.ord = null; estado.dir = "desc";
     const soContratacoes = estado.tipo === "contratacoes";
     $("f-modalidade").classList.toggle("oculto", !soContratacoes);
     $("f-situacao").classList.toggle("oculto", !soContratacoes);
@@ -508,6 +558,9 @@ $("pag-prox").addEventListener("click", () => {
 
 // ── detalhe ───────────────────────────────────────────────────────────────
 const ROTULOS = {
+  numero_item:"Item nº", categoria:"Categoria", grupo:"Grupo de contratação",
+  quantidade:"Quantidade estimada", valor_total:"Valor total",
+  id_pca:"Plano (id PNCP)", ano:"Ano",
   modalidade_nome:"Modalidade", situacao:"Situação", orgao_nome:"Órgão",
   unidade:"Unidade", valor_estimado:"Valor estimado",
   valor_homologado:"Valor homologado", valor_global:"Valor global",
@@ -521,8 +574,9 @@ async function abrirDetalhe(nc) {
   const d = await api.detalhe(estado.tipo, nc);
   if (!d) return;
   detalheAtual = nc;
-  $("det-titulo").textContent = d.objeto || d.numero_controle;
-  $("det-sub").textContent = d.numero_controle;
+  $("det-titulo").textContent = d.objeto || d.descricao || d.numero_controle || d.id;
+  $("det-sub").textContent = d.numero_controle || d.id_pca || "";
+  $("det-pncp").classList.toggle("oculto", estado.tipo === "pca");
   $("det-meta").innerHTML = Object.entries(ROTULOS)
     .filter(([campo]) => d[campo] != null && d[campo] !== "")
     .map(([campo, rotulo]) => {

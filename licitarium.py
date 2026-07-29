@@ -1,12 +1,13 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.1.2
+Versão 0.2.0
 """
 import csv
 import json
 import sqlite3
 import threading
+import urllib.request
 import webbrowser
 from datetime import date, datetime
 from pathlib import Path
@@ -15,7 +16,7 @@ import webview
 
 import pncp
 
-VERSAO = "0.1.2"
+VERSAO = "0.2.0"
 DIR_APP = Path(__file__).resolve().parent
 DIR_DADOS = Path.home() / "AppData" / "Local" / "Licitarium"
 ARQUIVO_DB = DIR_DADOS / "licitarium.db"
@@ -40,6 +41,11 @@ CREATE TABLE IF NOT EXISTS atas (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
   vigencia_inicio TEXT, vigencia_fim TEXT, data_atualizacao TEXT,
   raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS pca_itens (
+  id TEXT PRIMARY KEY, id_pca TEXT, ano INTEGER, orgao_cnpj TEXT, unidade TEXT,
+  numero_item INTEGER, descricao TEXT, categoria TEXT, grupo TEXT,
+  quantidade REAL, valor_total REAL, data_atualizacao TEXT,
+  raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, iniciado_em TEXT, tipo TEXT,
   janela_ini TEXT, janela_fim TEXT, registros INTEGER, status TEXT, erro TEXT);
@@ -47,9 +53,29 @@ CREATE INDEX IF NOT EXISTS ix_contratacoes_pub ON contratacoes (data_publicacao)
 CREATE INDEX IF NOT EXISTS ix_contratacoes_mod ON contratacoes (modalidade_id);
 CREATE INDEX IF NOT EXISTS ix_contratos_pub ON contratos (data_publicacao);
 CREATE INDEX IF NOT EXISTS ix_atas_vig ON atas (vigencia_fim);
+CREATE INDEX IF NOT EXISTS ix_pca_ano ON pca_itens (ano);
 """
 
-TABELAS = {"contratacoes", "contratos", "atas"}  # whitelist p/ tipo vindo do JS
+# whitelists p/ valores vindos do JS (tipo, coluna de ordenação)
+TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
+           "atas": "atas", "pca": "pca_itens"}
+CHAVES = {"pca": "id"}  # demais tabelas usam numero_controle
+ORDENAVEIS = {
+    "contratacoes": {"modalidade": "modalidade_nome", "objeto": "objeto",
+                     "valor": "COALESCE(valor_homologado, valor_estimado)",
+                     "situacao": "situacao"},
+    "contratos": {"numero": "numero_controle", "objeto": "objeto",
+                  "vigencia": "vigencia_fim", "valor": "valor_global"},
+    "atas": {"numero": "numero_controle", "origem": "contratacao_controle",
+             "vigencia": "vigencia_fim"},
+    "pca": {"item": "numero_item", "descricao": "descricao",
+            "categoria": "categoria", "quantidade": "quantidade",
+            "valor": "valor_total"},
+}
+PADRAO_ORDEM = {"contratacoes": "data_publicacao DESC",
+                "contratos": "data_publicacao DESC",
+                "atas": "vigencia_fim DESC",
+                "pca": "ano DESC, numero_item"}
 
 
 def abrir_db():
@@ -190,15 +216,16 @@ class Api:
     # ── listagem e detalhe ──────────────────────────────────────────────
 
     def listar(self, tipo, filtros=None, pagina=1):
-        if tipo not in TABELAS:
+        tabela = TABELAS.get(tipo)
+        if not tabela:
             return {"itens": [], "total": 0}
         f = filtros or {}
         where, args = [], []
         if f.get("ano"):
-            if tipo == "contratacoes":
-                # ano do processo (anoCompra), não da publicação: o PNCP
-                # reescreve dataPublicacaoPncp quando o órgão atualiza o
-                # processo, jogando um "36/2024" para o ano corrente
+            if tipo in ("contratacoes", "pca"):
+                # ano do processo/plano, não da publicação: o PNCP reescreve
+                # dataPublicacaoPncp quando o órgão atualiza um processo,
+                # jogando um "36/2024" para o ano corrente
                 where.append("ano=?")
                 args.append(f["ano"])
             else:
@@ -212,20 +239,26 @@ class Api:
             where.append("situacao=?")
             args.append(f["situacao"])
         if f.get("busca"):
-            where.append("(objeto LIKE ? OR numero_controle LIKE ?)"
-                         if tipo != "atas" else "numero_controle LIKE ?")
-            termo = f"%{f['busca']}%"
-            args += [termo, termo] if tipo != "atas" else [termo]
+            campos = {"contratacoes": ["objeto", "numero_controle"],
+                      "contratos": ["objeto", "fornecedor_nome",
+                                    "numero_controle"],
+                      "atas": ["numero_controle"],
+                      "pca": ["descricao", "grupo"]}[tipo]
+            where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
+            args += [f"%{f['busca']}%"] * len(campos)
         sql_where = (" WHERE " + " AND ".join(where)) if where else ""
-        ordem = {"contratacoes": "data_publicacao DESC",
-                 "contratos": "data_publicacao DESC",
-                 "atas": "vigencia_fim DESC"}[tipo]
+        # ordenação por clique: só colunas da whitelist entram no SQL
+        ordem = PADRAO_ORDEM[tipo]
+        coluna_ord = ORDENAVEIS[tipo].get(f.get("ord") or "")
+        if coluna_ord:
+            direcao = "ASC" if f.get("dir") == "asc" else "DESC"
+            ordem = f"{coluna_ord} {direcao}"
         db = abrir_db()
         try:
             total = db.execute(
-                f"SELECT COUNT(*) FROM {tipo}{sql_where}", args).fetchone()[0]
+                f"SELECT COUNT(*) FROM {tabela}{sql_where}", args).fetchone()[0]
             linhas = db.execute(
-                f"SELECT * FROM {tipo}{sql_where} ORDER BY {ordem} "
+                f"SELECT * FROM {tabela}{sql_where} ORDER BY {ordem} "
                 f"LIMIT 50 OFFSET ?", args + [(max(1, pagina) - 1) * 50])
             itens = []
             for r in linhas:
@@ -237,11 +270,13 @@ class Api:
             db.close()
 
     def detalhe(self, tipo, numero_controle):
-        if tipo not in TABELAS:
+        tabela = TABELAS.get(tipo)
+        if not tabela:
             return None
+        chave = CHAVES.get(tipo, "numero_controle")
         db = abrir_db()
         try:
-            r = db.execute(f"SELECT * FROM {tipo} WHERE numero_controle=?",
+            r = db.execute(f"SELECT * FROM {tabela} WHERE {chave}=?",
                            (numero_controle,)).fetchone()
             if not r:
                 return None
@@ -271,6 +306,8 @@ class Api:
     # ── link oficial ────────────────────────────────────────────────────
 
     def abrir_pncp(self, tipo, numero_controle):
+        if tipo == "pca":
+            return False  # PNCP não tem página por item de PCA
         d = self.detalhe(tipo, numero_controle)
         if not d:
             return False
@@ -341,6 +378,37 @@ class Api:
                 "SELECT * FROM sync_log ORDER BY id DESC LIMIT 10")]
         finally:
             db.close()
+
+    # ── atualização do aplicativo ───────────────────────────────────────
+
+    def checar_atualizacao(self):
+        """Compara a versão local com a última release do GitHub.
+
+        Falha em silêncio (sem internet, rate limit): a checagem é cortesia,
+        nunca pode atrapalhar o uso.
+        """
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/devtulio/licitarium/releases/latest",
+                headers={"User-Agent": pncp.USER_AGENT,
+                         "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                d = json.load(r)
+            tag = (d.get("tag_name") or "").lstrip("v")
+            local = [int(x) for x in VERSAO.split(".")]
+            remota = [int(x) for x in tag.split(".")] if tag else []
+            if remota > local:
+                self._atualizacao = d.get("html_url")
+                return {"nova": tag}
+        except Exception:
+            pass
+        return None
+
+    def abrir_atualizacao(self):
+        if getattr(self, "_atualizacao", None):
+            webbrowser.open(self._atualizacao)
+            return True
+        return False
 
     # ── exportação ──────────────────────────────────────────────────────
 

@@ -238,6 +238,50 @@ def sync_atas(db, cnpj, inicio, fim, progresso=None):
     return total
 
 
+def _upsert_pca(db, plano):
+    """Achata os itens de um plano (PCA) — contexto do plano vai em cada linha."""
+    id_pca = plano.get("idPcaPncp")
+    if not id_pca:
+        return 0
+    agora = datetime.now().isoformat()
+    n = 0
+    for item in plano.get("itens") or []:
+        numero = item.get("numeroItem")
+        if numero is None:
+            continue
+        db.execute(
+            """INSERT OR REPLACE INTO pca_itens
+               (id, id_pca, ano, orgao_cnpj, unidade, numero_item, descricao,
+                categoria, grupo, quantidade, valor_total, data_atualizacao,
+                raw, sync_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (f"{id_pca}#{numero}", id_pca, plano.get("anoPca"),
+             plano.get("orgaoEntidadeCnpj"), plano.get("nomeUnidade"), numero,
+             item.get("descricaoItem"), item.get("nomeClassificacaoCatalogo"),
+             item.get("grupoContratacaoNome"), item.get("quantidadeEstimada"),
+             item.get("valorTotal"), item.get("dataAtualizacao"),
+             json.dumps(item, ensure_ascii=False), agora))
+        n += 1
+    return n
+
+
+def sync_pca(db, cnpj, inicio, fim, progresso=None):
+    """Fase 2: itens do Plano de Contratações Anual de um órgão.
+
+    Atenção: este endpoint usa dataInicio/dataFim — os demais usam
+    dataInicial/dataFinal (verificado contra a API real em 2026-07-29).
+    """
+    total = 0
+    for a, b in _janelas(inicio, fim):
+        for plano in _paginar("/v1/pca/atualizacao",
+                              {"dataInicio": _amd(a), "dataFim": _amd(b),
+                               "cnpj": cnpj},
+                              tamanho_pagina=500):
+            total += _upsert_pca(db, plano)
+        db.commit()  # transação curta por janela
+    return total
+
+
 def _config(db, chave, valor=None):
     if valor is None:
         linha = db.execute("SELECT valor FROM config WHERE chave=?", (chave,)).fetchone()
@@ -288,7 +332,8 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
     # fase 2 — contratos e atas por CNPJ de órgão ativo
     orgaos = [r[0] for r in db.execute(
         "SELECT cnpj FROM orgaos WHERE ativo=1").fetchall()]
-    for tipo, func in (("contratos", sync_contratos), ("atas", sync_atas)):
+    for tipo, func in (("contratos", sync_contratos), ("atas", sync_atas),
+                       ("pca", sync_pca)):
         inicio = janela_de(tipo)
         total, falhou = 0, False
         for cnpj in orgaos:

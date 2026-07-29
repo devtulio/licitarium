@@ -4,8 +4,9 @@
 
 **Repositório local de contratações públicas municipais.** O Licitarium espelha,
 no seu computador, tudo o que o seu município publica no
-[PNCP](https://pncp.gov.br) — contratações (editais e avisos), contratos e atas
-de registro de preços — e mantém esse acervo pesquisável, offline e permanente.
+[PNCP](https://pncp.gov.br) — contratações (editais e avisos), contratos, atas
+de registro de preços e o Plano de Contratações Anual (PCA) — e mantém esse
+acervo pesquisável, offline e permanente.
 
 *Licitarium* — do latim *licitatio* (lance, leilão) + *-arium* (lugar que
 guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**

@@ -122,6 +122,40 @@ def test_sincronizar_tudo_continua_apos_falha(db, monkeypatch):
     assert erros >= 1
 
 
+def test_sync_pca_idempotente_e_parametros(db, monkeypatch):
+    """PCA achata itens do plano; endpoint usa dataInicio/dataFim."""
+    params_vistos, servido = [], []
+    plano = {"idPcaPncp": "111-0-000001/2026", "anoPca": 2026,
+             "orgaoEntidadeCnpj": "11111111000111", "nomeUnidade": "Sec. Adm",
+             "itens": [
+                 {"numeroItem": 1, "descricaoItem": "Papel A4",
+                  "nomeClassificacaoCatalogo": "Material",
+                  "quantidadeEstimada": 100.0, "valorTotal": 2500.0},
+                 {"numeroItem": 2, "descricaoItem": "Consultoria",
+                  "nomeClassificacaoCatalogo": "Serviço",
+                  "quantidadeEstimada": 1.0, "valorTotal": 30000.0}]}
+    def fake_get(caminho, params):
+        assert "pca" in caminho
+        params_vistos.append(params)
+        if params["pagina"] == 1 and not servido:
+            servido.append(1)
+            return {"data": [plano], "totalPaginas": 1}
+        return None
+    monkeypatch.setattr(pncp, "_get", fake_get)
+    n1 = pncp.sync_pca(db, "11111111000111", date(2026, 1, 1), date(2026, 2, 1))
+    servido.clear()
+    n2 = pncp.sync_pca(db, "11111111000111", date(2026, 1, 1), date(2026, 2, 1))
+    assert n1 == n2 == 2
+    assert db.execute("SELECT COUNT(*) FROM pca_itens").fetchone()[0] == 2
+    linha = db.execute(
+        "SELECT * FROM pca_itens WHERE id='111-0-000001/2026#1'").fetchone()
+    assert linha["descricao"] == "Papel A4"
+    assert linha["ano"] == 2026
+    # o endpoint de PCA usa dataInicio/dataFim, não dataInicial/dataFinal
+    assert all("dataInicio" in p and "dataInicial" not in p
+               for p in params_vistos)
+
+
 def test_sync_incremental_com_sobreposicao(db, monkeypatch):
     """Segunda rodada parte de last_sync - 1 dia (catch-up seguro)."""
     chamadas = []

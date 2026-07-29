@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-07-29
+
+- **PCA**: 4ª aba com os itens do Plano de Contratações Anual por órgão
+  (endpoint `/v1/pca/atualizacao`; atenção: usa `dataInicio`/`dataFim`,
+  diferente dos demais). Itens achatados com contexto do plano.
+- **Ordenação por clique** no cabeçalho de todas as listas (whitelist de
+  colunas no backend; ▲/▼ com aria-sort).
+- **Objetos em caixa alta** nas listas e no detalhe.
+- **Aviso de versão nova**: checagem da última release do GitHub ao abrir,
+  com link no rodapé; falha em silêncio.
+- Busca dos contratos agora cobre também o fornecedor.
+
 ## 0.1.2 — 2026-07-29
 
 - Nova tentativa de arquivamento no Zenodo após reset do vínculo GitHub↔Zenodo
