@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS contratos (
   data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS atas (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
+  numero_ata TEXT, ano_ata INTEGER,
   vigencia_inicio TEXT, vigencia_fim TEXT, data_atualizacao TEXT,
   raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS pca_itens (
@@ -69,8 +70,9 @@ ORDENAVEIS = {
                      "situacao": "situacao"},
     "contratos": {"numero": "numero_controle", "objeto": "objeto",
                   "vigencia": "vigencia_fim", "valor": "valor_global"},
-    "atas": {"numero": "numero_controle", "origem": "contratacao_controle",
-             "vigencia": "vigencia_fim"},
+    "atas": {"numero":
+             "(COALESCE(ano_ata,0)*100000+CAST(COALESCE(numero_ata,'0') AS INTEGER))",
+             "origem": "contratacao_controle", "vigencia": "vigencia_fim"},
     "pca": {"item": "numero_item", "descricao": "descricao",
             "categoria": "categoria", "quantidade": "quantidade",
             "valor": "valor_total"},
@@ -87,6 +89,16 @@ def abrir_db():
     DIR_DADOS.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(ARQUIVO_DB)
     db.row_factory = sqlite3.Row
+    # migração: atas ganharam numero_ata/ano_ata como colunas (0.2.x);
+    # bancos antigos são reprojetados a partir do raw (fonte da verdade)
+    colunas_atas = {r[1] for r in db.execute("PRAGMA table_info(atas)")}
+    if colunas_atas and "numero_ata" not in colunas_atas:
+        db.execute("ALTER TABLE atas ADD COLUMN numero_ata TEXT")
+        db.execute("ALTER TABLE atas ADD COLUMN ano_ata INTEGER")
+        db.execute("UPDATE atas SET"
+                   " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
+                   " ano_ata=json_extract(raw,'$.anoAta')")
+        db.commit()
     # WAL + busy_timeout: a thread de sync grava enquanto a ponte JS lê/grava
     # config — sem isso, "database is locked" na primeira concorrência
     db.execute("PRAGMA journal_mode=WAL")
@@ -248,7 +260,7 @@ class Api:
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",
                                     "numero_controle"],
-                      "atas": ["numero_controle"],
+                      "atas": ["numero_controle", "numero_ata"],
                       "pca": ["descricao", "grupo"]}[tipo]
             where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
             args += [f"%{f['busca']}%"] * len(campos)

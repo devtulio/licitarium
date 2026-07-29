@@ -107,7 +107,7 @@
   .cab:hover { background:var(--surface2); }
   .g-contratacoes { grid-template-columns:80px 135px 1fr 120px 120px; }
   .g-contratos    { grid-template-columns:150px 1fr 160px 110px; }
-  .g-atas         { grid-template-columns:200px 1fr 170px; }
+  .g-atas         { grid-template-columns:90px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
   .cab span[data-ord] { cursor:pointer; user-select:none; }
   .cab span[data-ord]:hover { color:var(--accent); }
@@ -512,7 +512,7 @@ const COLUNAS = {
                  ["Situação","situacao"]],
   contratos:    [["Número","numero"], ["Objeto / Fornecedor","objeto"],
                  ["Vigência","vigencia"], ["Valor","valor"]],
-  atas:         [["Número","numero"], ["Contratação de origem","origem"],
+  atas:         [["Ata","numero"], ["Contratação de origem","origem"],
                  ["Vigência","vigencia"]],
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
@@ -545,7 +545,7 @@ function renderLinha(tipo, d) {
       <span class="dim">${esc(d.categoria ?? "–")}</span>
       <span class="num">${d.quantidade ?? "–"}</span>
       <span class="num">${dinheiro(d.valor_total)}</span>`;
-  return `<span class="dim">${esc(d.numero_controle)}</span>
+  return `<span class="dim">${esc(d.numero_ata ?? "–")}/${esc(d.ano_ata ?? "")}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
     <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
 }
@@ -614,6 +614,7 @@ $("pag-prox").addEventListener("click", () => {
 
 // ── detalhe ───────────────────────────────────────────────────────────────
 const ROTULOS = {
+  numero_ata:"Ata nº", ano_ata:"Ano da ata",
   numero_item:"Item nº", categoria:"Categoria", grupo:"Grupo de contratação",
   quantidade:"Quantidade estimada", valor_total:"Valor total",
   id_pca:"Plano (id PNCP)", ano:"Ano",

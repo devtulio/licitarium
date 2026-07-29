@@ -172,11 +172,13 @@ def _upsert_ata(db, item):
     db.execute(
         """INSERT OR REPLACE INTO atas
            (numero_controle, contratacao_controle, orgao_cnpj,
+            numero_ata, ano_ata,
             vigencia_inicio, vigencia_fim, data_atualizacao, raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
         (numero,
          _primeiro(item, "numeroControlePNCPCompra", "numeroControlePncpCompra"),
          _primeiro(item, "cnpjOrgao", "cnpj"),
+         item.get("numeroAtaRegistroPreco"), item.get("anoAta"),
          _primeiro(item, "vigenciaInicio", "dataVigenciaInicio"),
          _primeiro(item, "vigenciaFim", "dataVigenciaFim"),
          _primeiro(item, "dataAtualizacao", "dataAtualizacaoGlobal"),

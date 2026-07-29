@@ -78,6 +78,27 @@ def test_abrir_pncp_ata_monta_url_da_ata(api, monkeypatch):
     assert len(urls) == 1
 
 
+def test_migracao_atas_reprojeta_do_raw(tmp_path, monkeypatch):
+    """Banco 0.2.0 (atas sem numero_ata) ganha as colunas preenchidas do raw."""
+    import json
+    import sqlite3 as sq
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "m.db")
+    con = sq.connect(tmp_path / "m.db")
+    con.execute("CREATE TABLE atas (numero_controle TEXT PRIMARY KEY,"
+                " contratacao_controle TEXT, orgao_cnpj TEXT,"
+                " vigencia_inicio TEXT, vigencia_fim TEXT,"
+                " data_atualizacao TEXT, raw TEXT, sync_em TEXT)")
+    con.execute("INSERT INTO atas (numero_controle, raw) VALUES ('X', ?)",
+                (json.dumps({"numeroAtaRegistroPreco": "13", "anoAta": 2026}),))
+    con.commit()
+    con.close()
+    db = licitarium.abrir_db()
+    r = db.execute("SELECT numero_ata, ano_ata FROM atas").fetchone()
+    db.close()
+    assert (r["numero_ata"], r["ano_ata"]) == ("13", 2026)
+
+
 def test_filtro_por_orgao(api):
     assert api.listar("contratacoes", {"orgao": "111"})["total"] == 2
     assert api.listar("contratacoes", {"orgao": "222"})["total"] == 1
