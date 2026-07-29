@@ -98,6 +98,8 @@
   .linha { display:grid; gap:12px; padding:11px 16px; align-items:center;
            font-size:13px; cursor:pointer; border:none; background:none;
            width:100%; text-align:left; color:var(--text); }
+  .linha:not(.cab):nth-child(even) {
+    background:color-mix(in srgb, var(--surface2) 55%, var(--surface)); }
   .linha:hover, .linha:focus { background:var(--surface2); }
   .linha + .linha { border-top:1px solid var(--border); }
   .cab { font-size:11px; letter-spacing:.07em; text-transform:uppercase;
@@ -111,9 +113,16 @@
   .cab span[data-ord]:hover { color:var(--accent); }
   .cab .seta { font-size:9px; }
   .obj, #det-titulo { text-transform:uppercase; }
-  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .num { text-align:center; font-variant-numeric:tabular-nums;
+         white-space:nowrap; }
   [data-theme="pergaminho"] .num { font-family:Georgia,serif; }
   .dim { color:var(--muted); font-size:12px; }
+  /* colunas curtas centralizadas (mesmo tratamento dos relatórios) */
+  .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(4),
+  .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
+  .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(3),
+  .g-pca > :nth-child(1), .g-pca > :nth-child(3) { text-align:center; }
+  .linha .obj { text-align:justify; hyphens:auto; }
   .vazio { padding:34px; text-align:center; color:var(--muted); font-size:13px; }
 
   .rodape { display:flex; justify-content:space-between; align-items:center;
@@ -521,7 +530,7 @@ function renderLinha(tipo, d) {
         ${d.sequencial ?? ""}/${d.ano ?? ""}</span>
       <span class="obj">${esc(d.objeto ?? "–")}</span>
       <span class="num">${dinheiro(d.valor_homologado ?? d.valor_estimado)}</span>
-      <span style="justify-self:end">${badgeSituacao(d.situacao)}</span>`;
+      <span style="justify-self:center">${badgeSituacao(d.situacao)}</span>`;
   if (tipo === "contratos")
     return `<span class="dim">${esc(d.numero_controle)}</span>
       <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
