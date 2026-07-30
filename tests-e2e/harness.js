@@ -33,6 +33,19 @@ const DADOS = {
       vigencia_inicio: "2026-04-10", vigencia_fim: "2027-04-10" },
   ],
   pca: [],
+  itens: [
+    { id: "X-3#1", contratacao_controle: "X-3", ano: 2025, sequencial: 50,
+      numero_item: 1, descricao: "PAPEL SULFITE A4 75G RESMA 500 FOLHAS",
+      unidade: "RESMA", quantidade: 300, quantidade_homologada: 300,
+      valor_unitario_estimado: 24.9, valor_unitario_homologado: 18.75,
+      fornecedor_nome: "PAPELARIA CENTRAL LTDA",
+      data_resultado: "2025-11-28" },
+    { id: "X-3#2", contratacao_controle: "X-3", ano: 2025, sequencial: 50,
+      numero_item: 2, descricao: "CANETA ESFEROGRÁFICA AZUL",
+      unidade: "UN", quantidade: 500, quantidade_homologada: 500,
+      valor_unitario_estimado: 1.9, valor_unitario_homologado: null,
+      fornecedor_nome: null, data_resultado: null },
+  ],
 };
 
 // serializada para dentro do addInitScript (roda no contexto da página)
@@ -56,7 +69,16 @@ function scriptPonte() {
                  { cnpj: "51351716000174", nome: "ORINDIUVA CAMARA MUNICIPAL" }] }),
       listar: async (tipo, filtros, pagina) => {
         window.__chamadas.push({ metodo: "listar", tipo, filtros, pagina });
-        return { itens: DADOS[tipo] || [], total: (DADOS[tipo] || []).length };
+        let itens = DADOS[tipo] || [];
+        if (tipo === "itens" && filtros && filtros.so_homologados)
+          itens = itens.filter(i => i.valor_unitario_homologado != null);
+        return { itens, total: itens.length };
+      },
+      estatisticas_preco: async (busca, ano) => {
+        window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano });
+        if (!/papel/i.test(busca || "")) return null;
+        return { n: 3, minimo: 15.4, maximo: 24.9, media: 19.68,
+                 mediana: 18.75, fornecedores: 2 };
       },
       detalhe: async (tipo, nc) =>
         ({ ...(DADOS[tipo] || []).find(d => d.numero_controle === nc),

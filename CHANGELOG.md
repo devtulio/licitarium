@@ -1,5 +1,20 @@
 # Changelog
 
+## Não lançado
+
+- **Banco de preços municipal**: nova aba **Preços** com os itens de cada
+  contratação — descrição, unidade, quantidade, valor unitário homologado e
+  fornecedor vencedor. Buscar um termo mostra menor preço, mediana, média,
+  maior preço, quantidade de itens e de fornecedores.
+- **Relatório de Pesquisa de Preços**: levantamento timbrado do histórico de
+  preços unitários homologados para um termo, do menor para o maior, com
+  fornecedor e processo de origem — subsídio ao art. 23 da Lei 14.133/2021.
+- Coleta de itens como terceira fase da sincronização, só revisitando
+  contratação nova ou alterada (controle por `itens_versao`).
+- Correção: com o Smart App Control do Windows 11 ativo, a atualização
+  automática fica desligada e o exe novo é validado antes de substituir o
+  atual (era a causa do erro "Failed to load Python DLL").
+
 ## 0.6.0 — 2026-07-29
 
 - **Valor estimado distinguido do homologado**: processos sem homologação

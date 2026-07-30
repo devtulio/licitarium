@@ -54,6 +54,37 @@ test("tema troca via configurações e persiste via set_config",
   expect(salvo.v).toBe("observatorio");
 });
 
+test("aba Preços lista itens e resume o histórico do termo buscado",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await expect(page.locator("#cx-homologados")).toBeVisible();
+  await expect(page.locator("#f-busca"))
+    .toHaveAttribute("placeholder", /papel A4/);
+  // "só com preço fechado" vem ligado: o item sem resultado não aparece
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(1);
+  await expect(page.locator(".linha:not(.cab)").first())
+    .toContainText("PAPEL SULFITE");
+  // resumo estatístico aparece ao buscar
+  await expect(page.locator("#precos-resumo")).toBeHidden();
+  await page.locator("#f-busca").fill("papel");
+  await expect(page.locator("#precos-resumo")).toBeVisible();
+  await expect(page.locator("#precos-resumo")).toContainText("mediana");
+  await expect(page.locator("#precos-resumo")).toContainText("18,75");
+  // desmarcar traz também o item sem preço fechado
+  await page.locator("#f-homologados").uncheck();
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(2);
+});
+
+test("resumo de preços abre o relatório com o termo preenchido",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator("#f-busca").fill("papel");
+  await page.locator("#btn-rel-precos").click();
+  await expect(page.locator("#veu-relatorios")).toBeVisible();
+  await expect(page.locator("#rel-tipo")).toHaveValue("precos");
+  await expect(page.locator("#rel-termo")).toHaveValue("papel");
+});
+
 test("valor sem homologação é marcado como estimado", async ({ page }) => {
   const linhas = page.locator(".linha:not(.cab)");
   // X-1 tem homologado: valor limpo, sem marca

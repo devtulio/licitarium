@@ -29,7 +29,8 @@ TITULOS = {"contratacoes": "Relação de Contratações",
            "contratos": "Relação de Contratos",
            "atas": "Relação de Atas de Registro de Preços",
            "executivo": "Resumo Executivo de Contratações",
-           "fracionamento": "Alerta de Fracionamento — Dispensas × Limites"}
+           "fracionamento": "Alerta de Fracionamento — Dispensas × Limites",
+           "precos": "Pesquisa de Preços — Histórico de Contratações"}
 
 # Valores do art. 75, I e II, da Lei 14.133/2021 conforme Decreto de
 # atualização — parametrizáveis nas configurações (confira o decreto vigente)
@@ -224,6 +225,40 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
             "limite_compras": limite_compras, "limite_obras": limite_obras,
             "total": sum(d["valor"] or 0 for d in dispensas),
             "n": len(dispensas)}
+
+
+def dados_precos(db, termo, ano=None, orgao=None):
+    """Histórico de preços unitários homologados para um termo de busca."""
+    where = ["valor_unitario_homologado IS NOT NULL", "descricao LIKE ?"]
+    args = [f"%{(termo or '').strip()}%"]
+    if ano:
+        where.append("ano=?")
+        args.append(int(ano))
+    if orgao:
+        where.append("orgao_cnpj=?")
+        args.append(orgao)
+    sql_where = " WHERE " + " AND ".join(where)
+    linhas = [dict(r) for r in db.execute(
+        f"""SELECT descricao, unidade, quantidade_homologada, unidade,
+                   valor_unitario_homologado, valor_total_homologado,
+                   fornecedor_nome, fornecedor_ni, data_resultado,
+                   sequencial, ano, contratacao_controle
+            FROM itens{sql_where}
+            ORDER BY valor_unitario_homologado""", args)]
+    valores = [l["valor_unitario_homologado"] for l in linhas]
+    resumo = None
+    if valores:
+        n = len(valores)
+        meio = n // 2
+        resumo = {
+            "n": n, "minimo": valores[0], "maximo": valores[-1],
+            "media": sum(valores) / n,
+            "mediana": valores[meio] if n % 2
+                       else (valores[meio - 1] + valores[meio]) / 2,
+            "fornecedores": len({l["fornecedor_ni"] for l in linhas}),
+        }
+    return {"termo": (termo or "").strip(), "linhas": linhas, "resumo": resumo,
+            "ano": ano}
 
 
 # ── render ──────────────────────────────────────────────────────────────────
@@ -456,6 +491,50 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
                    tema=tema)
 
 
+def render_precos(d, municipio, uf, tema="pergaminho"):
+    r = d["resumo"]
+    periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
+    if not r:
+        corpo = (f'<div class="caixa-aviso">Nenhum item homologado encontrado '
+                 f'para <b>{_e(d["termo"])}</b> no acervo local.</div>')
+        return _pagina(f"{TITULOS['precos']} — {_e(d['termo'])}", corpo,
+                       municipio, uf, periodo, paisagem=True, tema=tema)
+    cards = f"""<div class="cards">
+<div class="card"><div class="n">{moeda(r['minimo'])}</div><div class="l">menor unitário</div></div>
+<div class="card"><div class="n">{moeda(r['mediana'])}</div><div class="l">mediana</div></div>
+<div class="card"><div class="n">{moeda(r['media'])}</div><div class="l">média</div></div>
+<div class="card"><div class="n">{moeda(r['maximo'])}</div><div class="l">maior unitário</div></div>
+<div class="card"><div class="n">{r['n']}</div><div class="l">itens</div></div>
+<div class="card"><div class="n">{r['fornecedores']}</div><div class="l">fornecedores</div></div>
+</div>"""
+    linhas = "".join(f"""<tr>
+      <td class="obj">{_e(l['descricao'])}</td>
+      <td class="ctr">{_e(l['unidade'])}</td>
+      <td class="num">{l['quantidade_homologada'] or '–'}</td>
+      <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
+      <td class="num">{moeda(l['valor_total_homologado'])}</td>
+      <td class="ctr">{_e(l['fornecedor_nome'])}</td>
+      <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
+      <td class="num">{data_br(l['data_resultado'])}</td></tr>"""
+      for l in d["linhas"])
+    corpo = f"""<div class="caixa-aviso">Levantamento de <b>preços efetivamente
+homologados</b> pelo município, extraído do PNCP — subsídio à pesquisa de
+preços do art. 23 da Lei 14.133/2021 (que admite contratações similares de
+outros entes como parâmetro). Confira a aderência de especificação, unidade e
+quantidade de cada item antes de usar como referência.
+Termo pesquisado: <b>{_e(d['termo'])}</b>.</div>
+{cards}
+<h2>Itens homologados, do menor para o maior preço unitário</h2>
+<table><thead><tr><th>Descrição</th><th class="ctr">Unid.</th>
+<th class="num">Qtde</th><th class="num">Unitário</th>
+<th class="num">Total</th><th class="ctr">Fornecedor</th>
+<th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
+<tbody>{linhas}</tbody></table>"""
+    titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
+    return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
+                   tema=tema)
+
+
 MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
               "jul", "ago", "set", "out", "nov", "dez"]
 
@@ -533,6 +612,15 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         conteudo = render_executivo(d, municipio, uf, tema)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
+    elif tipo == "precos":
+        termo = (params.get("termo") or "").strip()
+        if not termo:
+            raise ValueError("informe o que pesquisar")
+        d = dados_precos(db, termo, ano, orgao)
+        conteudo = render_precos(d, municipio, uf, tema)
+        limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
+        nome = f"pesquisa_precos_{limpo}"
+        linhas_csv = d["linhas"]
     elif tipo == "fracionamento":
         if not ano:
             ano = date.today().year

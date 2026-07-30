@@ -15,6 +15,9 @@ import urllib.request
 from datetime import date, datetime, timedelta
 
 BASE = "https://pncp.gov.br/api/consulta"
+# itens e resultados por item ficam na API interna do portal, não na de
+# consulta; devolvem array puro (sem envelope data/totalPaginas)
+BASE_PNCP = "https://pncp.gov.br/api/pncp"
 USER_AGENT = "Licitarium/0.1 (repositorio local de contratacoes; open-source)"
 DATA_INICIO_PNCP = date(2021, 1, 1)  # portal entrou no ar em ago/2021
 # /v1/pca/atualizacao rejeita dataInicio anterior a 01/04/2021 (HTTP 422
@@ -49,10 +52,10 @@ _INTERVALO_MIN = 0.5  # s entre requisições — o PNCP tem throttling agressiv
 _ultima_req = 0.0
 
 
-def _get(caminho, params, tentativas=5):
+def _get(caminho, params, tentativas=5, base=None):
     """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados."""
     global _ultima_req
-    url = f"{BASE}{caminho}?{urllib.parse.urlencode(params)}"
+    url = f"{base or BASE}{caminho}?{urllib.parse.urlencode(params)}"
     for tentativa in range(tentativas):
         espera = _INTERVALO_MIN - (time.monotonic() - _ultima_req)
         if espera > 0:
@@ -298,6 +301,103 @@ def sync_pca(db, cnpj, inicio, fim, progresso=None):
     return total
 
 
+def _itens_da_compra(cnpj, ano, sequencial):
+    """Itens de uma contratação (endpoint devolve array puro, paginado)."""
+    pagina = 1
+    while True:
+        lote = _get(f"/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens",
+                    {"pagina": pagina, "tamanhoPagina": 100}, base=BASE_PNCP)
+        if not lote:
+            return
+        yield from lote
+        if len(lote) < 100:
+            return
+        pagina += 1
+
+
+def _resultado_do_item(cnpj, ano, sequencial, numero_item):
+    """Resultado homologado de um item: vencedor e valor unitário fechado."""
+    lote = _get(
+        f"/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens/{numero_item}"
+        f"/resultados", {}, base=BASE_PNCP)
+    if not lote:
+        return None
+    # o mais recente não cancelado é o que vale
+    validos = [r for r in lote if not r.get("dataCancelamento")]
+    return (validos or lote)[0]
+
+
+def _upsert_item(db, contratacao, item, resultado):
+    numero = item.get("numeroItem")
+    if numero is None:
+        return 0
+    r = resultado or {}
+    db.execute(
+        """INSERT OR REPLACE INTO itens
+           (id, contratacao_controle, orgao_cnpj, ano, sequencial, numero_item,
+            descricao, material_servico, categoria, unidade, quantidade,
+            valor_unitario_estimado, valor_total_estimado, tem_resultado,
+            valor_unitario_homologado, valor_total_homologado,
+            quantidade_homologada, fornecedor_ni, fornecedor_nome,
+            fornecedor_porte, data_resultado, situacao, data_atualizacao,
+            raw, sync_em)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (f"{contratacao['numero_controle']}#{numero}",
+         contratacao["numero_controle"], contratacao["orgao_cnpj"],
+         contratacao["ano"], contratacao["sequencial"], numero,
+         item.get("descricao"), item.get("materialOuServicoNome"),
+         item.get("itemCategoriaNome"), item.get("unidadeMedida"),
+         item.get("quantidade"), item.get("valorUnitarioEstimado"),
+         item.get("valorTotal"), 1 if item.get("temResultado") else 0,
+         r.get("valorUnitarioHomologado"), r.get("valorTotalHomologado"),
+         r.get("quantidadeHomologada"), r.get("niFornecedor"),
+         r.get("nomeRazaoSocialFornecedor"), r.get("porteFornecedorNome"),
+         r.get("dataResultado"), item.get("situacaoCompraItemNome"),
+         item.get("dataAtualizacao"),
+         json.dumps({"item": item, "resultado": r}, ensure_ascii=False),
+         datetime.now().isoformat()))
+    return 1
+
+
+def sync_itens(db, progresso=None, limite=None):
+    """Fase 3: itens e resultados das contratações — o banco de preços.
+
+    Custa uma requisição por contratação mais uma por item com resultado, e
+    por isso só visita contratação nova ou alterada desde a última coleta
+    (itens_versao guarda a dataAtualizacao vigente naquele momento).
+    """
+    pendentes = [dict(r) for r in db.execute(
+        """SELECT numero_controle, orgao_cnpj, ano, sequencial, data_atualizacao
+           FROM contratacoes
+           WHERE orgao_cnpj IS NOT NULL AND sequencial IS NOT NULL
+             AND (itens_versao IS NULL OR itens_versao <> data_atualizacao)
+           ORDER BY data_publicacao DESC""")]
+    if limite:
+        pendentes = pendentes[:limite]
+    total = 0
+    for i, c in enumerate(pendentes, 1):
+        if progresso:
+            progresso(f"Itens — contratação {i} de {len(pendentes)}…")
+        try:
+            for item in _itens_da_compra(c["orgao_cnpj"], c["ano"],
+                                         c["sequencial"]):
+                resultado = None
+                if item.get("temResultado"):
+                    resultado = _resultado_do_item(
+                        c["orgao_cnpj"], c["ano"], c["sequencial"],
+                        item["numeroItem"])
+                total += _upsert_item(db, c, item, resultado)
+            db.execute("UPDATE contratacoes SET itens_versao=?,"
+                       " itens_sync_em=? WHERE numero_controle=?",
+                       (c["data_atualizacao"], datetime.now().isoformat(),
+                        c["numero_controle"]))
+            db.commit()
+        except PncpErro:
+            db.commit()  # preserva o que já entrou; tenta de novo na próxima
+            raise
+    return total
+
+
 def _config(db, chave, valor=None):
     if valor is None:
         linha = db.execute("SELECT valor FROM config WHERE chave=?", (chave,)).fetchone()
@@ -349,7 +449,7 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
     orgaos = [r[0] for r in db.execute(
         "SELECT cnpj FROM orgaos WHERE ativo=1").fetchall()]
     for tipo, func in (("contratos", sync_contratos), ("atas", sync_atas),
-                       ("pca", sync_pca)):
+                       ("pca", sync_pca)):  # fase 2, por CNPJ de órgão
         inicio = janela_de(tipo)
         total, falhou = 0, False
         for cnpj in orgaos:
@@ -366,4 +466,15 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
             resumo[tipo] = total
         else:
             resumo[tipo] = None
+
+    # fase 3 — itens das contratações (banco de preços); é a mais custosa,
+    # então vem no fim: se falhar, o resto do acervo já está gravado
+    try:
+        n = sync_itens(db, progresso)
+        _config(db, "last_sync_itens", hoje.isoformat())
+        _log(db, "itens", hoje, hoje, n, "ok")
+        resumo["itens"] = n
+    except PncpErro as e:
+        _log(db, "itens", hoje, hoje, 0, "erro", str(e))
+        resumo["itens"] = None
     return resumo

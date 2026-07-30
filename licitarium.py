@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS contratacoes (
   modalidade_id INTEGER, modalidade_nome TEXT, situacao TEXT, objeto TEXT,
   valor_estimado REAL, valor_homologado REAL,
   data_encerramento_proposta TEXT,
-  data_publicacao TEXT, data_atualizacao TEXT, raw TEXT, sync_em TEXT);
+  data_publicacao TEXT, data_atualizacao TEXT,
+  itens_versao TEXT, itens_sync_em TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS contratos (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
   numero_contrato TEXT, ano_contrato INTEGER, sequencial_contrato INTEGER,
@@ -49,6 +50,16 @@ CREATE TABLE IF NOT EXISTS atas (
   numero_ata TEXT, ano_ata INTEGER, objeto TEXT,
   vigencia_inicio TEXT, vigencia_fim TEXT, data_atualizacao TEXT,
   raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS itens (
+  id TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
+  ano INTEGER, sequencial INTEGER, numero_item INTEGER,
+  descricao TEXT, material_servico TEXT, categoria TEXT, unidade TEXT,
+  quantidade REAL, valor_unitario_estimado REAL, valor_total_estimado REAL,
+  tem_resultado INTEGER,
+  valor_unitario_homologado REAL, valor_total_homologado REAL,
+  quantidade_homologada REAL, fornecedor_ni TEXT, fornecedor_nome TEXT,
+  fornecedor_porte TEXT, data_resultado TEXT, situacao TEXT,
+  data_atualizacao TEXT, raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS pca_itens (
   id TEXT PRIMARY KEY, id_pca TEXT, ano INTEGER, orgao_cnpj TEXT, unidade TEXT,
   numero_item INTEGER, descricao TEXT, categoria TEXT, grupo TEXT,
@@ -62,12 +73,15 @@ CREATE INDEX IF NOT EXISTS ix_contratacoes_mod ON contratacoes (modalidade_id);
 CREATE INDEX IF NOT EXISTS ix_contratos_pub ON contratos (data_publicacao);
 CREATE INDEX IF NOT EXISTS ix_atas_vig ON atas (vigencia_fim);
 CREATE INDEX IF NOT EXISTS ix_pca_ano ON pca_itens (ano);
+CREATE INDEX IF NOT EXISTS ix_itens_desc ON itens (descricao);
+CREATE INDEX IF NOT EXISTS ix_itens_contratacao ON itens (contratacao_controle);
+CREATE INDEX IF NOT EXISTS ix_itens_unit ON itens (valor_unitario_homologado);
 """
 
 # whitelists p/ valores vindos do JS (tipo, coluna de ordenação)
 TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
-           "atas": "atas", "pca": "pca_itens"}
-CHAVES = {"pca": "id"}  # demais tabelas usam numero_controle
+           "atas": "atas", "pca": "pca_itens", "itens": "itens"}
+CHAVES = {"pca": "id", "itens": "id"}  # demais usam numero_controle
 ORDENAVEIS = {
     "contratacoes": {"numero": "(ano*100000+COALESCE(sequencial,0))",
                      "modalidade": "modalidade_nome", "objeto": "objeto",
@@ -84,11 +98,17 @@ ORDENAVEIS = {
     "pca": {"item": "numero_item", "descricao": "descricao",
             "categoria": "categoria", "quantidade": "quantidade",
             "valor": "valor_total"},
+    "itens": {"descricao": "descricao", "unidade": "unidade",
+              "unitario": "COALESCE(valor_unitario_homologado,"
+                          " valor_unitario_estimado)",
+              "fornecedor": "fornecedor_nome", "data": "data_resultado",
+              "origem": "(ano*100000+COALESCE(sequencial,0))"},
 }
 PADRAO_ORDEM = {"contratacoes": "data_publicacao DESC",
                 "contratos": "data_publicacao DESC",
                 "atas": "vigencia_fim DESC",
-                "pca": "ano DESC, numero_item"}
+                "pca": "ano DESC, numero_item",
+                "itens": "data_resultado DESC, id"}
 
 
 def abrir_db():
@@ -114,6 +134,11 @@ def abrir_db():
                    " objeto=json_extract(raw,'$.objetoContratacao')")
         db.commit()
     colunas_c = {r[1] for r in db.execute("PRAGMA table_info(contratacoes)")}
+    if colunas_c and "itens_versao" not in colunas_c:
+        # controle da coleta de itens: só revisita contratação alterada
+        db.execute("ALTER TABLE contratacoes ADD COLUMN itens_versao TEXT")
+        db.execute("ALTER TABLE contratacoes ADD COLUMN itens_sync_em TEXT")
+        db.commit()
     if colunas_c and "data_encerramento_proposta" not in colunas_c:
         db.execute("ALTER TABLE contratacoes"
                    " ADD COLUMN data_encerramento_proposta TEXT")
@@ -297,7 +322,10 @@ class Api:
         f = filtros or {}
         where, args = [], []
         if f.get("ano"):
-            if tipo in ("contratacoes", "pca"):
+            if tipo == "itens":
+                where.append("ano=?")
+                args.append(f["ano"])
+            elif tipo in ("contratacoes", "pca"):
                 # ano do processo/plano, não da publicação: o PNCP reescreve
                 # dataPublicacaoPncp quando o órgão atualiza um processo,
                 # jogando um "36/2024" para o ano corrente
@@ -321,12 +349,15 @@ class Api:
         if f.get("propostas") and tipo == "contratacoes":
             where.append(
                 "datetime(data_encerramento_proposta) >= datetime('now')")
+        if f.get("so_homologados") and tipo == "itens":
+            where.append("valor_unitario_homologado IS NOT NULL")
         if f.get("busca"):
             campos = {"contratacoes": ["objeto", "numero_controle"],
                       "contratos": ["objeto", "fornecedor_nome",
                                     "numero_controle", "numero_contrato"],
                       "atas": ["numero_controle", "numero_ata", "objeto"],
-                      "pca": ["descricao", "grupo"]}[tipo]
+                      "pca": ["descricao", "grupo"],
+                      "itens": ["descricao", "fornecedor_nome"]}[tipo]
             where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
             args += [f"%{f['busca']}%"] * len(campos)
         sql_where = (" WHERE " + " AND ".join(where)) if where else ""
@@ -369,6 +400,36 @@ class Api:
         finally:
             db.close()
 
+    def estatisticas_preco(self, busca, ano=None):
+        """Resumo do valor unitário homologado para um termo — a resposta de
+        'quanto pagamos por isso?' que instrui a pesquisa de preços."""
+        if not (busca or "").strip():
+            return None
+        where = ["valor_unitario_homologado IS NOT NULL", "descricao LIKE ?"]
+        args = [f"%{busca.strip()}%"]
+        if ano:
+            where.append("ano=?")
+            args.append(ano)
+        db = abrir_db()
+        try:
+            valores = [r[0] for r in db.execute(
+                "SELECT valor_unitario_homologado FROM itens WHERE "
+                + " AND ".join(where) + " ORDER BY 1", args)]
+            if not valores:
+                return None
+            n = len(valores)
+            meio = n // 2
+            mediana = (valores[meio] if n % 2
+                       else (valores[meio - 1] + valores[meio]) / 2)
+            fornecedores = db.execute(
+                "SELECT COUNT(DISTINCT fornecedor_ni) FROM itens WHERE "
+                + " AND ".join(where), args).fetchone()[0]
+            return {"n": n, "minimo": valores[0], "maximo": valores[-1],
+                    "media": sum(valores) / n, "mediana": mediana,
+                    "fornecedores": fornecedores}
+        finally:
+            db.close()
+
     def filtros_disponiveis(self):
         db = abrir_db()
         try:
@@ -396,6 +457,8 @@ class Api:
         d = self.detalhe(tipo, numero_controle)
         if not d:
             return False
+        if tipo == "itens":  # item leva à contratação de origem
+            return self.abrir_pncp("contratacoes", d["contratacao_controle"])
         raw = d["raw"]
         orgao = (raw.get("orgaoEntidade") or {}).get("cnpj")
         if tipo == "contratacoes" and orgao:

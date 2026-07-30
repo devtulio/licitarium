@@ -137,6 +137,20 @@
   .g-contratos    { grid-template-columns:110px 1fr 160px 110px; }
   .g-atas         { grid-template-columns:90px 210px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
+  .g-itens        { grid-template-columns:1fr 70px 90px 120px 170px 100px; }
+  .precos { padding:12px 16px; margin-bottom:12px; }
+  .precos h3 { font-size:12.5px; color:var(--muted); font-weight:600;
+               letter-spacing:.04em; text-transform:uppercase;
+               margin-bottom:8px; }
+  .precos .grade { display:flex; gap:10px; flex-wrap:wrap; }
+  .precos .cel { flex:1 1 auto; min-width:96px; }
+  .precos .cel .v { font-size:16px; font-weight:700; white-space:nowrap;
+                    font-variant-numeric:tabular-nums; }
+  [data-theme="pergaminho"] .precos .cel .v { font-family:Georgia,serif;
+                                              font-weight:400; }
+  .precos .cel .r { font-size:10px; color:var(--muted); letter-spacing:.05em;
+                    text-transform:uppercase; margin-top:2px; }
+  .precos .cel.destaque .v { color:var(--accent); }
   .cab span[data-ord] { cursor:pointer; user-select:none; }
   .cab span[data-ord]:hover { color:var(--accent); }
   .cab .seta { font-size:9px; }
@@ -158,7 +172,9 @@
   .g-contratacoes > :nth-child(5),
   .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
   .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(4),
-  .g-pca > :nth-child(1), .g-pca > :nth-child(3) { text-align:center; }
+  .g-pca > :nth-child(1), .g-pca > :nth-child(3),
+  .g-itens > :nth-child(2), .g-itens > :nth-child(3),
+  .g-itens > :nth-child(5), .g-itens > :nth-child(6) { text-align:center; }
   .linha .obj { display:block; text-align:justify; hyphens:auto; }
   .vazio { padding:30px 34px 34px; text-align:center; color:var(--muted);
            font-size:13px; }
@@ -279,7 +295,9 @@
       <button data-tipo="contratos" role="tab">Contratos</button>
       <button data-tipo="atas" role="tab">Atas</button>
       <button data-tipo="pca" role="tab">PCA</button>
+      <button data-tipo="itens" role="tab">Preços</button>
     </nav>
+    <div class="card precos oculto" id="precos-resumo"></div>
     <div class="filtros">
       <select id="f-ano" aria-label="Ano"><option value="">Todos os anos</option></select>
       <select id="f-modalidade" aria-label="Modalidade">
@@ -292,6 +310,8 @@
         <input type="checkbox" id="f-propostas"> Propostas abertas</label>
       <label class="check-filtro oculto" id="cx-vigentes">
         <input type="checkbox" id="f-vigentes"> Vigentes</label>
+      <label class="check-filtro oculto" id="cx-homologados">
+        <input type="checkbox" id="f-homologados" checked> Só com preço fechado</label>
       <input type="search" id="f-busca" placeholder="Buscar no objeto…"
              aria-label="Buscar">
       <button class="btn ghost oculto" id="btn-limpar">✕ Limpar filtros</button>
@@ -344,7 +364,13 @@
         <option value="atas">Relação de Atas de Registro de Preços</option>
         <option value="executivo">Resumo Executivo Anual</option>
         <option value="fracionamento">Alerta de Fracionamento (uso interno)</option>
+        <option value="precos">Pesquisa de Preços</option>
       </select>
+      <div id="rel-termo-caixa" class="oculto">
+        <label for="rel-termo">O que pesquisar</label>
+        <input type="text" id="rel-termo" style="width:100%"
+               placeholder="ex.: papel A4, óleo lubrificante, pneu">
+      </div>
       <label for="rel-ano">Período</label>
       <select id="rel-ano" style="width:100%"></select>
       <div id="rel-mod-caixa">
@@ -670,6 +696,7 @@ function filtrosAtuais() {
            orgao: $("f-orgao").value || null,
            propostas: $("f-propostas").checked || null,
            vigentes: $("f-vigentes").checked || null,
+           so_homologados: $("f-homologados").checked || null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
@@ -677,7 +704,8 @@ function filtrosAtuais() {
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const CAMPOS_FILTRO = ["f-ano", "f-modalidade", "f-situacao", "f-orgao",
                        "f-busca"];
-const CAIXAS_FILTRO = ["f-propostas", "f-vigentes"];
+const CAIXAS_FILTRO = ["f-propostas", "f-vigentes"];  // f-homologados é
+// padrão ligado na aba Preços, então não conta como "filtro ativo"
 
 function temFiltroAtivo() {
   return CAMPOS_FILTRO.some(id => $(id).value)
@@ -703,6 +731,9 @@ const COLUNAS = {
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
+  itens:        [["Descrição","descricao"], ["Unid.","unidade"],
+                 ["Qtde",null], ["Valor unitário","unitario"],
+                 ["Fornecedor","fornecedor"], ["Processo","origem"]],
 };
 
 // nº do contrato no padrão numero/ano (PNCP grava "0033/26" — normaliza
@@ -746,6 +777,19 @@ function renderLinha(tipo, d) {
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
       <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
+  if (tipo === "itens") {
+    const homologado = d.valor_unitario_homologado != null;
+    const unit = homologado
+      ? dinheiro(d.valor_unitario_homologado)
+      : `<span class="est" title="Sem resultado homologado: valor de referência
+          do edital">${dinheiro(d.valor_unitario_estimado)} <small>est.</small></span>`;
+    return `<span class="obj">${esc(d.descricao ?? "–")}</span>
+      <span class="dim">${esc(d.unidade ?? "–")}</span>
+      <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
+      <span class="num">${unit}</span>
+      <span class="dim">${esc(d.fornecedor_nome ?? "–")}</span>
+      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>`;
+  }
   if (tipo === "pca")
     return `<span class="dim">${esc(d.numero_item)}</span>
       <span class="obj">${esc(d.descricao ?? "–")}</span>
@@ -758,7 +802,36 @@ function renderLinha(tipo, d) {
     <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
 }
 
+async function mostrarResumoPrecos() {
+  const caixa = $("precos-resumo");
+  const termo = $("f-busca").value.trim();
+  if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
+    caixa.classList.add("oculto");
+    return;
+  }
+  const s = await api.estatisticas_preco(termo,
+    $("f-ano").value ? +$("f-ano").value : null);
+  if (!s) { caixa.classList.add("oculto"); return; }
+  const cel = (v, r, destaque) =>
+    `<div class="cel${destaque ? " destaque" : ""}">
+       <div class="v">${v}</div><div class="r">${r}</div></div>`;
+  caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
+    <div class="grade">
+      ${cel(dinheiro(s.minimo), "menor unitário")}
+      ${cel(dinheiro(s.mediana), "mediana", true)}
+      ${cel(dinheiro(s.media), "média")}
+      ${cel(dinheiro(s.maximo), "maior unitário")}
+      ${cel(s.n, "itens homologados")}
+      ${cel(s.fornecedores, "fornecedores")}
+      <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
+        Relatório de pesquisa de preços</button>
+    </div>`;
+  caixa.classList.remove("oculto");
+  $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
+}
+
 async function carregarLista() {
+  mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
   estado.total = r.total;
   const g = `g-${estado.tipo}`;
@@ -820,11 +893,16 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("cx-propostas").classList.toggle("oculto", !soContratacoes);
     $("cx-vigentes").classList.toggle("oculto",
       !["contratos", "atas"].includes(estado.tipo));
+    const ehItens = estado.tipo === "itens";
+    $("cx-homologados").classList.toggle("oculto", !ehItens);
+    $("f-busca").placeholder = ehItens
+      ? "Buscar item — ex.: papel A4, óleo, pneu…"
+      : "Buscar no objeto…";
     $("f-propostas").checked = false;
     $("f-vigentes").checked = false;
     carregarLista();
   }));
-["f-propostas", "f-vigentes"].forEach(id =>
+["f-propostas", "f-vigentes", "f-homologados"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 
 // navegação programática (KPIs e alertas)
@@ -855,6 +933,12 @@ $("pag-prox").addEventListener("click", () => {
 
 // ── detalhe ───────────────────────────────────────────────────────────────
 const ROTULOS = {
+  unidade:"Unidade", material_servico:"Tipo",
+  valor_unitario_estimado:"Valor unitário estimado",
+  valor_unitario_homologado:"Valor unitário homologado",
+  valor_total_homologado:"Valor total homologado",
+  quantidade_homologada:"Quantidade homologada",
+  fornecedor_porte:"Porte do fornecedor", data_resultado:"Data do resultado",
   numero_ata:"Ata nº", ano_ata:"Ano da ata",
   numero_contrato:"Contrato nº", ano_contrato:"Ano do contrato",
   numero_item:"Item nº", categoria:"Categoria", grupo:"Grupo de contratação",
@@ -911,8 +995,10 @@ async function montarOpcoesRelatorio() {
   const sel = $("rel-ano");
   sel.length = 0;
   const soExercicio = ["executivo", "fracionamento"].includes(tipo);
+  $("rel-termo-caixa").classList.toggle("oculto", tipo !== "precos");
   if (!soExercicio) {
-    if (tipo !== "contratacoes") sel.add(new Option("Vigentes hoje", "vigentes"));
+    if (!["contratacoes", "precos"].includes(tipo))
+      sel.add(new Option("Vigentes hoje", "vigentes"));
     sel.add(new Option("Todo o período", "todos"));
   }
   f.anos.forEach(a => sel.add(new Option(`Exercício ${a}`, `ano:${a}`)));
@@ -934,6 +1020,15 @@ $("btn-relatorios").addEventListener("click", async () => {
   abrirModal("veu-relatorios");
 });
 $("rel-tipo").addEventListener("change", montarOpcoesRelatorio);
+// atalho: na aba Preços, o termo buscado já vai preenchido no relatório
+function abrirRelatorioPrecos() {
+  $("rel-tipo").value = "precos";
+  montarOpcoesRelatorio().then(() => {
+    $("rel-termo").value = $("f-busca").value.trim();
+    $("rel-status").textContent = "";
+    abrirModal("veu-relatorios");
+  });
+}
 $("rel-gerar").addEventListener("click", async () => {
   const periodo = $("rel-ano").value;
   const params = {
@@ -941,7 +1036,13 @@ $("rel-gerar").addEventListener("click", async () => {
     vigentes: periodo === "vigentes",
     modalidade: $("rel-modalidade").value || null,
     orgao: $("rel-orgao").value || null,
+    termo: $("rel-termo").value || null,
   };
+  if ($("rel-tipo").value === "precos" && !params.termo) {
+    $("rel-status").textContent = "Informe o que pesquisar";
+    $("rel-termo").focus();
+    return;
+  }
   $("rel-gerar").disabled = true;
   $("rel-status").textContent = "Gerando…";
   const r = await api.gerar_relatorio($("rel-tipo").value, params);

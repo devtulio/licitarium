@@ -99,7 +99,9 @@ def test_descobrir_orgaos(db, monkeypatch):
 def test_sincronizar_tudo_continua_apos_falha(db, monkeypatch):
     servido = []  # 1 registro numa única janela (como na API real, em que
                   # o item só aparece na janela da sua dataAtualizacao)
-    def fake_get(caminho, params):
+    def fake_get(caminho, params, base=None):
+        if base == pncp.BASE_PNCP:
+            return None            # fase 3 (itens) sem dados neste teste
         if "contratos" in caminho:
             raise pncp.PncpErro("PNCP fora do ar")
         if "contratacoes" in caminho:
@@ -114,6 +116,7 @@ def test_sincronizar_tudo_continua_apos_falha(db, monkeypatch):
     assert resumo["contratacoes"] == 1
     assert resumo["contratos"] is None     # falhou, não bloqueou o resto
     assert resumo["atas"] == 0
+    assert resumo["itens"] == 0            # fase 3 rodou por último
     # last_sync só avança para quem concluiu
     assert pncp._config(db, "last_sync_contratacoes") is not None
     assert pncp._config(db, "last_sync_contratos") is None
@@ -154,6 +157,65 @@ def test_sync_pca_idempotente_e_parametros(db, monkeypatch):
     # o endpoint de PCA usa dataInicio/dataFim, não dataInicial/dataFinal
     assert all("dataInicio" in p and "dataInicial" not in p
                for p in params_vistos)
+
+
+def test_sync_itens_grava_resultado_e_marca_versao(db, monkeypatch):
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, data_atualizacao, data_publicacao)"
+        " VALUES ('C1', 2026, 30, '111', '2026-07-01', '2026-06-01')")
+    db.commit()
+    item = {"numeroItem": 1, "descricao": "PAPEL A4", "unidadeMedida": "RESMA",
+            "quantidade": 100.0, "valorUnitarioEstimado": 24.9,
+            "valorTotal": 2490.0, "temResultado": True,
+            "materialOuServicoNome": "Material",
+            "situacaoCompraItemNome": "Homologado"}
+    resultado = {"niFornecedor": "999", "nomeRazaoSocialFornecedor": "FORN X",
+                 "valorUnitarioHomologado": 18.75, "valorTotalHomologado": 1875.0,
+                 "quantidadeHomologada": 100.0, "dataResultado": "2026-06-20"}
+
+    def fake_get(caminho, params, base=None):
+        assert base == pncp.BASE_PNCP
+        if caminho.endswith("/resultados"):
+            return [resultado]
+        return [item] if params.get("pagina") == 1 else []
+    monkeypatch.setattr(pncp, "_get", fake_get)
+
+    assert pncp.sync_itens(db) == 1
+    r = db.execute("SELECT * FROM itens").fetchone()
+    assert r["id"] == "C1#1"
+    assert r["valor_unitario_homologado"] == 18.75
+    assert r["fornecedor_nome"] == "FORN X"
+    assert r["descricao"] == "PAPEL A4"
+    # contratação marcada com a versão coletada: não revisita sem alteração
+    assert db.execute("SELECT itens_versao FROM contratacoes").fetchone()[0] \
+        == "2026-07-01"
+    assert pncp.sync_itens(db) == 0
+    # contratação alterada no PNCP volta para a fila
+    db.execute("UPDATE contratacoes SET data_atualizacao='2026-07-15'")
+    db.commit()
+    assert pncp.sync_itens(db) == 1
+
+
+def test_sync_itens_sem_resultado_nao_busca_vencedor(db, monkeypatch):
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, data_atualizacao) VALUES ('C2', 2026, 5, '111', 'x')")
+    db.commit()
+    caminhos = []
+
+    def fake_get(caminho, params, base=None):
+        caminhos.append(caminho)
+        if caminho.endswith("/itens"):
+            return ([{"numeroItem": 7, "descricao": "CANETA",
+                      "temResultado": False, "valorUnitarioEstimado": 1.9}]
+                    if params.get("pagina") == 1 else [])
+        return None
+    monkeypatch.setattr(pncp, "_get", fake_get)
+    assert pncp.sync_itens(db) == 1
+    assert not any(c.endswith("/resultados") for c in caminhos)
+    r = db.execute("SELECT * FROM itens").fetchone()
+    assert r["tem_resultado"] == 0 and r["valor_unitario_homologado"] is None
 
 
 def test_sync_pca_respeita_data_minima(db, monkeypatch):

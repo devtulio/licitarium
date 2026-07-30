@@ -160,6 +160,30 @@ def test_filtro_por_orgao(api):
     assert api.listar("contratacoes", {"orgao": "999"})["total"] == 0
 
 
+def test_precos_na_ponte(api):
+    db = licitarium.abrir_db()
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+        " numero_item, descricao, valor_unitario_estimado,"
+        " valor_unitario_homologado, fornecedor_ni) VALUES (?,?,?,?,?,?,?,?,?)",
+        [("i1", "A", 2026, 1, 1, "PAPEL A4", 24.9, 18.0, "1"),
+         ("i2", "A", 2026, 1, 2, "PAPEL A3", 30.0, 22.0, "2"),
+         ("i3", "A", 2026, 1, 3, "CANETA", 2.0, None, None)])
+    db.commit()
+    db.close()
+    # padrão da aba mostra só o que tem preço fechado
+    assert api.listar("itens", {"so_homologados": True})["total"] == 2
+    assert api.listar("itens", {})["total"] == 3
+    s = api.estatisticas_preco("papel")
+    assert (s["n"], s["minimo"], s["maximo"], s["fornecedores"]) == (2, 18., 22., 2)
+    assert api.estatisticas_preco("  ") is None
+    assert api.estatisticas_preco("inexistente") is None
+    # ordenação por unitário usa o homologado quando existe
+    r = api.listar("itens", {"so_homologados": True, "ord": "unitario",
+                             "dir": "asc"})
+    assert [i["id"] for i in r["itens"]] == ["i1", "i2"]
+
+
 def test_filtro_ano_pca(api):
     assert api.listar("pca", {"ano": 2026})["total"] == 2
     assert api.listar("pca", {"ano": 2024})["total"] == 0

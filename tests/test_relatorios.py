@@ -102,6 +102,45 @@ def test_filtro_orgao_nos_relatorios(db, tmp_path):
     assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_precos_estatisticas_e_relatorio(db, tmp_path):
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+        " numero_item, descricao, unidade, quantidade_homologada,"
+        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
+        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [("a", "A", 2026, 1, 1, "PAPEL A4 75G", "RESMA", 10, 20.0, 200.0,
+          "1", "FORN A", "2026-03-10"),
+         ("b", "A", 2026, 1, 2, "PAPEL A4 90G", "RESMA", 5, 30.0, 150.0,
+          "2", "FORN B", "2026-04-10"),
+         ("c", "B", 2025, 9, 1, "PAPEL A4 75G", "RESMA", 8, 10.0, 80.0,
+          "1", "FORN A", "2025-05-10"),
+         ("d", "B", 2025, 9, 2, "CANETA AZUL", "UN", 100, 1.5, 150.0,
+          "1", "FORN A", "2025-05-10")])
+    db.commit()
+    d = relatorios.dados_precos(db, "papel")
+    assert d["resumo"]["n"] == 3
+    assert d["resumo"]["minimo"] == 10.0 and d["resumo"]["maximo"] == 30.0
+    assert d["resumo"]["mediana"] == 20.0          # 10, 20, 30
+    assert d["resumo"]["fornecedores"] == 2
+    assert [l["valor_unitario_homologado"] for l in d["linhas"]] == [10., 20., 30.]
+    # filtro por exercício
+    assert relatorios.dados_precos(db, "papel", ano=2025)["resumo"]["n"] == 1
+    r = relatorios.gerar(db, "precos", {"termo": "papel A4"}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Pesquisa de Preços" in html and "art. 23" in html
+    assert "pesquisa_precos_papel_a4" in r["html"]
+    assert r["csv"] and Path(r["csv"]).exists()
+
+
+def test_precos_termo_vazio_e_sem_achados(db, tmp_path):
+    with pytest.raises(ValueError):
+        relatorios.gerar(db, "precos", {"termo": "  "}, "T", "SP", tmp_path)
+    r = relatorios.gerar(db, "precos", {"termo": "inexistente"}, "T", "SP",
+                         tmp_path)
+    assert "Nenhum item homologado" in Path(r["html"]).read_text(encoding="utf-8")
+    assert r["csv"] is None
+
+
 def test_num_contrato_normaliza():
     assert relatorios.num_contrato("0033/26", 2026) == "33/2026"
     assert relatorios.num_contrato("35", 2026) == "35/2026"
