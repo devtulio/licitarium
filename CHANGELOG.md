@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.7.0 — 2026-07-30
 
 - **Banco de preços municipal**: nova aba **Preços** com os itens de cada
   contratação — descrição, unidade, quantidade, valor unitário homologado e
