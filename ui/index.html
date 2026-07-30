@@ -133,14 +133,17 @@
   .cab { font-size:11px; letter-spacing:.07em; text-transform:uppercase;
          color:var(--muted); cursor:default; background:var(--surface2); }
   .cab:hover { background:var(--surface2); }
-  .g-contratacoes { grid-template-columns:80px 135px 1fr 120px 120px; }
-  .g-contratos    { grid-template-columns:110px 1fr 160px 110px; }
-  .g-atas         { grid-template-columns:90px 210px 1fr 170px; }
-  .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
-  .g-itens        { grid-template-columns:minmax(0,1fr) 52px 74px 124px 320px 78px; }
-  /* na aba Preços só a descrição quebra; o resto fica em uma linha */
-  .g-itens > :nth-child(n+2) { white-space:nowrap; overflow:hidden;
-                               text-overflow:ellipsis; }
+  /* larguras padrão; o usuário pode ajustar arrastando (var --cols) */
+  .g-contratacoes { grid-template-columns:var(--cols, 80px 135px 1fr 120px 120px); }
+  .g-contratos    { grid-template-columns:var(--cols, 110px 1fr 160px 110px); }
+  .g-atas         { grid-template-columns:var(--cols, 90px 210px 1fr 170px); }
+  .g-pca          { grid-template-columns:var(--cols, 60px 1fr 150px 80px 110px); }
+  .g-itens        { grid-template-columns:var(--cols, minmax(0,1fr) 52px 74px 124px 320px 78px); }
+  /* na aba Preços só a descrição quebra; o resto fica em uma linha.
+     O cabeçalho fica de fora do overflow para não recortar a alça. */
+  .g-itens > :nth-child(n+2) { white-space:nowrap; }
+  .g-itens:not(.cab) > :nth-child(n+2) { overflow:hidden;
+                                         text-overflow:ellipsis; }
   .precos { padding:12px 16px; margin-bottom:12px; }
   .precos h3 { font-size:12.5px; color:var(--muted); font-weight:600;
                letter-spacing:.04em; text-transform:uppercase;
@@ -157,6 +160,16 @@
   .cab span[data-ord] { cursor:pointer; user-select:none; }
   .cab span[data-ord]:hover { color:var(--accent); }
   .cab .seta { font-size:9px; }
+  /* alça de redimensionamento: arrastar ajusta, duplo clique dá autofit */
+  .cab > span { position:relative; }
+  .cab .alca { position:absolute; top:-11px; bottom:-11px; right:-7px;
+               width:12px; cursor:col-resize; z-index:2; }
+  .cab .alca::after { content:""; position:absolute; top:2px; bottom:2px;
+                      left:5px; width:2px; border-radius:1px;
+                      background:transparent; }
+  .cab .alca:hover::after, body.redimensionando .cab .alca::after {
+                      background:var(--accent); }
+  body.redimensionando { cursor:col-resize; user-select:none; }
   .obj, #det-titulo { text-transform:uppercase; }
   #det-titulo { text-align:justify; hyphens:auto; }
   /* tamanho da fonte (zoom escala a UI inteira, preservando o layout) */
@@ -432,6 +445,13 @@
         <option value="confortavel">Confortável — linhas com respiro</option>
         <option value="compacta">Compacta — mais registros na tela</option>
       </select>
+      <label>Largura das colunas</label>
+      <button class="btn ghost" id="btn-restaurar-colunas">
+        Restaurar larguras padrão</button>
+      <div class="dim" style="font-size:11.5px; margin-top:6px">
+        Nas listas, arraste a borda direita de um cabeçalho para ajustar a
+        coluna; dê duplo clique nela para caber no conteúdo.
+      </div>
     </div>
     <div class="card cfg">
       <h2>Município</h2>
@@ -532,6 +552,7 @@ window.addEventListener("pywebviewready", async () => {
   aplicarLargura(e.largura || "compacta", false);
   aplicarFonte(e.fonte || "normal", false);
   aplicarDensidade(e.densidade || "confortavel", false);
+  try { larguras = JSON.parse(e.colunas || "{}"); } catch { larguras = {}; }
   $("sobre-versao").textContent = e.versao;
   $("rodape-versao").textContent = `PNCP · dados públicos · v${e.versao}`;
   if (!e.ibge) { iniciarWizard(); return; }
@@ -570,6 +591,7 @@ function aplicarDensidade(v, salvar = true) {
 }
 $("cfg-densidade").addEventListener("change",
   () => aplicarDensidade($("cfg-densidade").value));
+$("btn-restaurar-colunas").addEventListener("click", restaurarLarguras);
 
 // ── wizard ────────────────────────────────────────────────────────────────
 let wizEscolha = null;
@@ -848,6 +870,107 @@ async function mostrarResumoPrecos() {
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
 }
 
+// ── largura das colunas: arrastar ajusta, duplo clique dá autofit ─────────
+// A coluna elástica de cada aba (objeto/descrição) absorve a sobra e por
+// isso não tem alça: alargar qualquer outra encolhe ela, que é o que se
+// espera ao puxar "fornecedor" para ver o nome inteiro.
+const COL_FLEX = { contratacoes:2, contratos:1, atas:2, pca:1, itens:0 };
+const LARGURA_MIN = 44;
+const FLEX_MIN = 170;       // espaço que a coluna elástica nunca cede
+let larguras = {};
+
+function larguraAtualPx() {
+  const cab = document.querySelector(".lista .cab");
+  if (!cab) return [];
+  return getComputedStyle(cab).gridTemplateColumns.split(" ").map(parseFloat);
+}
+
+function aplicarLarguras(tipo) {
+  const lista = $("lista");
+  const mapa = larguras[tipo];
+  if (!mapa) { lista.style.removeProperty("--cols"); return; }
+  const flex = COL_FLEX[tipo];
+  const n = COLUNAS[tipo].length;
+  const cols = [];
+  for (let i = 0; i < n; i++)
+    cols.push(i === flex ? "minmax(0,1fr)" : `${Math.round(mapa[i])}px`);
+  lista.style.setProperty("--cols", cols.join(" "));
+}
+
+function guardarLarguras(tipo, px) {
+  const flex = COL_FLEX[tipo];
+  larguras[tipo] = {};
+  px.forEach((v, i) => { if (i !== flex) larguras[tipo][i] = v; });
+}
+
+function autofit(tipo, i) {
+  const celulas = [...document.querySelectorAll(".lista .linha:not(.cab)")]
+    .map(l => l.children[i]).filter(Boolean);
+  const desejada = Math.max(...celulas.map(c => c.scrollWidth),
+                            LARGURA_MIN) + 26;   // respiro do padding
+  const px = larguraAtualPx();
+  const flex = COL_FLEX[tipo];
+  // não deixar o autofit engolir a coluna elástica: ela guarda um mínimo
+  // referência é a soma das colunas atuais (já desconta padding e vãos,
+  // que o clientWidth do container incluiria por engano)
+  const outras = px.reduce((s, v, j) => (j === i || j === flex) ? s : s + v, 0);
+  const teto = px.reduce((s, v) => s + v, 0) - outras - FLEX_MIN;
+  px[i] = Math.max(LARGURA_MIN, Math.min(desejada, teto));
+  guardarLarguras(tipo, px);
+  aplicarLarguras(tipo);
+  api.set_config("colunas", JSON.stringify(larguras));
+}
+
+function ligarAlcas() {
+  const tipo = estado.tipo;
+  const flex = COL_FLEX[tipo];
+  document.querySelectorAll(".lista .cab > span").forEach((cel, i) => {
+    if (i === flex || i === COLUNAS[tipo].length - 1) return;  // última não
+    const alca = document.createElement("span");
+    alca.className = "alca";
+    alca.title = "Arraste para ajustar · duplo clique para caber no conteúdo";
+    alca.addEventListener("mousedown", e => {
+      e.preventDefault(); e.stopPropagation();
+      const x0 = e.clientX, px = larguraAtualPx(), inicial = px[i];
+      document.body.classList.add("redimensionando");
+      const flex = COL_FLEX[tipo];
+      const outras = px.reduce(
+        (s, v, j) => (j === i || j === flex) ? s : s + v, 0);
+      const teto = px.reduce((s, v) => s + v, 0) - outras - FLEX_MIN;
+      const mover = ev => {
+        px[i] = Math.max(LARGURA_MIN,
+                         Math.min(inicial + (ev.clientX - x0), teto));
+        guardarLarguras(tipo, px);
+        aplicarLarguras(tipo);
+      };
+      const soltar = () => {
+        document.removeEventListener("mousemove", mover);
+        document.removeEventListener("mouseup", soltar);
+        document.body.classList.remove("redimensionando");
+        api.set_config("colunas", JSON.stringify(larguras));
+      };
+      document.addEventListener("mousemove", mover);
+      document.addEventListener("mouseup", soltar);
+    });
+    // o clique precisa morrer aqui: o cabeçalho ordena, e ordenar
+    // re-renderiza a lista no meio do arrasto/duplo clique
+    alca.addEventListener("click", e => {
+      e.preventDefault(); e.stopPropagation();
+    });
+    alca.addEventListener("dblclick", e => {
+      e.preventDefault(); e.stopPropagation();
+      autofit(tipo, i);
+    });
+    cel.appendChild(alca);
+  });
+}
+
+function restaurarLarguras() {
+  larguras = {};
+  aplicarLarguras(estado.tipo);
+  if (api) api.set_config("colunas", "{}");
+}
+
 async function carregarLista() {
   mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
@@ -875,6 +998,8 @@ async function carregarLista() {
         publicou no PNCP.</p>
         <button class="btn" id="vazio-sync">Sincronizar agora</button></div>`;
   $("lista").innerHTML = cab + (linhas || vazio);
+  aplicarLarguras(estado.tipo);
+  ligarAlcas();
   $("vazio-limpar")?.addEventListener("click", limparFiltros);
   $("vazio-sync")?.addEventListener("click", () => api.sincronizar());
   $("lista").querySelectorAll("button.linha[data-nc]").forEach(b =>

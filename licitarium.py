@@ -189,6 +189,7 @@ class Api:
                     "largura": cfg.get("largura", "compacta"),
                     "fonte": cfg.get("fonte", "normal"),
                     "densidade": cfg.get("densidade", "confortavel"),
+                    "colunas": cfg.get("colunas", "{}"),
                     "limite_dispensa_compras":
                         cfg.get("limite_dispensa_compras",
                                 str(relatorios.LIMITE_PADRAO_COMPRAS)),
@@ -235,7 +236,8 @@ class Api:
 
     def set_config(self, chave, valor):
         if chave not in ("tema", "largura", "fonte", "densidade",
-                         "limite_dispensa_compras", "limite_dispensa_obras"):
+                         "colunas", "limite_dispensa_compras",
+                         "limite_dispensa_obras"):
             return False
         db = abrir_db()
         try:

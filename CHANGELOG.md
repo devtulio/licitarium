@@ -1,5 +1,15 @@
 # Changelog
 
+## Não lançado
+
+- **Colunas ajustáveis com o mouse**: arraste a borda direita de um cabeçalho
+  para redimensionar e dê duplo clique para ajustar ao conteúdo (autofit),
+  em todas as listas. As larguras são salvas por aba e há "Restaurar larguras
+  padrão" nas configurações. A coluna de objeto/descrição nunca é reduzida
+  abaixo do mínimo legível.
+- Nome de fornecedor sem o sufixo societário (LTDA, ME, EPP…) na aba Preços,
+  com o nome íntegro no tooltip e nos relatórios.
+
 ## 0.7.0 — 2026-07-30
 
 - **Banco de preços municipal**: nova aba **Preços** com os itens de cada

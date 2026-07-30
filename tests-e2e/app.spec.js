@@ -82,7 +82,7 @@ test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
   await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
   const m = await page.evaluate(() => {
     const quebrou = [], truncou = [];
-    document.querySelectorAll(".linha").forEach(linha => {
+    document.querySelectorAll(".linha:not(.cab)").forEach(linha => {
       [...linha.children].forEach((cel, i) => {
         if (i === 0) return;                     // descrição pode quebrar
         const uma = parseFloat(getComputedStyle(cel).lineHeight) || 18;
@@ -101,6 +101,72 @@ test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
   const forn = page.locator(".linha:not(.cab)").nth(2).locator("span").nth(4);
   await expect(forn).toHaveText("CENTRAL HOLDING LOGISTICA");
   await expect(forn).toHaveAttribute("title", "CENTRAL HOLDING LOGISTICA LTDA");
+});
+
+test("arrastar a alça redimensiona a coluna e persiste", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  const larguraDe = i => page.evaluate(n => parseFloat(
+    getComputedStyle(document.querySelector(".lista .cab"))
+      .gridTemplateColumns.split(" ")[n]), i);
+  const antes = await larguraDe(4);                 // coluna Fornecedor
+  const alca = page.locator(".cab > span").nth(4).locator(".alca");
+  const cx = await alca.boundingBox();
+  await page.mouse.move(cx.x + cx.width / 2, cx.y + cx.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cx.x + cx.width / 2 + 40, cx.y + cx.height / 2,
+                        { steps: 5 });
+  await page.mouse.up();
+  const depois = await larguraDe(4);
+  expect(depois).toBeGreaterThan(antes + 30);
+  // a coluna elástica cedeu espaço, mas não abaixo do mínimo
+  expect(await larguraDe(0)).toBeGreaterThanOrEqual(160);
+  // largura salva para voltar na próxima abertura
+  const salvo = await page.evaluate(() => window.__chamadas.filter(
+    c => c.metodo === "set_config" && c.k === "colunas").pop());
+  expect(JSON.parse(salvo.v).itens[4]).toBeGreaterThan(antes + 30);
+  // ordenação não dispara ao arrastar sobre o cabeçalho
+  const chamadas = await page.evaluate(() => window.__chamadas.filter(
+    c => c.metodo === "listar" && c.filtros && c.filtros.ord));
+  expect(chamadas).toEqual([]);
+});
+
+test("duplo clique na alça ajusta a coluna ao conteúdo (autofit)",
+    async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  const cortado = txt => page.evaluate(t => {
+    const c = [...document.querySelectorAll(".lista .linha:not(.cab)")]
+      .map(l => l.children[4]).find(e => e.textContent.includes(t));
+    return c.scrollWidth > c.clientWidth + 1;
+  }, txt);
+  // encolhe a coluna a ponto de cortar até um nome curto
+  await page.evaluate(() => {
+    larguras.itens = { 1:52, 2:74, 3:124, 4:90, 5:78 };
+    aplicarLarguras("itens");
+  });
+  expect(await cortado("ZILDA")).toBe(true);
+  await page.locator(".cab > span").nth(4).locator(".alca").dblclick();
+  expect(await cortado("ZILDA")).toBe(false);        // autofit recuperou
+  // e a coluna elástica não foi engolida pelo nome gigante
+  const flex = await page.evaluate(() => parseFloat(
+    getComputedStyle(document.querySelector(".lista .cab"))
+      .gridTemplateColumns.split(" ")[0]));
+  expect(flex).toBeGreaterThanOrEqual(160);
+  // ordenação não foi disparada pelos cliques do duplo clique
+  const ord = await page.evaluate(() => window.__chamadas.filter(
+    c => c.metodo === "listar" && c.filtros && c.filtros.ord));
+  expect(ord).toEqual([]);
+});
+
+test("restaurar larguras volta ao padrão", async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator(".cab > span").nth(4).locator(".alca").dblclick();
+  await expect(page.locator("#lista")).toHaveAttribute("style", /--cols/);
+  await page.locator("#btn-config").click();
+  await page.locator("#btn-restaurar-colunas").click();
+  const style = await page.locator("#lista").getAttribute("style");
+  expect(style || "").not.toContain("--cols");
 });
 
 test("resumo de preços abre o relatório com o termo preenchido",
