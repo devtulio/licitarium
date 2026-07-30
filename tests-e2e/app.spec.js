@@ -61,7 +61,7 @@ test("aba Preços lista itens e resume o histórico do termo buscado",
   await expect(page.locator("#f-busca"))
     .toHaveAttribute("placeholder", /papel A4/);
   // "só com preço fechado" vem ligado: o item sem resultado não aparece
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(3);
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
   await expect(page.locator(".linha:not(.cab)").first())
     .toContainText("PAPEL SULFITE");
   // resumo estatístico aparece ao buscar
@@ -72,29 +72,35 @@ test("aba Preços lista itens e resume o histórico do termo buscado",
   await expect(page.locator("#precos-resumo")).toContainText("18,75");
   // desmarcar traz também o item sem preço fechado
   await page.locator("#f-homologados").uncheck();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
 });
 
-test("colunas da aba Preços cabem sem quebrar nem truncar",
+test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
     async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(3);
-  const medidas = await page.evaluate(() => {
-    const fora = [];
-    document.querySelectorAll(".linha").forEach((linha, iLinha) => {
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
+  const m = await page.evaluate(() => {
+    const quebrou = [], truncou = [];
+    document.querySelectorAll(".linha").forEach(linha => {
       [...linha.children].forEach((cel, i) => {
         if (i === 0) return;                     // descrição pode quebrar
         const uma = parseFloat(getComputedStyle(cel).lineHeight) || 18;
-        if (cel.scrollHeight > uma * 1.6)
-          fora.push({ iLinha, i, motivo: "quebrou", txt: cel.textContent.trim() });
-        if (cel.scrollWidth > cel.clientWidth + 1)
-          fora.push({ iLinha, i, motivo: "truncou", txt: cel.textContent.trim() });
+        const txt = cel.textContent.trim();
+        if (cel.scrollHeight > uma * 1.6) quebrou.push(txt);
+        if (cel.scrollWidth > cel.clientWidth + 1) truncou.push(txt);
       });
     });
-    return fora;
+    return { quebrou, truncou };
   });
-  expect(medidas).toEqual([]);
+  expect(m.quebrou).toEqual([]);                 // nunca quebra linha
+  // razão social gigante (105 chars) corta com reticências; o resto cabe
+  expect(m.truncou.length).toBe(1);
+  expect(m.truncou[0]).toContain("COOPERATIVA");
+  // sufixo societário sai do nome exibido, íntegro no title
+  const forn = page.locator(".linha:not(.cab)").nth(2).locator("span").nth(4);
+  await expect(forn).toHaveText("CENTRAL HOLDING LOGISTICA");
+  await expect(forn).toHaveAttribute("title", "CENTRAL HOLDING LOGISTICA LTDA");
 });
 
 test("resumo de preços abre o relatório com o termo preenchido",

@@ -53,6 +53,15 @@ const DADOS = {
       valor_unitario_estimado: 2100.0, valor_unitario_homologado: 635000.0,
       fornecedor_nome: "CENTRAL HOLDING LOGISTICA LTDA",
       data_resultado: "2026-07-02" },
+    // pior caso real do acervo (105 chars): não cabe em coluna alguma,
+    // serve para garantir que corta com reticências em vez de quebrar
+    { id: "X-3#11", contratacao_controle: "X-3", ano: 2026, sequencial: 30,
+      numero_item: 11, descricao: "SERVIÇO BANCÁRIO",
+      unidade: "UN", quantidade: 1, quantidade_homologada: 1,
+      valor_unitario_estimado: 100.0, valor_unitario_homologado: 90.0,
+      fornecedor_nome: "COOPERATIVA DE CRÉDITO, POUPANÇA E INVESTIMENTO DO "
+        + "NOROESTE DO ESTADO DE SÃO PAULO - SICREDI NOROESTE -SP",
+      data_resultado: "2026-07-02" },
     { id: "X-3#2", contratacao_controle: "X-3", ano: 2025, sequencial: 50,
       numero_item: 2, descricao: "CANETA ESFEROGRÁFICA AZUL",
       unidade: "UN", quantidade: 500, quantidade_homologada: 500,

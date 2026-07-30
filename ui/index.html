@@ -137,7 +137,7 @@
   .g-contratos    { grid-template-columns:110px 1fr 160px 110px; }
   .g-atas         { grid-template-columns:90px 210px 1fr 170px; }
   .g-pca          { grid-template-columns:60px 1fr 150px 80px 110px; }
-  .g-itens        { grid-template-columns:minmax(0,1fr) 58px 76px 128px 262px 84px; }
+  .g-itens        { grid-template-columns:minmax(0,1fr) 52px 74px 124px 320px 78px; }
   /* na aba Preços só a descrição quebra; o resto fica em uma linha */
   .g-itens > :nth-child(n+2) { white-space:nowrap; overflow:hidden;
                                text-overflow:ellipsis; }
@@ -739,6 +739,20 @@ const COLUNAS = {
                  ["Fornecedor","fornecedor"], ["Processo","origem"]],
 };
 
+// Sufixo societário não identifica ninguém e come metade da coluna:
+// "STARMEDICAL ... LTDA -EPP" vira "STARMEDICAL ...". O nome íntegro fica
+// no tooltip, no detalhe e nos relatórios.
+const SUFIXO_SOCIETARIO =
+  /[\s,.\-–]*\b(LTDA|LIMITADA|ME|EPP|EIRELI|MEI|S\/A|S\.?\s?A\.?|SA|CIA|EI)\b\.?\s*$/i;
+
+function fornecedorCurto(nome) {
+  if (!nome) return "–";
+  let s = String(nome).trim();
+  for (let i = 0; i < 4 && SUFIXO_SOCIETARIO.test(s); i++)
+    s = s.replace(SUFIXO_SOCIETARIO, "").trim();
+  return s || String(nome).trim();
+}
+
 // nº do contrato no padrão numero/ano (PNCP grava "0033/26" — normaliza
 // para 33/2026 usando o ano de 4 dígitos)
 function numContrato(d) {
@@ -791,7 +805,7 @@ function renderLinha(tipo, d) {
       <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
       <span class="num">${unit}</span>
       <span class="dim" title="${esc(d.fornecedor_nome ?? "")}"
-        >${esc(d.fornecedor_nome ?? "–")}</span>
+        >${esc(fornecedorCurto(d.fornecedor_nome))}</span>
       <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>`;
   }
   if (tipo === "pca")
