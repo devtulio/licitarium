@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.8.0 — 2026-07-30
 
 - **Colunas ajustáveis com o mouse**: arraste a borda direita de um cabeçalho
   para redimensionar e dê duplo clique para ajustar ao conteúdo (autofit),
