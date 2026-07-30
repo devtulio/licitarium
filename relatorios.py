@@ -327,6 +327,8 @@ def _css(paisagem, tema="pergaminho"):
   td.ctr, th.ctr {{ text-align:center; }}
   tfoot td {{ background:var(--cabecalho); font-weight:600; }}
   .obj {{ text-transform:uppercase; text-align:justify; hyphens:auto; }}
+  /* nome de fornecedor quebra feio; a coluna cede espaço da descrição */
+  td.forn, th.forn {{ text-align:center; min-width:170px; }}
   .cards {{ display:flex; gap:10px; margin-bottom:6px; }}
   .card {{ background:var(--superficie); border:1px solid var(--borda);
            border-radius:3px;
@@ -513,7 +515,7 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
       <td class="num">{l['quantidade_homologada'] or '–'}</td>
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
       <td class="num">{moeda(l['valor_total_homologado'])}</td>
-      <td class="ctr">{_e(l['fornecedor_nome'])}</td>
+      <td class="forn">{_e(l['fornecedor_nome'])}</td>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="num">{data_br(l['data_resultado'])}</td></tr>"""
       for l in d["linhas"])
@@ -527,7 +529,7 @@ Termo pesquisado: <b>{_e(d['termo'])}</b>.</div>
 <h2>Itens homologados, do menor para o maior preço unitário</h2>
 <table><thead><tr><th>Descrição</th><th class="ctr">Unid.</th>
 <th class="num">Qtde</th><th class="num">Unitário</th>
-<th class="num">Total</th><th class="ctr">Fornecedor</th>
+<th class="num">Total</th><th class="forn">Fornecedor</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
 <tbody>{linhas}</tbody></table>"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
