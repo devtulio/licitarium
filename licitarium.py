@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS pca_minuta_itens (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ano_alvo INTEGER, chave TEXT,
   descricao TEXT, unidade TEXT, categoria TEXT, quantidade REAL,
   valor_unitario REAL, margem REAL, incluir INTEGER DEFAULT 1,
-  editado INTEGER DEFAULT 0, origem TEXT);
+  editado INTEGER DEFAULT 0, origem TEXT, mesclado_de TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, iniciado_em TEXT, tipo TEXT,
   janela_ini TEXT, janela_fim TEXT, registros INTEGER, status TEXT, erro TEXT);
@@ -141,6 +141,10 @@ def abrir_db():
         db.execute("UPDATE atas SET"
                    " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
                    " ano_ata=json_extract(raw,'$.anoAta')")
+        db.commit()
+    colunas_m = {r[1] for r in db.execute("PRAGMA table_info(pca_minuta_itens)")}
+    if colunas_m and "mesclado_de" not in colunas_m:
+        db.execute("ALTER TABLE pca_minuta_itens ADD COLUMN mesclado_de TEXT")
         db.commit()
     colunas_a = {r[1] for r in db.execute("PRAGMA table_info(atas)")}
     if colunas_a and "objeto" not in colunas_a:
@@ -575,6 +579,7 @@ class Api:
             cfg = db.execute("SELECT * FROM pca_minuta WHERE ano_alvo=?",
                              (int(ano_alvo),)).fetchone()
             return {"itens": itens,
+                    "familias": pca_builder.resumo_familias(itens),
                     "totais": pca_builder.totais(itens),
                     "parametros": json.loads(cfg["parametros"]) if cfg else None,
                     "gerado_em": cfg["gerado_em"] if cfg else None}
@@ -594,6 +599,21 @@ class Api:
                        list(campos.values()) + [int(item_id)])
             db.commit()
             return {"ok": True}
+        finally:
+            db.close()
+
+    def mesclar_itens_minuta(self, ano_alvo, ids):
+        db = abrir_db()
+        try:
+            return pca_builder.mesclar(db, int(ano_alvo),
+                                       [int(i) for i in (ids or [])])
+        finally:
+            db.close()
+
+    def dividir_item_minuta(self, item_id):
+        db = abrir_db()
+        try:
+            return pca_builder.dividir(db, int(item_id))
         finally:
             db.close()
 

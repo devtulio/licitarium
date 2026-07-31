@@ -230,17 +230,17 @@ test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
   // exercício sugerido é o ano seguinte ao último com itens (2026 -> 2027)
   await expect(page.locator("#pca-ano")).toHaveValue("2027");
   await page.locator("#pca-gerar").click();
-  await expect(page.locator("#pca-status")).toContainText("2 grupos");
+  await expect(page.locator("#pca-status")).toContainText("3 grupos");
   const linhas = page.locator("#pca-lista .linha:not(.cab)");
-  await expect(linhas).toHaveCount(2);
+  await expect(linhas).toHaveCount(3);
   // sinalizações que orientam a revisão
   await expect(linhas.nth(0).locator(".aviso-un")).toBeVisible();
   await expect(linhas.nth(1).locator(".tag-unico")).toContainText("ÚNICA");
-  await expect(page.locator("#pca-totais")).toContainText("522.000,00");
+  await expect(page.locator("#pca-totais")).toContainText("525.000,00");
   // editar a quantidade recalcula o total
   await linhas.nth(0).locator('[data-campo="quantidade"]').fill("300");
   await linhas.nth(0).locator('[data-campo="quantidade"]').blur();
-  await expect(page.locator("#pca-totais")).toContainText("530.000,00");
+  await expect(page.locator("#pca-totais")).toContainText("533.000,00");
   // excluir um item sai da conta e é contado como excluído
   await linhas.nth(1).locator('[data-campo="incluir"]').uncheck();
   await expect(page.locator("#pca-totais")).toContainText("1 excluído");
@@ -250,11 +250,42 @@ test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
     { quantidade: 300 }, { incluir: 0 }]);
 });
 
+test("PCA: famílias filtram, ABC classifica e mesclagem funde itens",
+    async ({ page }) => {
+  await page.locator("#btn-pca").click();
+  await page.locator("#pca-gerar").click();
+  const linhas = page.locator("#pca-lista .linha:not(.cab)");
+  await expect(linhas).toHaveCount(3);
+  // curva ABC destacada e resumida no topo
+  await expect(linhas.nth(0).locator(".abc")).toHaveText("B");
+  await expect(page.locator("#pca-totais")).toContainText("classe A");
+  // chips por família: FILTRO tem 2 itens
+  const chipFiltro = page.locator('#pca-familias button[data-familia="FILTRO"]');
+  await expect(chipFiltro).toContainText("2");
+  await chipFiltro.click();
+  await expect(linhas).toHaveCount(2);
+  await page.locator('#pca-familias button[data-familia=""]').click();
+  await expect(linhas).toHaveCount(3);
+  // mesclar exige dois: o botão só habilita a partir do segundo
+  await expect(page.locator("#pca-mesclar")).toBeDisabled();
+  await linhas.nth(0).locator("[data-sel]").check();
+  await expect(page.locator("#pca-mesclar")).toBeDisabled();
+  await linhas.nth(2).locator("[data-sel]").check();
+  await expect(page.locator("#pca-mesclar")).toContainText("2 itens");
+  await page.locator("#pca-mesclar").click();
+  await expect(page.locator("#pca-status")).toContainText("fundidos");
+  await expect(linhas).toHaveCount(2);
+  // o item fundido oferece desfazer
+  await expect(page.locator("[data-dividir]")).toBeVisible();
+  await page.locator("[data-dividir]").click();
+  await expect(page.locator("#pca-status")).toContainText("desfeita");
+});
+
 test("modal do PCA ocupa a janela e a descrição tem espaço", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.locator("#btn-pca").click();
   await page.locator("#pca-gerar").click();
-  await expect(page.locator("#pca-lista .linha:not(.cab)")).toHaveCount(2);
+  await expect(page.locator("#pca-lista .linha:not(.cab)")).toHaveCount(3);
   const m = await page.evaluate(() => {
     const modal = document.querySelector("#veu-pca .modal");
     const desc = document.querySelector(

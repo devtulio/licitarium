@@ -280,7 +280,23 @@
   .pca-params label { margin:0 0 4px; }
   .pca-totais { padding:0 20px 10px; font-size:12.5px; color:var(--muted); }
   .pca-totais b { color:var(--text); font-size:14px; }
-  .g-pca-minuta { grid-template-columns:34px minmax(0,1fr) 62px 96px 108px 60px 116px; }
+  .g-pca-minuta { grid-template-columns:26px 30px 30px minmax(0,1fr) 62px 96px 108px 58px 116px; }
+  .abc { display:inline-block; width:19px; height:19px; line-height:19px;
+         border-radius:50%; text-align:center; font-size:10.5px;
+         font-weight:700; }
+  .abc-A { background:color-mix(in srgb, var(--accent) 22%, transparent);
+           color:var(--accent); }
+  .abc-B { background:color-mix(in srgb, var(--warn) 20%, transparent);
+           color:var(--warn); }
+  .abc-C { background:var(--surface2); color:var(--muted); }
+  .familias { display:flex; gap:6px; flex-wrap:wrap; padding:0 20px 10px;
+              max-height:74px; overflow-y:auto; }
+  .familias button { border:1px solid var(--border); background:var(--surface);
+    color:var(--text); border-radius:var(--pill); padding:4px 11px;
+    font-size:11.5px; cursor:pointer; white-space:nowrap; }
+  .familias button.on { border-color:var(--accent); color:var(--accent); }
+  .familias button small { color:var(--muted); margin-left:5px; }
+  .tag-mesclado { font-size:9.5px; color:var(--accent); letter-spacing:.04em; }
   .g-pca-minuta input[type=text], .g-pca-minuta input[type=number] {
     width:100%; padding:3px 6px; font-size:12.5px; }
   .linha .aviso-un { color:var(--warn); cursor:help; }
@@ -472,8 +488,10 @@
       <button class="btn" id="pca-gerar" style="align-self:end">Gerar</button>
     </div>
     <div class="pca-totais" id="pca-totais"></div>
+    <div class="familias" id="pca-familias"></div>
     <div class="card lista" id="pca-lista" style="margin:0 20px"></div>
     <div class="macoes">
+      <button class="btn ghost" id="pca-mesclar" disabled>⚯ Mesclar selecionados</button>
       <button class="btn ghost" id="pca-csv">Exportar CSV</button>
       <button class="btn ghost" id="pca-relatorio">Relatório da minuta</button>
       <span class="dim" id="pca-status" style="align-self:center"></span>
@@ -1370,28 +1388,65 @@ $("pca-gerar").addEventListener("click", async () => {
 
 $("pca-ano").addEventListener("change", carregarMinuta);
 
+let familiaFiltro = null;      // família selecionada na revisão em 2 níveis
+let selecionados = new Set();  // itens marcados para mesclar
+
 async function carregarMinuta() {
   const dados = await api.listar_minuta_pca(+$("pca-ano").value);
   const t = dados.totais;
+  // chips de família: revisar 1.500 linhas soltas é inviável; por família,
+  // o gestor ataca PNEU, FILTRO, PAPEL… um bloco de cada vez
+  const familias = dados.familias || [];
+  $("pca-familias").innerHTML = familias.length > 1 ? [
+    `<button data-familia="" class="${familiaFiltro ? "" : "on"}">Todas
+       <small>${dados.itens.length}</small></button>`,
+    ...familias.slice(0, 40).map(f =>
+      `<button data-familia="${esc(f.familia)}"
+        class="${familiaFiltro === f.familia ? "on" : ""}"
+        title="${dinheiro(f.valor)}">${esc(f.familia)}
+        <small>${f.itens}</small></button>`)].join("") : "";
+  $("pca-familias").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => {
+      familiaFiltro = b.dataset.familia || null;
+      carregarMinuta();
+    }));
+  const classeA = dados.itens.filter(i => i.abc === "A").length;
   $("pca-totais").innerHTML = dados.itens.length
     ? `<b>${t.grupos}</b> itens no plano · <b>${dinheiro(t.valor)}</b>
+       ${classeA ? ` · <b>${classeA}</b> itens classe A concentram 80% do valor` : ""}
        ${t.excluidos ? ` · ${t.excluidos} excluído(s)` : ""}
        ${dados.gerado_em ? ` · gerado em ${dataBr(dados.gerado_em)}` : ""}`
     : `Nenhuma minuta para este exercício — ajuste os parâmetros e clique em
        <b>Gerar</b>.`;
   const cab = `<div class="linha cab g-pca-minuta">
-      <span title="Incluir no plano">✓</span><span>Descrição</span>
+      <span title="Selecionar para mesclar">⚯</span>
+      <span title="Incluir no plano">✓</span>
+      <span title="Curva ABC: A concentra 80% do valor">ABC</span>
+      <span>Descrição</span>
       <span>Unid.</span><span class="num">Quantidade</span>
       <span class="num">Unitário</span><span class="num">Margem</span>
       <span class="num">Total</span></div>`;
-  const linhas = dados.itens.map(i => `
+  const visiveis = familiaFiltro
+    ? dados.itens.filter(i => i.familia === familiaFiltro) : dados.itens;
+  const linhas = visiveis.map(i => `
     <div class="linha g-pca-minuta" data-id="${i.id}">
+      <span><input type="checkbox" data-sel="${i.id}"
+        ${selecionados.has(i.id) ? "checked" : ""}
+        aria-label="Selecionar para mesclar"></span>
       <span><input type="checkbox" data-campo="incluir"
         ${i.incluir ? "checked" : ""} aria-label="Incluir"></span>
+      <span><span class="abc abc-${i.abc || "C"}"
+        title="Classe ${i.abc || "C"}">${i.abc || "C"}</span></span>
       <span><input type="text" data-campo="descricao"
         value="${esc(i.descricao ?? "")}">
         ${i.origem && i.origem.recorrente === false
-          ? '<span class="tag-unico" title="Contratado uma única vez: confira se cabe no plano">OCORRÊNCIA ÚNICA</span>' : ""}</span>
+          ? '<span class="tag-unico" title="Contratado uma única vez: confira se cabe no plano">OCORRÊNCIA ÚNICA</span>' : ""}
+        ${i.origem && i.origem.preco_disperso
+          ? `<span class="tag-unico" title="Preços do grupo variam de
+              ${dinheiro(i.origem.preco_min)} a ${dinheiro(i.origem.preco_max)}:
+              provável lote lançado como item">PREÇO DISPERSO</span>` : ""}
+        ${i.mesclado
+          ? '<button class="tag-mesclado" data-dividir="' + i.id + '" title="Desfazer a mesclagem">MESCLADO ⤢</button>' : ""}</span>
       <span><input type="text" data-campo="unidade" value="${esc(i.unidade ?? "")}">
         ${i.origem && i.origem.unidades_divergentes
           ? '<span class="aviso-un" title="O grupo tem unidades diferentes; confira">⚠</span>' : ""}</span>
@@ -1405,6 +1460,22 @@ async function carregarMinuta() {
     </div>`).join("");
   $("pca-lista").innerHTML = cab + (linhas ||
     `<div class="vazio">Sem itens. Clique em <b>Gerar</b>.</div>`);
+  // seleção para mesclagem
+  $("pca-lista").querySelectorAll("[data-sel]").forEach(cx =>
+    cx.addEventListener("change", () => {
+      const id = +cx.dataset.sel;
+      cx.checked ? selecionados.add(id) : selecionados.delete(id);
+      $("pca-mesclar").disabled = selecionados.size < 2;
+      $("pca-mesclar").textContent = selecionados.size > 1
+        ? `⚯ Mesclar ${selecionados.size} itens` : "⚯ Mesclar selecionados";
+    }));
+  $("pca-lista").querySelectorAll("[data-dividir]").forEach(b =>
+    b.addEventListener("click", async () => {
+      const r = await api.dividir_item_minuta(+b.dataset.dividir);
+      $("pca-status").textContent = r.ok
+        ? `Mesclagem desfeita: ${r.itens} itens restaurados` : r.erro;
+      await carregarMinuta();
+    }));
   $("pca-lista").querySelectorAll("[data-campo]").forEach(campo =>
     campo.addEventListener("change", async () => {
       const linha = campo.closest(".linha");
@@ -1416,6 +1487,18 @@ async function carregarMinuta() {
       await carregarMinuta();   // recalcula totais com o ajuste
     }));
 }
+
+$("pca-mesclar").addEventListener("click", async () => {
+  const r = await api.mesclar_itens_minuta(+$("pca-ano").value,
+                                           [...selecionados]);
+  $("pca-status").textContent = r.ok
+    ? `${r.itens} itens fundidos — quantidade somada e preço ponderado`
+    : r.erro;
+  selecionados.clear();
+  $("pca-mesclar").disabled = true;
+  $("pca-mesclar").textContent = "⚯ Mesclar selecionados";
+  await carregarMinuta();
+});
 
 $("pca-csv").addEventListener("click", async () => {
   const r = await api.exportar_csv("minuta_pca", { ano: +$("pca-ano").value });

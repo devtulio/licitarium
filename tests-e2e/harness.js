@@ -126,24 +126,53 @@ function scriptPonte(temaBanco = "portal") {
       gerar_minuta_pca: async (ano, params) => {
         window.__chamadas.push({ metodo: "gerar_minuta_pca", ano, params });
         window.__minuta = [
-          { id: 1, chave: "FILTRO AR MOTOR", descricao: "FILTRO DE AR",
+          { id: 1, chave: "FILTRO AR MOTOR", familia: "FILTRO", abc: "B",
+            descricao: "FILTRO DE AR",
             unidade: "UND", categoria: "Material", quantidade: 220,
             valor_unitario: 100, margem: 10, incluir: 1, valor_total: 22000,
             origem: { recorrente: true, unidades_divergentes: true } },
-          { id: 2, chave: "REFORMA PRACA", descricao: "REFORMA DE PRAÇA",
+          { id: 2, chave: "REFORMA PRACA", familia: "REFORMA", abc: "A",
+            descricao: "REFORMA DE PRAÇA",
             unidade: "UN", categoria: "Serviço", quantidade: 1,
             valor_unitario: 500000, margem: 10, incluir: 1,
             valor_total: 500000, origem: { recorrente: false } },
+          { id: 3, chave: "FILTRO ÓLEO MOTOR", familia: "FILTRO", abc: "C",
+            descricao: "FILTRO DE ÓLEO",
+            unidade: "UND", categoria: "Material", quantidade: 100,
+            valor_unitario: 30, margem: 10, incluir: 1, valor_total: 3000,
+            origem: { recorrente: true } },
         ];
-        return { ok: true, grupos: 2 };
+        return { ok: true, grupos: 3 };
       },
       listar_minuta_pca: async () => {
         const itens = window.__minuta || [];
         const inc = itens.filter(i => i.incluir);
+        const fam = {};
+        itens.forEach(i => {
+          const f = fam[i.familia] || (fam[i.familia] =
+            { familia: i.familia, itens: 0, valor: 0, excluidos: 0 });
+          f.itens++;
+          i.incluir ? f.valor += i.valor_total : f.excluidos++;
+        });
         return { itens, gerado_em: "2026-07-31T10:00:00",
+                 familias: Object.values(fam).sort((a, b) => b.valor - a.valor),
                  parametros: { margem: 10, base: "media" },
                  totais: { grupos: inc.length, excluidos: itens.length - inc.length,
                            valor: inc.reduce((s, i) => s + i.valor_total, 0) } };
+      },
+      mesclar_itens_minuta: async (ano, ids) => {
+        window.__chamadas.push({ metodo: "mesclar_itens_minuta", ano, ids });
+        const alvo = (window.__minuta || []).filter(i => ids.includes(i.id));
+        const qtd = alvo.reduce((s, i) => s + i.quantidade, 0);
+        const valor = alvo.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0);
+        window.__minuta = (window.__minuta || []).filter(i => !ids.includes(i.id));
+        window.__minuta.push({ ...alvo[0], id: 99, mesclado: true,
+          quantidade: qtd, valor_unitario: valor / qtd, valor_total: valor });
+        return { ok: true, itens: alvo.length };
+      },
+      dividir_item_minuta: async id => {
+        window.__chamadas.push({ metodo: "dividir_item_minuta", id });
+        return { ok: true, itens: 2 };
       },
       editar_item_minuta: async (id, campos) => {
         window.__chamadas.push({ metodo: "editar_item_minuta", id, campos });

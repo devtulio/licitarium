@@ -16,6 +16,13 @@ IRRELEVANTES = {"DE", "DA", "DO", "DAS", "DOS", "EM", "PARA", "COM", "E", "A",
                 "O", "AS", "OS", "NA", "NO", "AO", "POR", "SEM", "SOB"}
 # lotes lançados como item único não representam consumo de nada
 PADRAO_LOTE = re.compile(r"TODOS\s+OS\s+ITENS|LOTE\s+[ÚU]NICO", re.IGNORECASE)
+# abertura burocrática que aparece em metade dos editais e não identifica nada
+PREFIXOS_VAZIOS = re.compile(
+    r"^(?:(?:AQUISI[ÇC][ÃA]O|CONTRATA[ÇC][ÃA]O|PRESTA[ÇC][ÃA]O|FORNECIMENTO|"
+    r"LOCA[ÇC][ÃA]O|REGISTRO)\s+(?:DE\s+)?(?:PRE[ÇC]OS?\s+(?:PARA\s+)?)?"
+    r"(?:EMPRESA\s+)?(?:ESPECIALIZADA\s+)?(?:PARA\s+)?(?:A\s+)?)+")
+# preço muito disperso dentro do grupo denuncia lote disfarçado de item
+DISPERSAO_SUSPEITA = 10
 
 PALAVRAS_CHAVE_PADRAO = 3
 MARGEM_PADRAO = 10.0
@@ -24,10 +31,41 @@ ESTATISTICAS = ("mediana", "media", "recente", "menor")
 
 
 def chave_agrupamento(descricao, palavras=PALAVRAS_CHAVE_PADRAO):
-    """Radical da descrição: maiúsculas, sem pontuação e sem palavras vazias."""
+    """Radical da descrição: maiúsculas, sem pontuação e sem palavras vazias.
+
+    Prefixos de praxe ("AQUISIÇÃO DE", "CONTRATAÇÃO DE EMPRESA PARA") são
+    descartados: eles abrem metade dos editais e nada dizem sobre o item.
+    """
     limpo = re.sub(r"[^0-9A-ZÁÂÃÉÊÍÓÔÕÚÇ ]", " ", (descricao or "").upper())
+    limpo = PREFIXOS_VAZIOS.sub("", limpo.strip(), count=1)
     termos = [t for t in limpo.split() if t not in IRRELEVANTES]
     return " ".join(termos[:palavras])
+
+
+def familia(chave):
+    """Primeiro termo da chave: PNEU 295 80R22 e PNEU 275 80R22 são itens
+    diferentes no plano, mas o gestor revisa melhor vendo-os juntos."""
+    return (chave or "").split(" ")[0] if chave else ""
+
+
+def classificar_abc(itens):
+    """Curva ABC por valor: A concentra 80% do total, B 15%, C o resto.
+
+    Diz ao gestor onde vale gastar o tempo de revisão — normalmente poucos
+    itens respondem pela maior parte do plano.
+    """
+    validos = [i for i in itens if (i.get("valor_total") or 0) > 0]
+    total = sum(i["valor_total"] for i in validos)
+    for i in itens:
+        i["abc"] = "C"
+    if not total:
+        return itens
+    acumulado = 0.0
+    for i in sorted(validos, key=lambda x: -x["valor_total"]):
+        acumulado += i["valor_total"]
+        fatia = acumulado / total
+        i["abc"] = "A" if fatia <= 0.8 else ("B" if fatia <= 0.95 else "C")
+    return itens
 
 
 def _preco(valores, datas, estatistica):
@@ -105,6 +143,7 @@ def consolidar(db, anos=None, palavras=PALAVRAS_CHAVE_PADRAO,
         resultado.append({
             "recorrente": recorrente,
             "chave": g["chave"],
+            "familia": familia(g["chave"]),
             "descricao": descricao,
             "unidade": statistics.mode(g["unidades"]) if any(g["unidades"]) else None,
             "categoria": statistics.mode(g["categorias"]) if any(g["categorias"]) else None,
@@ -119,6 +158,9 @@ def consolidar(db, anos=None, palavras=PALAVRAS_CHAVE_PADRAO,
             "unidades_divergentes": len({u for u in g["unidades"] if u}) > 1,
             "preco_min": min(g["precos"]),
             "preco_max": max(g["precos"]),
+            "preco_disperso": (min(g["precos"]) > 0
+                               and max(g["precos"]) / min(g["precos"])
+                               >= DISPERSAO_SUSPEITA),
         })
     if so_recorrentes:
         resultado = [r for r in resultado if r["recorrente"]]
@@ -191,8 +233,77 @@ def listar_minuta(db, ano_alvo, so_incluidos=False):
         d["origem"] = json.loads(d["origem"]) if d.get("origem") else {}
         d["valor_total"] = round((d["quantidade"] or 0)
                                  * (d["valor_unitario"] or 0), 2)
+        d["familia"] = d["origem"].get("familia") or familia(d["chave"])
+        d["mesclado"] = bool(d.get("mesclado_de"))
         itens.append(d)
-    return itens
+    return classificar_abc(itens)
+
+
+def resumo_familias(itens):
+    """Agrupa a minuta por família para a revisão em dois níveis."""
+    familias = {}
+    for i in itens:
+        f = familias.setdefault(i["familia"] or "—",
+                                {"familia": i["familia"] or "—",
+                                 "itens": 0, "valor": 0.0, "excluidos": 0})
+        f["itens"] += 1
+        if i.get("incluir", 1):
+            f["valor"] += i["valor_total"]
+        else:
+            f["excluidos"] += 1
+    return sorted(familias.values(), key=lambda f: -f["valor"])
+
+
+def mesclar(db, ano_alvo, ids):
+    """Funde itens num só: soma quantidades e pondera o preço pelo volume."""
+    if len(ids) < 2:
+        return {"ok": False, "erro": "selecione ao menos dois itens"}
+    marcas = ",".join("?" * len(ids))
+    linhas = [dict(r) for r in db.execute(
+        f"SELECT * FROM pca_minuta_itens WHERE ano_alvo=? AND id IN ({marcas})",
+        [ano_alvo] + list(ids))]
+    if len(linhas) < 2:
+        return {"ok": False, "erro": "itens não encontrados"}
+    qtd = sum(l["quantidade"] or 0 for l in linhas)
+    valor = sum((l["quantidade"] or 0) * (l["valor_unitario"] or 0)
+                for l in linhas)
+    unit = (valor / qtd) if qtd else max(
+        (l["valor_unitario"] or 0) for l in linhas)
+    principal = max(linhas, key=lambda l: (l["quantidade"] or 0)
+                    * (l["valor_unitario"] or 0))
+    db.execute(f"DELETE FROM pca_minuta_itens WHERE id IN ({marcas})", list(ids))
+    db.execute(
+        """INSERT INTO pca_minuta_itens
+           (ano_alvo, chave, descricao, unidade, categoria, quantidade,
+            valor_unitario, margem, incluir, editado, origem, mesclado_de)
+           VALUES (?,?,?,?,?,?,?,?,1,1,?,?)""",
+        (ano_alvo, principal["chave"], principal["descricao"],
+         principal["unidade"], principal["categoria"], round(qtd, 2),
+         round(unit, 2), principal["margem"], principal["origem"],
+         json.dumps(linhas, ensure_ascii=False, default=str)))
+    db.commit()
+    return {"ok": True, "itens": len(linhas)}
+
+
+def dividir(db, item_id):
+    """Desfaz uma mesclagem, devolvendo os itens como estavam."""
+    linha = db.execute("SELECT * FROM pca_minuta_itens WHERE id=?",
+                       (item_id,)).fetchone()
+    if not linha or not linha["mesclado_de"]:
+        return {"ok": False, "erro": "este item não veio de uma mesclagem"}
+    originais = json.loads(linha["mesclado_de"])
+    db.execute("DELETE FROM pca_minuta_itens WHERE id=?", (item_id,))
+    for o in originais:
+        db.execute(
+            """INSERT INTO pca_minuta_itens
+               (ano_alvo, chave, descricao, unidade, categoria, quantidade,
+                valor_unitario, margem, incluir, editado, origem, mesclado_de)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (o["ano_alvo"], o["chave"], o["descricao"], o["unidade"],
+             o["categoria"], o["quantidade"], o["valor_unitario"], o["margem"],
+             o["incluir"], o["editado"], o["origem"], o.get("mesclado_de")))
+    db.commit()
+    return {"ok": True, "itens": len(originais)}
 
 
 def totais(itens):
