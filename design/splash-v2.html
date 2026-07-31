@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Licitarium — splash por tema</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e8e8ea; font-family:system-ui,'Segoe UI',sans-serif;
+         padding:22px; color:#222; }
+  h1 { font-size:20px; } .sub { color:#666; font-size:13px; margin:4px 0 18px;
+       max-width:900px; line-height:1.5; }
+  .grade { display:grid; grid-template-columns:repeat(3,1fr); gap:18px;
+           max-width:1260px; margin:0 auto; }
+  .cartao { background:#fff; border-radius:10px; overflow:hidden;
+            box-shadow:0 2px 10px rgba(0,0,0,.13); }
+  .topo { padding:12px 14px 10px; display:flex; align-items:center;
+          justify-content:space-between; gap:8px; }
+  .topo h2 { font-size:13.5px; }
+  .topo select { font-size:12px; padding:4px 6px; }
+  .palco { height:300px; border-top:1px solid #e3e3e3; }
+  .refazer { display:block; margin:10px 14px 14px auto; font-size:12px;
+             padding:5px 12px; cursor:pointer; border:1px solid #ccc;
+             background:#f6f6f6; border-radius:4px; }
+
+  /* ══ paletas dos temas do app ══ */
+  .tema-portal { --bg:#f8f9fa; --superficie:#ffffff; --borda:#e3e6e8;
+    --texto:#1b1b1b; --suave:#5c6670; --acento:#1351b4; --trilho:#e9edf3; }
+  .tema-pergaminho { --bg:#f5efe2; --superficie:#fbf7ee; --borda:#d9cbaa;
+    --texto:#2b2115; --suave:#6f5b3e; --acento:#8b2e2e; --trilho:#ded5c2;
+    --dourado:#b08d3e; }
+  .tema-observatorio { --bg:#10151c; --superficie:#1a212b; --borda:#232c38;
+    --texto:#dce3ec; --suave:#8b97a7; --acento:#f0a836; --trilho:#232c38; }
+
+  /* ══ composições (usam só variáveis: servem a qualquer tema) ══ */
+  .tela { height:100%; background:var(--bg); color:var(--texto);
+          display:flex; align-items:center; justify-content:center; }
+  .mark { font-family:Georgia,'Times New Roman',serif; letter-spacing:.16em; }
+  .mark b { color:var(--acento); font-weight:400; }
+  .status { font-size:11px; color:var(--suave); margin-top:8px; }
+  .divisa { font-family:Georgia,serif; font-style:italic; font-size:11.5px;
+            color:var(--suave); letter-spacing:.06em; margin-top:3px; }
+  .barra { height:3px; background:var(--trilho); border-radius:2px;
+           overflow:hidden; }
+  .barra i { display:block; height:100%; width:0; border-radius:2px;
+             background:var(--dourado, var(--acento));
+             animation:carrega 2.4s ease-out forwards; }
+  .anel { position:relative; }
+  .anel .giro { position:absolute; inset:-8px; border-radius:50%;
+                border:2px solid transparent;
+                border-top-color:var(--dourado, var(--acento));
+                border-right-color:var(--acento);
+                animation:girar 1.2s linear infinite; }
+  .pilha { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .cx { background:var(--superficie); border:1px solid var(--borda);
+        border-radius:8px; padding:20px 26px; display:flex; gap:18px;
+        align-items:center; box-shadow:0 10px 30px rgba(0,0,0,.14);
+        animation:surge .6s ease-out both; }
+  .cx.diploma { flex-direction:column; text-align:center; gap:4px;
+                border-radius:4px; border-top:3px double var(--dourado,var(--acento));
+                border-bottom:3px double var(--dourado,var(--acento)); }
+  .linha2 { font-size:11.5px; color:var(--suave); margin-top:3px; }
+  @keyframes carrega { to { width:100%; } }
+  @keyframes surge { from { opacity:0; transform:translateY(8px); } }
+  @keyframes pulsa { 50% { transform:scale(1.05); opacity:.85; } }
+  @keyframes girar { to { transform:rotate(360deg); } }
+  .pulsante { animation:pulsa 1.6s ease-in-out infinite; }
+  .surgindo { animation:surge .7s ease-out both; }
+  template { display:none; }
+</style>
+</head>
+<body>
+<h1>Splash por tema</h1>
+<p class="sub">Uma mesma composição veste a paleta de cada tema — e você pode
+escolher composições diferentes por tema. Troque nos seletores e clique em
+<i>rever animação</i>. O selo e o estandarte mantêm as cores originais da
+marca em qualquer tema, como manda a identidade.</p>
+
+<div class="grade" id="grade"></div>
+
+<template id="svg-estandarte"><svg viewBox="0 0 64 64" aria-hidden="true">
+  <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
+  <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
+  <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
+  <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
+        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
+  <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
+        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
+  <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
+  <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
+        fill="#2b2115" text-anchor="middle">MMXXVI</text>
+</svg></template>
+
+<template id="svg-selo"><svg viewBox="0 0 64 64" aria-hidden="true">
+  <polygon points="11,25 3,19 3,45 11,39" fill="#8b2e2e"/>
+  <polygon points="53,25 61,19 61,45 53,39" fill="#8b2e2e"/>
+  <rect x="9" y="17" width="46" height="30" fill="#8b2e2e"/>
+  <rect x="12.5" y="20.5" width="39" height="23" fill="none" stroke="#f5efe2"
+        stroke-width="1.4" opacity=".7"/>
+  <text x="32" y="40.5" font-family="Georgia, 'Times New Roman', serif"
+        font-size="21" fill="#f5efe2" text-anchor="middle">L</text>
+</svg></template>
+
+<script>
+  const est = t => `<div style="width:${t}px;height:${t}px">
+    ${document.getElementById("svg-estandarte").innerHTML}</div>`;
+  const selo = t => `<div style="width:${t}px;height:${t}px">
+    ${document.getElementById("svg-selo").innerHTML}</div>`;
+  const WORD = `<div class="mark" style="font-size:24px">LICITARI<b>V</b>M</div>`;
+  const MUNI = `<div class="linha2">Orindiúva · SP — v0.9.0</div>`;
+
+  const COMPOSICOES = {
+    estandarte: {
+      nome: "Estandarte + barra",
+      html: () => `<div class="tela"><div class="pilha">
+        <div class="surgindo">${est(118)}</div>${WORD}
+        <div class="divisa">svb hasta pvblica</div>
+        <div class="barra" style="width:190px;margin-top:16px"><i></i></div>
+        <div class="status">abrindo o acervo…</div></div></div>`,
+    },
+    estandarteAnel: {
+      nome: "Estandarte + anel",
+      html: () => `<div class="tela"><div class="pilha">
+        <div class="anel surgindo">${est(112)}<div class="giro"></div></div>
+        ${WORD}<div class="status">abrindo o acervo…</div></div></div>`,
+    },
+    cartao: {
+      nome: "Cartão com selo",
+      html: () => `<div class="tela"><div class="cx">${selo(64)}
+        <div>${WORD}${MUNI}
+        <div class="barra" style="margin-top:12px"><i></i></div></div></div></div>`,
+    },
+    diploma: {
+      nome: "Cartão com estandarte",
+      html: () => `<div class="tela"><div class="cx diploma">${est(88)}
+        ${WORD}${MUNI}
+        <div class="barra" style="width:100%;margin-top:12px"><i></i></div>
+        </div></div>`,
+    },
+    seloAnel: {
+      nome: "Selo + anel",
+      html: () => `<div class="tela"><div class="pilha">
+        <div class="anel">${selo(80)}<div class="giro"></div></div>
+        ${WORD}<div class="divisa">svb hasta pvblica</div></div></div>`,
+    },
+    seloPulsante: {
+      nome: "Selo pulsante + barra",
+      html: () => `<div class="tela"><div class="pilha">
+        <div class="pulsante">${selo(92)}</div>${WORD}
+        <div class="status" style="text-transform:uppercase;letter-spacing:.08em">carregando</div>
+        <div class="barra" style="width:170px;margin-top:12px"><i></i></div></div></div>`,
+    },
+  };
+
+  // sugestão inicial: cada tema com a composição que melhor o representa
+  const TEMAS = [
+    { id:"portal", nome:"Portal (padrão)", escolha:"cartao" },
+    { id:"pergaminho", nome:"Pergaminho", escolha:"diploma" },
+    { id:"observatorio", nome:"Observatório", escolha:"seloAnel" },
+  ];
+
+  const grade = document.getElementById("grade");
+  TEMAS.forEach(t => {
+    const opcoes = Object.entries(COMPOSICOES).map(([k, v]) =>
+      `<option value="${k}"${k === t.escolha ? " selected" : ""}>${v.nome}</option>`).join("");
+    const cartao = document.createElement("div");
+    cartao.className = "cartao";
+    cartao.innerHTML = `<div class="topo"><h2>${t.nome}</h2>
+        <select data-tema="${t.id}">${opcoes}</select></div>
+      <div class="palco tema-${t.id}" data-tema="${t.id}"></div>
+      <button class="refazer">rever animação</button>`;
+    grade.appendChild(cartao);
+  });
+
+  function montar(tema) {
+    const sel = document.querySelector(`select[data-tema="${tema}"]`);
+    const palco = document.querySelector(`.palco[data-tema="${tema}"]`);
+    palco.innerHTML = COMPOSICOES[sel.value].html();
+  }
+  TEMAS.forEach(t => montar(t.id));
+  document.querySelectorAll("select[data-tema]").forEach(s =>
+    s.addEventListener("change", () => montar(s.dataset.tema)));
+  document.querySelectorAll(".refazer").forEach(b =>
+    b.addEventListener("click", () =>
+      montar(b.parentElement.querySelector(".palco").dataset.tema)));
+</script>
+</body>
+</html>

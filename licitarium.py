@@ -757,13 +757,30 @@ def main():
         uf = pncp._config(db, "municipio_uf")
         # abre maximizado por padrão: as listas são largas
         maximizar = (pncp._config(db, "maximizar") or "1") == "1"
+        tema = pncp._config(db, "tema") or "portal"
     finally:
         db.close()
     titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
+    # o tema vai na URL para a splash já nascer na cor certa (sem piscar)
+    url = (DIR_APP / "ui" / "index.html").as_uri() + f"?tema={tema}"
     api._janela = webview.create_window(
-        titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
+        titulo, url, js_api=api,
         width=1100, height=740, min_size=(900, 600), maximized=maximizar)
+    _fechar_splash_nativa()
     webview.start()
+
+
+def _fechar_splash_nativa():
+    """Encerra a imagem que o PyInstaller mostra durante a extração.
+
+    O módulo pyi_splash só existe dentro do exe empacotado; rodando do
+    código-fonte não há nada para fechar.
+    """
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

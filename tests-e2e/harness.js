@@ -123,9 +123,10 @@ function scriptPonte() {
   `;
 }
 
-async function abrirApp(page) {
+async function abrirApp(page, opcoes = {}) {
   await page.addInitScript(scriptPonte());
-  await page.goto(URL_UI);
+  // o Python passa o tema na URL para a splash nascer na cor certa
+  await page.goto(opcoes.tema ? `${URL_UI}?tema=${opcoes.tema}` : URL_UI);
   await page.evaluate(() => window.dispatchEvent(new Event("pywebviewready")));
 }
 

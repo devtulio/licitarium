@@ -29,6 +29,37 @@
          font-size:14px; transition:background .25s,color .25s; }
   .oculto { display:none !important; }
 
+  /* ══ splash: cobre a tela enquanto o acervo abre ══ */
+  #splash { position:fixed; inset:0; z-index:50; background:var(--bg);
+            display:flex; align-items:center; justify-content:center;
+            transition:opacity .35s ease; }
+  #splash.saindo { opacity:0; pointer-events:none; }
+  #splash .pilha { display:flex; flex-direction:column; align-items:center;
+                   gap:6px; }
+  #splash .cx { background:var(--surface); border:1px solid var(--border);
+                border-radius:8px; padding:22px 28px; display:flex; gap:18px;
+                align-items:center; box-shadow:0 10px 30px rgba(0,0,0,.14);
+                animation:sp-surge .6s ease-out both; }
+  #splash .cx.diploma { flex-direction:column; text-align:center; gap:4px;
+                        border-radius:4px;
+                        border-top:3px double #b08d3e;
+                        border-bottom:3px double #b08d3e; }
+  #splash .mark { font-size:24px; }
+  #splash .linha2 { font-size:11.5px; color:var(--muted); margin-top:3px; }
+  #splash .divisa { font-family:Georgia,serif; font-style:italic;
+                    font-size:11.5px; color:var(--muted); letter-spacing:.06em; }
+  #splash .barra { height:3px; background:var(--surface2); border-radius:2px;
+                   overflow:hidden; margin-top:12px; }
+  #splash .barra i { display:block; height:100%; width:12%; border-radius:2px;
+                     background:var(--accent); transition:width .4s ease; }
+  #splash .anel { position:relative; }
+  #splash .anel .giro { position:absolute; inset:-8px; border-radius:50%;
+                        border:2px solid transparent; border-top-color:#b08d3e;
+                        border-right-color:var(--accent);
+                        animation:sp-girar 1.2s linear infinite; }
+  @keyframes sp-surge { from { opacity:0; transform:translateY(8px); } }
+  @keyframes sp-girar { to { transform:rotate(360deg); } }
+
   .mark { font-family:Georgia,'Times New Roman',serif; letter-spacing:.16em; }
   .mark b { color:var(--mark-v); font-weight:400; }
   .marca { display:flex; align-items:center; gap:12px; }
@@ -262,6 +293,9 @@
 </style>
 </head>
 <body>
+
+<!-- ═══ SPLASH (montada antes de tudo, no tema vindo da URL) ═══ -->
+<div id="splash"></div>
 
 <!-- ═══ WIZARD ═══ -->
 <div id="wizard" class="oculto">
@@ -553,12 +587,64 @@ const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
                  ord:null, dir:"desc" };
 let api = null;
 
+// ── splash ────────────────────────────────────────────────────────────────
+// Composição por tema; o tema vem na URL (o Python já o lê do banco para
+// abrir a janela), então a splash nasce na cor certa, sem piscar.
+const SPLASH_POR_TEMA = {
+  portal: () => `<div class="cx">${SELO_SVG(60)}
+    <div><div class="mark">LICITARI<b>V</b>M</div>
+      <div class="linha2" id="splash-muni">Contratações públicas</div>
+      <div class="barra"><i id="splash-barra"></i></div></div></div>`,
+  pergaminho: () => `<div class="cx diploma">${ESTANDARTE_SVG(86)}
+    <div class="mark">LICITARI<b>V</b>M</div>
+    <div class="linha2" id="splash-muni">Contratações públicas</div>
+    <div class="barra" style="width:100%"><i id="splash-barra"></i></div></div>`,
+  observatorio: () => `<div class="pilha">
+    <div class="anel">${SELO_SVG(78)}<div class="giro"></div></div>
+    <div class="mark">LICITARI<b>V</b>M</div>
+    <div class="divisa">svb hasta pvblica</div>
+    <div class="barra" style="width:150px"><i id="splash-barra"></i></div></div>`,
+};
+const SELO_SVG = t =>
+  `<svg viewBox="0 0 64 64" aria-hidden="true" style="width:${t}px;height:${t}px;flex:none">${SELO}</svg>`;
+const ESTANDARTE_SVG = t =>
+  `<svg viewBox="0 0 64 64" aria-hidden="true" style="width:${t}px;height:${t}px">${ESTANDARTE}</svg>`;
+
+const splashInicio = Date.now();
+
+function montarSplash() {
+  const tema = new URLSearchParams(location.search).get("tema") || "portal";
+  document.documentElement.dataset.theme = tema;
+  $("splash").innerHTML = (SPLASH_POR_TEMA[tema] || SPLASH_POR_TEMA.portal)();
+}
+
+// a barra acompanha as etapas reais do carregamento, não um tempo inventado
+function progressoSplash(fracao, texto) {
+  const barra = $("splash-barra");
+  if (barra) barra.style.width = `${Math.round(fracao * 100)}%`;
+  if (texto && $("splash-muni")) $("splash-muni").textContent = texto;
+}
+
+function esconderSplash() {
+  const splash = $("splash");
+  if (!splash) return;
+  progressoSplash(1);
+  // piso de tempo: sem isso a splash pisca quando o acervo abre rápido
+  const espera = Math.max(0, 900 - (Date.now() - splashInicio));
+  setTimeout(() => {
+    splash.classList.add("saindo");
+    setTimeout(() => splash.remove(), 400);
+  }, espera);
+}
+montarSplash();
+
 // ── boot ──────────────────────────────────────────────────────────────────
 window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   document.querySelectorAll("#svg-estandarte-wiz, #svg-estandarte-sobre")
     .forEach(s => s.innerHTML = ESTANDARTE);
   $("svg-selo").innerHTML = SELO;
+  progressoSplash(0.35);
   const e = await api.get_estado();
   aplicarTema(e.tema || "portal", false);
   aplicarLargura(e.largura || "compacta", false);
@@ -611,6 +697,7 @@ $("cfg-maximizar").addEventListener("change", () =>
 // ── wizard ────────────────────────────────────────────────────────────────
 let wizEscolha = null;
 function iniciarWizard() {
+  esconderSplash();
   $("wizard").classList.remove("oculto");
   $("app").classList.add("oculto");
   const sel = $("wiz-uf");
@@ -654,10 +741,13 @@ async function iniciarApp(e) {
   $("sub-municipio").textContent =
     `Contratações públicas de ${e.municipio} · ${e.uf}`;
   api.set_titulo(`Licitarium — ${e.municipio}/${e.uf}`);
+  progressoSplash(0.6, `${e.municipio} · ${e.uf}`);
   mostrarUltimaSync(e.sincronizado_em);
   renderKpis(e.kpis);
   await carregarFiltros();
+  progressoSplash(0.85);
   await carregarLista();
+  esconderSplash();
   api.sincronizar();  // sync ao abrir (catch-up incremental)
   api.checar_atualizacao().then(at => {
     if (!at) return;

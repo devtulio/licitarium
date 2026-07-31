@@ -2,6 +2,12 @@
 
 ## Não lançado
 
+- **Tela de abertura (splash)** em dois estágios: uma imagem aparece assim que
+  o executável é aberto, enquanto o programa se prepara, e em seguida a tela
+  de abertura do próprio aplicativo — com composição própria para cada tema
+  (Portal: cartão com selo; Pergaminho: cartão com estandarte; Observatório:
+  selo com anel). A barra acompanha as etapas reais do carregamento.
+
 - Janela abre **maximizada** por padrão, com opção para desligar nas
   configurações.
 - Estado da sincronização e origem dos dados (PNCP · versão) movidos do

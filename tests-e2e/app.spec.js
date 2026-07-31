@@ -3,6 +3,29 @@ const { abrirApp } = require("./harness");
 
 test.beforeEach(async ({ page }) => abrirApp(page));
 
+test.describe("splash", () => {
+  test.use({ }); // testes que precisam da splash antes do app pronto
+
+  test("aparece no tema da URL e some quando o acervo abre",
+      async ({ page }) => {
+    // já montada pelo beforeEach: some sozinha ao fim do carregamento
+    await expect(page.locator("#splash")).toHaveCount(0, { timeout: 5000 });
+  });
+
+  for (const [tema, marca] of [["portal", ".cx"],
+                               ["pergaminho", ".cx.diploma"],
+                               ["observatorio", ".anel .giro"]]) {
+    test(`composição do tema ${tema}`, async ({ page }) => {
+      // impede o boot para inspecionar a splash em pé
+      await page.addInitScript(() => { window.__semBoot = true; });
+      await page.goto(`${require("./harness").URL_UI}?tema=${tema}`);
+      await expect(page.locator("#splash")).toBeVisible();
+      await expect(page.locator(`#splash ${marca}`)).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", tema);
+    });
+  }
+});
+
 test("boot: app abre com município, KPIs e alertas", async ({ page }) => {
   await expect(page.locator("#app")).toBeVisible();
   await expect(page.locator("#wizard")).toBeHidden();

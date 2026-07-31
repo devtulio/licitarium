@@ -184,6 +184,31 @@ decorativos com `aria-hidden`. Verificar contraste ao ajustar qualquer token.
   `prototipo-v2.html` (lista + temas), `selo-v1.html` a `selo-v5.html`
   (evolução do selo), `telas-v1.html` (wizard/detalhe/config).
 
+## 8.1 Tela de abertura (splash)
+
+Composição por tema, montada em `ui/index.html`:
+
+| Tema | Composição |
+|---|---|
+| Portal (padrão) | Cartão com selo, município e barra |
+| Pergaminho | Cartão com estandarte entre filetes duplos dourados |
+| Observatório | Selo com anel giratório e a divisa |
+
+- O **selo e o estandarte mantêm as cores da marca em qualquer tema**; só
+  fundo, texto e detalhes seguem a paleta ativa. Recolorir a marca por tema
+  enfraqueceria a identidade.
+- O tema chega pela **URL da janela** (`index.html?tema=…`), lida pelo Python
+  no banco antes de abrir: a splash nasce na cor certa, sem piscar.
+- A barra reflete **etapas reais** do carregamento (estado → município →
+  filtros → primeira lista), nunca um tempo inventado. Piso de 900 ms para a
+  splash não piscar quando o acervo abre rápido.
+- **Imagem estática do executável** (aparece durante a extração da runtime,
+  antes do Python subir): `design/splash.png`, gerada por
+  `design/gerar_splash.py` e declarada em `Licitarium.spec`; o app a encerra
+  em `main()` via `pyi_splash`.
+- Estudos: `design/splash-v1.html` (8 composições) e `design/splash-v2.html`
+  (composição × tema).
+
 ## 9. Arquivos da identidade
 
 ```
