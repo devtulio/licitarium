@@ -214,6 +214,16 @@ test("selo, título da janela e última sincronização no rodapé",
   await expect(page.locator("#sync-msg")).toContainText("Sincronizado");
 });
 
+test("abrir maximizada vem ligada e persiste ao desmarcar",
+    async ({ page }) => {
+  await page.locator("#btn-config").click();
+  await expect(page.locator("#cfg-maximizar")).toBeChecked();
+  await page.locator("#cfg-maximizar").uncheck();
+  const salvo = await page.evaluate(() => window.__chamadas.find(
+    c => c.metodo === "set_config" && c.k === "maximizar"));
+  expect(salvo.v).toBe("0");
+});
+
 test("densidade compacta aplica e persiste", async ({ page }) => {
   await page.locator("#btn-config").click();
   await page.locator("#cfg-densidade").selectOption("compacta");

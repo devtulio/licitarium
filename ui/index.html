@@ -454,6 +454,9 @@
         <option value="confortavel">Confortável — linhas com respiro</option>
         <option value="compacta">Compacta — mais registros na tela</option>
       </select>
+      <label class="check-filtro" style="margin-top:14px">
+        <input type="checkbox" id="cfg-maximizar"> Abrir a janela maximizada
+      </label>
       <label>Largura das colunas</label>
       <button class="btn ghost" id="btn-restaurar-colunas">
         Restaurar larguras padrão</button>
@@ -562,6 +565,7 @@ window.addEventListener("pywebviewready", async () => {
   aplicarFonte(e.fonte || "normal", false);
   aplicarDensidade(e.densidade || "confortavel", false);
   try { larguras = JSON.parse(e.colunas || "{}"); } catch { larguras = {}; }
+  $("cfg-maximizar").checked = (e.maximizar ?? "1") === "1";
   $("sobre-versao").textContent = e.versao;
   $("rodape-versao").textContent = `PNCP · dados públicos · v${e.versao}`;
   if (!e.ibge) { iniciarWizard(); return; }
@@ -601,6 +605,8 @@ function aplicarDensidade(v, salvar = true) {
 $("cfg-densidade").addEventListener("change",
   () => aplicarDensidade($("cfg-densidade").value));
 $("btn-restaurar-colunas").addEventListener("click", restaurarLarguras);
+$("cfg-maximizar").addEventListener("change", () =>
+  api.set_config("maximizar", $("cfg-maximizar").checked ? "1" : "0"));
 
 // ── wizard ────────────────────────────────────────────────────────────────
 let wizEscolha = null;

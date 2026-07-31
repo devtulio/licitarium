@@ -79,6 +79,7 @@ function scriptPonte() {
       get_estado: async () => ({ versao: "9.9.9", municipio: "Orindiúva",
         uf: "SP", ibge: "3534203", tema: "portal", largura: "compacta",
         fonte: "normal", densidade: "confortavel", colunas: "{}",
+        maximizar: "1",
         limite_dispensa_compras: "62639.92", limite_dispensa_obras: "125279.84",
         last_sync: "2026-07-29", sincronizado_em: "2026-07-29T14:32:00",
         kpis: { contratacoes: 131, homologado_ano: 10828702.73, vigentes: 47,

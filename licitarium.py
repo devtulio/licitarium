@@ -190,6 +190,7 @@ class Api:
                     "fonte": cfg.get("fonte", "normal"),
                     "densidade": cfg.get("densidade", "confortavel"),
                     "colunas": cfg.get("colunas", "{}"),
+                    "maximizar": cfg.get("maximizar", "1"),
                     "limite_dispensa_compras":
                         cfg.get("limite_dispensa_compras",
                                 str(relatorios.LIMITE_PADRAO_COMPRAS)),
@@ -236,7 +237,7 @@ class Api:
 
     def set_config(self, chave, valor):
         if chave not in ("tema", "largura", "fonte", "densidade",
-                         "colunas", "limite_dispensa_compras",
+                         "colunas", "maximizar", "limite_dispensa_compras",
                          "limite_dispensa_obras"):
             return False
         db = abrir_db()
@@ -754,12 +755,14 @@ def main():
     try:  # título já nasce com o município (a UI reconfirma no boot)
         municipio = pncp._config(db, "municipio_nome")
         uf = pncp._config(db, "municipio_uf")
+        # abre maximizado por padrão: as listas são largas
+        maximizar = (pncp._config(db, "maximizar") or "1") == "1"
     finally:
         db.close()
     titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
     api._janela = webview.create_window(
         titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
-        width=1100, height=740, min_size=(900, 600))
+        width=1100, height=740, min_size=(900, 600), maximized=maximizar)
     webview.start()
 
 

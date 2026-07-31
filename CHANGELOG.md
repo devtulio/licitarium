@@ -1,5 +1,12 @@
 # Changelog
 
+## Não lançado
+
+- Janela abre **maximizada** por padrão, com opção para desligar nas
+  configurações.
+- Estado da sincronização e origem dos dados (PNCP · versão) movidos do
+  rodapé para o cabeçalho, junto à marca; abas em caixa alta.
+
 ## 0.8.0 — 2026-07-30
 
 - **Colunas ajustáveis com o mouse**: arraste a borda direita de um cabeçalho
