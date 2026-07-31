@@ -34,8 +34,9 @@ guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
 - Busca, filtros por ano/modalidade/situação/órgão, detalhe completo de cada
   registro, link para a página oficial no PNCP e exportação CSV.
 - **Banco de preços**: cada item já contratado com valor unitário homologado e
-  fornecedor vencedor. Busque "papel A4" e veja menor preço, mediana, média e
-  maior preço já pagos — apoio direto à pesquisa de preços do art. 23.
+  fornecedor vencedor. Busque "papel A4" — palavras soltas, sem acento e pela
+  metade valem — e veja menor preço, mediana, média e maior preço já pagos:
+  apoio direto à pesquisa de preços do art. 23.
 - **Relatórios timbrados** prontos para o Tribunal de Contas: relações de
   contratações (com amparo legal e deságio), contratos e atas, resumo executivo
   anual e pesquisa de preços.

@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual do Licitarium v1.0.0</title>
+<title>Manual do Licitarium v1.1.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Manual do Licitarium v1.0.0"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Manual do Licitarium v1.1.0"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -70,7 +70,7 @@
           fill="#2b2115" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.0.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.1.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -142,6 +142,11 @@ proposta correndo) e <b>Vigentes</b> (contratos e atas).</p>
 <i>óleo lubrificante</i>, <i>pneu</i>). Aparece um resumo com <b>menor preço,
 mediana, média, maior preço</b>, quantos itens e quantos fornecedores, e
 abaixo a lista completa dos itens.</p>
+<p>A busca entende <b>palavras soltas</b>: <i>papel a4</i> encontra
+<i>PAPEL SULFITE A4 BRANCO</i>, na ordem que você digitar. Acentos não
+importam (<i>oleo</i> acha <i>ÓLEO</i>) e palavra pela metade vale como
+começo (<i>sulfit</i> acha <i>SULFITE</i>). Cada palavra a mais estreita o
+resultado, porque todas precisam aparecer no item.</p>
 <p>O botão <b>Relatório de pesquisa de preços</b> gera o documento timbrado
 com esse levantamento, do menor para o maior preço unitário — subsídio para a
 pesquisa de preços do art. 23 da Lei 14.133/2021. A caixa <b>Só com preço
@@ -183,8 +188,11 @@ processo no seu navegador.</p>
   <li><b>Sem internet:</b> o programa funciona normalmente com os dados locais
       e avisa que não conseguiu atualizar.</li>
   <li><b>Itens (banco de preços):</b> é a última etapa e a mais demorada, pois
-      consulta cada contratação individualmente. Depois da primeira carga, só
-      revisita processos novos ou alterados.</li>
+      consulta cada contratação individualmente — por isso é feita com várias
+      consultas simultâneas. Depois da primeira carga, só revisita processos
+      novos ou alterados.</li>
+  <li><b>Compactação:</b> quando o arquivo do acervo acumula espaço ocioso, o
+      Licitarium o compacta ao final da sincronização.</li>
 </ul>
 <p>O histórico das sincronizações (com eventuais erros) fica em
 <b>Configurações → Sincronizações recentes</b>.</p>

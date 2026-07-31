@@ -7,7 +7,9 @@ Endpoints /atualizacao permitem sync incremental por data de atualização.
 O JSON bruto de cada registro é guardado na coluna `raw` (fonte da verdade);
 as demais colunas são projeção para filtro/listagem.
 """
+import concurrent.futures
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -50,17 +52,42 @@ class PncpErro(Exception):
 
 _INTERVALO_MIN = 0.5  # s entre requisições — o PNCP tem throttling agressivo
 _ultima_req = 0.0
+_trava_pacing = threading.Lock()
+
+# a latência do PNCP é de ~0,9 s por chamada e ele tolera conexões
+# simultâneas: buscar os resultados de item em paralelo derruba a primeira
+# carga de ~20 min para poucos minutos
+CONEXOES_PARALELAS = 4
+_bloqueios = 0            # 429 observados; se insistirem, volta ao sequencial
+_trava_bloqueios = threading.Lock()
 
 
-def _get(caminho, params, tentativas=5, base=None):
-    """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados."""
+def _registrar_bloqueio():
+    global _bloqueios
+    with _trava_bloqueios:
+        _bloqueios += 1
+
+
+def _paralelismo_atual():
+    with _trava_bloqueios:
+        return 1 if _bloqueios >= 3 else CONEXOES_PARALELAS
+
+
+def _get(caminho, params, tentativas=5, base=None, pacing=True):
+    """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados.
+
+    Com pacing=False a espera entre chamadas é dispensada: quem controla o
+    ritmo passa a ser o número de conexões simultâneas.
+    """
     global _ultima_req
     url = f"{base or BASE}{caminho}?{urllib.parse.urlencode(params)}"
     for tentativa in range(tentativas):
-        espera = _INTERVALO_MIN - (time.monotonic() - _ultima_req)
-        if espera > 0:
-            time.sleep(espera)
-        _ultima_req = time.monotonic()
+        if pacing:
+            with _trava_pacing:
+                espera = _INTERVALO_MIN - (time.monotonic() - _ultima_req)
+                if espera > 0:
+                    time.sleep(espera)
+                _ultima_req = time.monotonic()
         try:
             req = urllib.request.Request(
                 url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
@@ -75,6 +102,7 @@ def _get(caminho, params, tentativas=5, base=None):
             if e.code == 204 or e.code == 404:
                 return None  # sem registros para o filtro
             if e.code == 429 and tentativa < tentativas - 1:
+                _registrar_bloqueio()
                 retry_after = e.headers.get("Retry-After")
                 time.sleep(int(retry_after) if (retry_after or "").isdigit()
                            else 5 * (tentativa + 1))
@@ -315,11 +343,11 @@ def _itens_da_compra(cnpj, ano, sequencial):
         pagina += 1
 
 
-def _resultado_do_item(cnpj, ano, sequencial, numero_item):
+def _resultado_do_item(cnpj, ano, sequencial, numero_item, pacing=True):
     """Resultado homologado de um item: vencedor e valor unitário fechado."""
     lote = _get(
         f"/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens/{numero_item}"
-        f"/resultados", {}, base=BASE_PNCP)
+        f"/resultados", {}, base=BASE_PNCP, pacing=pacing)
     if not lote:
         return None
     # o mais recente não cancelado é o que vale
@@ -379,14 +407,25 @@ def sync_itens(db, progresso=None, limite=None):
         if progresso:
             progresso(f"Itens — contratação {i} de {len(pendentes)}…")
         try:
-            for item in _itens_da_compra(c["orgao_cnpj"], c["ano"],
-                                         c["sequencial"]):
-                resultado = None
-                if item.get("temResultado"):
-                    resultado = _resultado_do_item(
-                        c["orgao_cnpj"], c["ano"], c["sequencial"],
-                        item["numeroItem"])
-                total += _upsert_item(db, c, item, resultado)
+            itens = list(_itens_da_compra(c["orgao_cnpj"], c["ano"],
+                                          c["sequencial"]))
+            # os resultados são independentes entre si: buscar em paralelo
+            com_resultado = [i for i in itens if i.get("temResultado")]
+            resultados = {}
+            if com_resultado:
+                conexoes = min(_paralelismo_atual(), len(com_resultado))
+                paralelo = conexoes > 1
+                with concurrent.futures.ThreadPoolExecutor(conexoes) as ex:
+                    futuros = {
+                        ex.submit(_resultado_do_item, c["orgao_cnpj"],
+                                  c["ano"], c["sequencial"], i["numeroItem"],
+                                  not paralelo): i["numeroItem"]
+                        for i in com_resultado}
+                    for f in concurrent.futures.as_completed(futuros):
+                        resultados[futuros[f]] = f.result()
+            for item in itens:
+                total += _upsert_item(db, c, item,
+                                      resultados.get(item.get("numeroItem")))
             db.execute("UPDATE contratacoes SET itens_versao=?,"
                        " itens_sync_em=? WHERE numero_controle=?",
                        (c["data_atualizacao"], datetime.now().isoformat(),
@@ -477,4 +516,11 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
     except PncpErro as e:
         _log(db, "itens", hoje, hoje, 0, "erro", str(e))
         resumo["itens"] = None
+
+    # devolve ao disco o espaço que as regravações deixaram para trás
+    # (200 páginas ≈ 0,8 MB; VACUUM do acervo municipal leva ~0,1 s)
+    if db.execute("PRAGMA freelist_count").fetchone()[0] > 200:
+        if progresso:
+            progresso("Compactando o acervo…")
+        db.execute("VACUUM")
     return resumo

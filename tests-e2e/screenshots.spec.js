@@ -13,6 +13,8 @@ for (const tema of ["portal", "pergaminho", "observatorio"]) {
       document.documentElement.dataset.theme = t;
     }, tema);
     await expect(page.locator(".linha:not(.cab)")).toHaveCount(3);
+    // a splash tem piso de 900 ms: sem esperar, o retrato sai dela
+    await expect(page.locator("#splash")).toBeHidden();
     await page.screenshot({ path: path.join(DESTINO, `${tema}.png`) });
   });
 }

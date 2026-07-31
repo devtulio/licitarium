@@ -229,6 +229,45 @@ def test_precos_na_ponte(api):
     assert [i["id"] for i in r["itens"]] == ["i1", "i2"]
 
 
+def test_busca_de_item_por_palavras_soltas(api):
+    db = licitarium.abrir_db()
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+        " numero_item, descricao, valor_unitario_homologado, fornecedor_nome)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        [("i1", "A", 2026, 1, 1, "PAPEL SULFITE A4 BRANCO", 18.0, "PAPELARIA"),
+         ("i2", "A", 2026, 1, 2, "CANETA ESFEROGRAFICA AZUL", 2.0, "X")])
+    db.commit()
+    db.close()
+    # ordem das palavras não importa, e nem precisa ser palavra inteira
+    for termo in ("papel a4", "a4 papel", "sulfite branc"):
+        assert [i["id"] for i in api.listar("itens", {"busca": termo})["itens"]] \
+            == ["i1"]
+    assert api.listar("itens", {"busca": "papel caneta"})["total"] == 0
+    assert api.listar("itens", {"busca": "papelaria"})["total"] == 1  # fornecedor
+    assert api.estatisticas_preco("a4 sulfite")["n"] == 1
+    # descrição que muda sai do índice junto
+    db = licitarium.abrir_db()
+    db.execute("UPDATE itens SET descricao='ENVELOPE' WHERE id='i1'")
+    db.commit()
+    db.close()
+    assert api.listar("itens", {"busca": "sulfite"})["total"] == 0
+    assert api.listar("itens", {"busca": "envelope"})["total"] == 1
+
+
+def test_indice_de_busca_reconstruido_em_banco_antigo(api, tmp_path):
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+               " numero_item, descricao) VALUES ('i9','A',2026,1,1,'MOUSE')")
+    # banco anterior ao FTS: dados nos itens, índice inexistente
+    db.execute("DROP TABLE itens_fts")
+    for t in ("ins", "del", "upd"):
+        db.execute(f"DROP TRIGGER tg_itens_fts_{t}")
+    db.commit()
+    db.close()
+    assert api.listar("itens", {"busca": "mouse"})["total"] == 1
+
+
 def test_filtro_ano_pca(api):
     assert api.listar("pca", {"ano": 2026})["total"] == 2
     assert api.listar("pca", {"ano": 2024})["total"] == 0

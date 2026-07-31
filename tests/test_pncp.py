@@ -174,7 +174,7 @@ def test_sync_itens_grava_resultado_e_marca_versao(db, monkeypatch):
                  "valorUnitarioHomologado": 18.75, "valorTotalHomologado": 1875.0,
                  "quantidadeHomologada": 100.0, "dataResultado": "2026-06-20"}
 
-    def fake_get(caminho, params, base=None):
+    def fake_get(caminho, params, base=None, pacing=True):
         assert base == pncp.BASE_PNCP
         if caminho.endswith("/resultados"):
             return [resultado]

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0 — 2026-07-31
+
+Versão de desempenho: a coleta ficou muito mais rápida e a busca do banco de
+preços passou a entender palavras soltas.
+
+**Novidades desta versão**
+
+- **Busca por palavras** no banco de preços e na aba Itens: digitar
+  `papel a4` encontra `PAPEL SULFITE A4 BRANCO` mesmo com as palavras fora de
+  ordem e separadas por outras. Acentos são ignorados (`oleo` acha `ÓLEO`) e
+  palavras incompletas valem como início (`sulfit` acha `SULFITE`). A busca
+  usa um índice de texto interno, então continua instantânea.
+- **Coleta de itens em paralelo**: a primeira sincronização, que percorre
+  todos os itens e seus vencedores, deixou de ser feita uma requisição por
+  vez. Se o PNCP começar a recusar as conexões, o programa volta sozinho ao
+  ritmo antigo.
+- **Compactação automática do acervo**: ao final da sincronização, quando o
+  arquivo tem muito espaço ocioso, ele é compactado.
+
 ## 1.0.0 — 2026-07-31
 
 Primeira versão estável. O acervo, os relatórios para o Tribunal de Contas,

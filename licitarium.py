@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.0.0"
+VERSAO = "1.1.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -86,6 +86,23 @@ CREATE INDEX IF NOT EXISTS ix_pca_ano ON pca_itens (ano);
 CREATE INDEX IF NOT EXISTS ix_itens_desc ON itens (descricao);
 CREATE INDEX IF NOT EXISTS ix_itens_contratacao ON itens (contratacao_controle);
 CREATE INDEX IF NOT EXISTS ix_itens_unit ON itens (valor_unitario_homologado);
+-- busca por palavras soltas nos itens: "papel a4" acha "PAPEL SULFITE A4"
+CREATE VIRTUAL TABLE IF NOT EXISTS itens_fts USING fts5(
+  descricao, fornecedor_nome, content='itens', content_rowid='rowid');
+CREATE TRIGGER IF NOT EXISTS tg_itens_fts_ins AFTER INSERT ON itens BEGIN
+  INSERT INTO itens_fts(rowid, descricao, fornecedor_nome)
+  VALUES (new.rowid, new.descricao, new.fornecedor_nome);
+END;
+CREATE TRIGGER IF NOT EXISTS tg_itens_fts_del AFTER DELETE ON itens BEGIN
+  INSERT INTO itens_fts(itens_fts, rowid, descricao, fornecedor_nome)
+  VALUES ('delete', old.rowid, old.descricao, old.fornecedor_nome);
+END;
+CREATE TRIGGER IF NOT EXISTS tg_itens_fts_upd AFTER UPDATE ON itens BEGIN
+  INSERT INTO itens_fts(itens_fts, rowid, descricao, fornecedor_nome)
+  VALUES ('delete', old.rowid, old.descricao, old.fornecedor_nome);
+  INSERT INTO itens_fts(rowid, descricao, fornecedor_nome)
+  VALUES (new.rowid, new.descricao, new.fornecedor_nome);
+END;
 """
 
 # whitelists p/ valores vindos do JS (tipo, coluna de ordenação)
@@ -178,8 +195,21 @@ def abrir_db():
     # config — sem isso, "database is locked" na primeira concorrência
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA busy_timeout=10000")
+    # o índice de busca nasce vazio; banco que já tinha itens precisa popular
+    # (COUNT(*) em tabela FTS externa lê o conteúdo, não serve de teste)
+    sem_fts = not db.execute("SELECT 1 FROM sqlite_master WHERE"
+                             " name='itens_fts'").fetchone()
     db.executescript(SCHEMA)
+    if sem_fts and db.execute("SELECT COUNT(*) FROM itens").fetchone()[0]:
+        db.execute("INSERT INTO itens_fts(itens_fts) VALUES('rebuild')")
+        db.commit()
     return db
+
+
+def _termo_fts(busca):
+    """Cada palavra vira prefixo obrigatório: "papel a4" -> papel* AND a4*."""
+    palavras = re.findall(r"[0-9A-Za-zÀ-ÿ]+", busca or "")
+    return " AND ".join(f'"{p}"*' for p in palavras) if palavras else None
 
 
 class Api:
@@ -374,14 +404,22 @@ class Api:
         if f.get("so_homologados") and tipo == "itens":
             where.append("valor_unitario_homologado IS NOT NULL")
         if f.get("busca"):
-            campos = {"contratacoes": ["objeto", "numero_controle"],
-                      "contratos": ["objeto", "fornecedor_nome",
-                                    "numero_controle", "numero_contrato"],
-                      "atas": ["numero_controle", "numero_ata", "objeto"],
-                      "pca": ["descricao", "grupo"],
-                      "itens": ["descricao", "fornecedor_nome"]}[tipo]
-            where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos) + ")")
-            args += [f"%{f['busca']}%"] * len(campos)
+            termo = _termo_fts(f["busca"]) if tipo == "itens" else None
+            if termo:
+                # palavras em qualquer ordem: "papel a4" acha "PAPEL ... A4"
+                where.append("rowid IN (SELECT rowid FROM itens_fts"
+                             " WHERE itens_fts MATCH ?)")
+                args.append(termo)
+            else:
+                campos = {"contratacoes": ["objeto", "numero_controle"],
+                          "contratos": ["objeto", "fornecedor_nome",
+                                        "numero_controle", "numero_contrato"],
+                          "atas": ["numero_controle", "numero_ata", "objeto"],
+                          "pca": ["descricao", "grupo"],
+                          "itens": ["descricao", "fornecedor_nome"]}[tipo]
+                where.append("(" + " OR ".join(f"{c} LIKE ?" for c in campos)
+                             + ")")
+                args += [f"%{f['busca']}%"] * len(campos)
         sql_where = (" WHERE " + " AND ".join(where)) if where else ""
         # ordenação por clique: só colunas da whitelist entram no SQL
         ordem = PADRAO_ORDEM[tipo]
@@ -427,8 +465,16 @@ class Api:
         'quanto pagamos por isso?' que instrui a pesquisa de preços."""
         if not (busca or "").strip():
             return None
-        where = ["valor_unitario_homologado IS NOT NULL", "descricao LIKE ?"]
-        args = [f"%{busca.strip()}%"]
+        termo = _termo_fts(busca)
+        where = ["valor_unitario_homologado IS NOT NULL"]
+        args = []
+        if termo:
+            where.append("rowid IN (SELECT rowid FROM itens_fts"
+                         " WHERE itens_fts MATCH ?)")
+            args.append(termo)
+        else:
+            where.append("descricao LIKE ?")
+            args.append(f"%{busca.strip()}%")
         if ano:
             where.append("ano=?")
             args.append(ano)

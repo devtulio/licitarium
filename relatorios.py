@@ -230,8 +230,16 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
 
 def dados_precos(db, termo, ano=None, orgao=None):
     """Histórico de preços unitários homologados para um termo de busca."""
-    where = ["valor_unitario_homologado IS NOT NULL", "descricao LIKE ?"]
-    args = [f"%{(termo or '').strip()}%"]
+    where = ["valor_unitario_homologado IS NOT NULL"]
+    args = []
+    palavras = re.findall(r"[0-9A-Za-zÀ-ÿ]+", termo or "")
+    if palavras:   # mesma busca por palavras da aba Preços
+        where.append("rowid IN (SELECT rowid FROM itens_fts"
+                     " WHERE itens_fts MATCH ?)")
+        args.append(" AND ".join(f'"{p}"*' for p in palavras))
+    else:
+        where.append("descricao LIKE ?")
+        args.append(f"%{(termo or '').strip()}%")
     if ano:
         where.append("ano=?")
         args.append(int(ano))

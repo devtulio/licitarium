@@ -85,7 +85,11 @@ sync_log      (id INTEGER PK, iniciado_em TEXT, tipo TEXT,
 Princípio: **`raw` (JSON completo do PNCP) é a fonte da verdade**; colunas são
 projeção para filtro/listagem. Campo novo na UI = reprojetar do raw, sem re-baixar.
 Índices: datas, modalidade, situação, orgao_cnpj. Busca textual: `LIKE` no objeto
-(volume municipal; FTS5 só se precisar).
+das contratações/contratos/atas (volume municipal não pede mais que isso). Nos
+**itens**, `LIKE` não servia — "papel a4" não acha "PAPEL SULFITE A4" — então
+entrou **FTS5** (`itens_fts`, external content sobre `itens`, sincronizada por
+triggers) com prefixo obrigatório por palavra. Banco anterior à 1.1.0 reconstrói
+o índice na primeira abertura.
 
 O banco é **cache reconstruível** — perdeu/corrompeu, re-bootstrap resolve.
 Sem sistema de backup próprio (diferente da família, onde o dado é produzido localmente).
@@ -143,7 +147,7 @@ Dados do usuário em `%LOCALAPPDATA%\Licitarium\licitarium.db`
 
 ## 8. Fora do escopo (por ora)
 
-Anexos/PDFs · FTS5 · multi-município na mesma instância · auto-update ·
+Anexos/PDFs · multi-município na mesma instância · auto-update ·
 assinatura de código (SmartScreen documentado no README) · cruzamento com SGCD/SGCA.
 
 ## 9. Decisões finais (2026-07-29)
