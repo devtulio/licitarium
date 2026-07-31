@@ -135,6 +135,11 @@ montada numa **hasta** de ponta lanceolada fincada numa linha de solo, com
 O par selo usa essa paleta fixa, **independente do tema ativo** — a marca não
 muda de cor com o tema (exceção: o V do wordmark, §2).
 
+Ressalva descoberta ao dar tema ao manual (1.1.0): o **exergo** do estandarte
+(filete + `MMXXVI`) é inscrito no *suporte*, não na pedra — desenhado em tinta
+fixa, ele desaparece no fundo escuro do Observatório. Exergo acompanha a cor do
+texto; pedra, hasta e sinete continuam fixos.
+
 ## 5. Os três temas
 
 Selecionáveis nas configurações, persistidos no banco; **Portal é o padrão**
@@ -151,6 +156,15 @@ Selecionáveis nas configurações, persistidos no banco; **Portal é o padrão*
 Tokens: `--bg --surface --surface2 --text --muted --border --accent --accent-fg
 --ok --warn --radius --pill --shadow --mark-v`. KPIs na tela inicial em todos os
 temas (herança da direção Observatório, promovida a recurso do produto).
+
+As três peles valem também para os **relatórios** (`relatorios.py:PALETAS`) e,
+desde a 1.1.0, para o **MANUAL.html** — que, por ser documento avulso, traz
+seletor próprio e guarda a escolha na mesma chave (`localStorage.tema`), de
+modo que o programa possa um dia abri-lo já no tema certo (`?tema=`). Em
+Portal e Observatório o corpo do manual troca a serifa por fonte de sistema;
+o wordmark segue serifado nos três, por ser marca. **Impressão ignora o tema
+da tela e sai sempre em Pergaminho** — papel é papel; mesma regra dos
+relatórios.
 
 ## 6. Tipografia
 

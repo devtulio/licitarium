@@ -18,6 +18,10 @@ preços passou a entender palavras soltas.
   ritmo antigo.
 - **Compactação automática do acervo**: ao final da sincronização, quando o
   arquivo tem muito espaço ocioso, ele é compactado.
+- **Manual com tema**: os três temas do programa (Pergaminho, Portal e
+  Observatório) também valem para o manual, com seletor no canto da página.
+  O estandarte da capa mantém as cores da marca em qualquer tema, e a
+  impressão sai sempre em pergaminho.
 
 ## 1.0.0 — 2026-07-31
 
