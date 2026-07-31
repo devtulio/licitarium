@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.4 — 2026-07-31
+
+- **Uma única tela de abertura**: a imagem fixa que aparecia logo ao clicar no
+  executável foi removida. Fica apenas a tela de abertura do aplicativo, que
+  acompanha o tema escolhido. O executável também ficou mais leve.
+
 ## 0.9.3 — 2026-07-31
 
 - **Fim da troca de tela na abertura**: a tela de abertura trocava de

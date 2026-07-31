@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.9.3
+Versão 0.9.4
 """
 import csv
 import json
@@ -21,7 +21,7 @@ import webview
 import pncp
 import relatorios
 
-VERSAO = "0.9.3"
+VERSAO = "0.9.4"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -769,7 +769,6 @@ def main():
     api._janela = webview.create_window(
         titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600), maximized=maximizar)
-    _fechar_splash_nativa()
     # armazenamento persistente: sem isso o WebView2 abre um perfil novo a
     # cada execução e o localStorage (usado como reserva pela splash) some
     webview.start(private_mode=False, storage_path=str(DIR_DADOS / "webview"))
@@ -791,19 +790,6 @@ def _escrever_tema_da_splash(tema):
             f'window.__TEMA = "{tema}";\n', encoding="utf-8")
     except OSError:
         pass  # sem permissão de escrita: a página cai no tema padrão
-
-
-def _fechar_splash_nativa():
-    """Encerra a imagem que o PyInstaller mostra durante a extração.
-
-    O módulo pyi_splash só existe dentro do exe empacotado; rodando do
-    código-fonte não há nada para fechar.
-    """
-    try:
-        import pyi_splash
-        pyi_splash.close()
-    except Exception:
-        pass
 
 
 if __name__ == "__main__":

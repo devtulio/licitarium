@@ -202,10 +202,12 @@ Composição por tema, montada em `ui/index.html`:
 - A barra reflete **etapas reais** do carregamento (estado → município →
   filtros → primeira lista), nunca um tempo inventado. Piso de 900 ms para a
   splash não piscar quando o acervo abre rápido.
-- **Imagem estática do executável** (aparece durante a extração da runtime,
-  antes do Python subir): `design/splash.png`, gerada por
-  `design/gerar_splash.py` e declarada em `Licitarium.spec`; o app a encerra
-  em `main()` via `pyi_splash`.
+- **Imagem estática do executável: removida na 0.9.4.** `design/splash.png` e
+  `design/gerar_splash.py` seguem no repositório como referência, mas o
+  `Splash()` saiu do `Licitarium.spec`: a imagem é fixa (não acompanha o
+  tema) e aparecia antes da splash temática, dando a impressão de duas
+  aberturas em sequência. Se um dia voltar, precisa ser neutra o bastante
+  para servir aos três temas.
 - Estudos: `design/splash-v1.html` (8 composições) e `design/splash-v2.html`
   (composição × tema).
 
