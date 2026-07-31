@@ -89,6 +89,11 @@ CREATE INDEX IF NOT EXISTS ix_itens_unit ON itens (valor_unitario_homologado);
 """
 
 # whitelists p/ valores vindos do JS (tipo, coluna de ordenação)
+# webview.SAVE_DIALOG foi marcado como obsoleto; FileDialog.SAVE é o
+# substituto (mesmo valor). Mantém compatibilidade com versões anteriores.
+DIALOGO_SALVAR = getattr(getattr(webview, "FileDialog", None), "SAVE",
+                         None) or webview.SAVE_DIALOG
+
 TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
            "atas": "atas", "pca": "pca_itens", "itens": "itens"}
 CHAVES = {"pca": "id", "itens": "id"}  # demais usam numero_controle
@@ -773,7 +778,7 @@ class Api:
             if not linhas:
                 return {"ok": False, "erro": "gere a minuta antes de exportar"}
             destino = self._janela.create_file_dialog(
-                webview.SAVE_DIALOG, save_filename=f"minuta_pca_{ano}.csv",
+                DIALOGO_SALVAR, save_filename=f"minuta_pca_{ano}.csv",
                 file_types=("CSV (*.csv)",))
             if not destino:
                 return {"ok": False, "erro": None}
@@ -786,7 +791,7 @@ class Api:
         if tipo not in TABELAS:
             return {"ok": False, "erro": "tipo inválido"}
         destino = self._janela.create_file_dialog(
-            webview.SAVE_DIALOG, save_filename=f"{tipo}.csv",
+            DIALOGO_SALVAR, save_filename=f"{tipo}.csv",
             file_types=("CSV (*.csv)",))
         if not destino:
             return {"ok": False, "erro": None}  # cancelado
