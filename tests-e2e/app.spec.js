@@ -12,6 +12,20 @@ test.describe("splash", () => {
     await expect(page.locator("#splash")).toHaveCount(0, { timeout: 5000 });
   });
 
+  test("primeira abertura: sem tema guardado, assume o do banco",
+      async ({ page }) => {
+    // sem localStorage a splash nasce em Portal; ao saber o tema do banco
+    // (pergaminho) ela é remontada na composição certa, ainda visível
+    await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
+    await abrirApp(page, { temaBanco: "pergaminho" });
+    await expect(page.locator("#splash .cx.diploma")).toBeVisible();
+    await expect(page.locator("html"))
+      .toHaveAttribute("data-theme", "pergaminho");
+    // e fica guardado para a próxima abertura já nascer certa
+    expect(await page.evaluate(() => localStorage.getItem("tema")))
+      .toBe("pergaminho");
+  });
+
   for (const [tema, marca] of [["portal", ".cx"],
                                ["pergaminho", ".cx.diploma"],
                                ["observatorio", ".anel .giro"]]) {

@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.9.1
+Versão 0.9.2
 """
 import csv
 import json
@@ -21,7 +21,7 @@ import webview
 import pncp
 import relatorios
 
-VERSAO = "0.9.1"
+VERSAO = "0.9.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -762,14 +762,15 @@ def main():
     finally:
         db.close()
     titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
-    # caminho simples: o pywebview resolve pelo _MEIPASS dentro do exe.
-    # (URI file:// com query string faz o WebView2 procurar um arquivo
-    # chamado "index.html?tema=..." e falhar com ERR_FILE_NOT_FOUND)
+    # caminho puro, sem query nem fragmento: é a única forma comprovada de
+    # o WebView2 achar o arquivo dentro do exe (ver CHANGELOG 0.9.1)
     api._janela = webview.create_window(
         titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600), maximized=maximizar)
     _fechar_splash_nativa()
-    webview.start()
+    # armazenamento persistente: sem isso o WebView2 abre um perfil novo a
+    # cada execução e o localStorage (usado como reserva pela splash) some
+    webview.start(private_mode=False, storage_path=str(DIR_DADOS / "webview"))
 
 
 def _fechar_splash_nativa():

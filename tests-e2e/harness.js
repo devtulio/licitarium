@@ -71,13 +71,15 @@ const DADOS = {
 };
 
 // serializada para dentro do addInitScript (roda no contexto da página)
-function scriptPonte() {
+function scriptPonte(temaBanco = "portal") {
   return `
     window.__chamadas = [];
+    window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
     window.pywebview = { api: {
       get_estado: async () => ({ versao: "9.9.9", municipio: "Orindiúva",
-        uf: "SP", ibge: "3534203", tema: "portal", largura: "compacta",
+        uf: "SP", ibge: "3534203", tema: window.__temaBanco,
+        largura: "compacta",
         fonte: "normal", densidade: "confortavel", colunas: "{}",
         maximizar: "1",
         limite_dispensa_compras: "62639.92", limite_dispensa_obras: "125279.84",
@@ -124,7 +126,7 @@ function scriptPonte() {
 }
 
 async function abrirApp(page, opcoes = {}) {
-  await page.addInitScript(scriptPonte());
+  await page.addInitScript(scriptPonte(opcoes.temaBanco || "portal"));
   // o Python passa o tema na URL para a splash nascer na cor certa
   await page.goto(opcoes.tema ? `${URL_UI}?tema=${opcoes.tema}` : URL_UI);
   await page.evaluate(() => window.dispatchEvent(new Event("pywebviewready")));

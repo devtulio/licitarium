@@ -114,14 +114,19 @@ def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):
         capturado.update(titulo=titulo, url=url, kw=kw)
         return object()
     monkeypatch.setattr(licitarium.webview, "create_window", falso_create_window)
-    monkeypatch.setattr(licitarium.webview, "start", lambda: None)
+    monkeypatch.setattr(licitarium.webview, "start",
+                        lambda **kw: capturado.update(start=kw))
     licitarium.main()
 
     url = capturado["url"]
-    assert "?" not in url and not url.startswith("file:")
+    assert "?" not in url and "#" not in url and not url.startswith("file:")
     assert url.endswith("index.html")
     assert Path(url).exists()          # o arquivo tem de existir de verdade
     assert capturado["kw"]["maximized"] is True
+    # armazenamento próprio: sem isso o WebView2 esquece o tema a cada
+    # execução e a splash volta sempre ao padrão
+    assert capturado["start"]["private_mode"] is False
+    assert str(tmp_path) in capturado["start"]["storage_path"]
 
 
 def test_script_atualizacao():

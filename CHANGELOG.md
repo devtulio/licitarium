@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2 — 2026-07-31
+
+- **Tela de abertura no tema certo**: a janela passou a usar armazenamento
+  próprio, então a preferência de tema sobrevive ao fechamento do programa —
+  antes o navegador embutido abria um perfil novo a cada execução e a tela de
+  abertura caía sempre na composição padrão. Na primeira abertura após esta
+  atualização, a tela é remontada assim que o tema é lido do banco.
+
 ## 0.9.1 — 2026-07-31
 
 - **Correção crítica**: o executável da 0.9.0 abria com "Arquivo não

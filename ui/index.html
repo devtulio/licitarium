@@ -615,8 +615,8 @@ const splashInicio = Date.now();
 // o tema fica espelhado no localStorage só para a splash nascer na cor
 // certa antes de qualquer consulta; o banco segue sendo a fonte da verdade
 function temaSalvo() {
-  // parâmetro da URL tem prioridade (serve para testes e depuração); no uso
-  // normal quem manda é o localStorage, escrito a cada troca de tema
+  // parâmetro de URL só existe em teste/depuração; no app o tema vem do
+  // localStorage, que persiste porque a janela usa armazenamento próprio
   const daUrl = new URLSearchParams(location.search).get("tema");
   if (daUrl) return daUrl;
   try { return localStorage.getItem("tema") || "portal"; }
@@ -657,7 +657,14 @@ window.addEventListener("pywebviewready", async () => {
   $("svg-selo").innerHTML = SELO;
   progressoSplash(0.35);
   const e = await api.get_estado();
-  aplicarTema(e.tema || "portal", false);
+  // primeira abertura (sem tema guardado ainda): remonta a splash na
+  // composição certa em vez de deixá-la no tema padrão até o fim
+  const temaBanco = e.tema || "portal";
+  if (temaBanco !== temaSalvo() && $("splash")) {
+    try { localStorage.setItem("tema", temaBanco); } catch {}
+    montarSplash();
+  }
+  aplicarTema(temaBanco, false);
   aplicarLargura(e.largura || "compacta", false);
   aplicarFonte(e.fonte || "normal", false);
   aplicarDensidade(e.densidade || "confortavel", false);
