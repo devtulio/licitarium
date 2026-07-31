@@ -16,6 +16,8 @@ test.describe("splash", () => {
       async ({ page }) => {
     // cenário de fallback — o arquivo do Python não chegou; a splash nasce
     // no padrão e é remontada quando o tema do banco é lido
+    // sem tema.js algum: cenário de reserva
+    await page.route("**/tema.js", r => r.fulfill({ status: 404, body: "" }));
     await page.addInitScript(() => {
       delete window.__TEMA;
       try { localStorage.clear(); } catch {}
@@ -33,8 +35,11 @@ test.describe("splash", () => {
                                ["pergaminho", ".cx.diploma"],
                                ["observatorio", ".anel .giro"]]) {
     test(`composição do tema ${tema}`, async ({ page }) => {
-      // reproduz o que o Python faz: grava o tema antes de a página abrir
-      await page.addInitScript(t => { window.__TEMA = t; }, tema);
+      // serve o tema.js como o Python o escreve (interceptar o arquivo, e
+      // não injetar a variável: o próprio arquivo do app a sobrescreveria)
+      await page.route("**/tema.js", r =>
+        r.fulfill({ contentType: "application/javascript",
+                    body: `window.__TEMA = "${tema}";` }));
       await page.goto(require("./harness").URL_UI);
       await expect(page.locator("#splash")).toBeVisible();
       await expect(page.locator(`#splash ${marca}`)).toBeVisible();
@@ -243,6 +248,22 @@ test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
     c => c.metodo === "editar_item_minuta"));
   expect(chamadas.map(c => c.campos)).toEqual([
     { quantidade: 300 }, { incluir: 0 }]);
+});
+
+test("modal do PCA ocupa a janela e a descrição tem espaço", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.locator("#btn-pca").click();
+  await page.locator("#pca-gerar").click();
+  await expect(page.locator("#pca-lista .linha:not(.cab)")).toHaveCount(2);
+  const m = await page.evaluate(() => {
+    const modal = document.querySelector("#veu-pca .modal");
+    const desc = document.querySelector(
+      '#pca-lista .linha:not(.cab) [data-campo="descricao"]');
+    return { modal: modal.clientWidth, janela: window.innerWidth,
+             descricao: desc.clientWidth };
+  });
+  expect(m.modal).toBeGreaterThan(m.janela * 0.9);   // usa a janela toda
+  expect(m.descricao).toBeGreaterThan(700);          // nome do item legível
 });
 
 test("parâmetros do PCA chegam ao motor", async ({ page }) => {

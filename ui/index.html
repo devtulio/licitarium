@@ -249,6 +249,9 @@
   /* com modal aberto o fundo não rola: a roda do mouse fica no diálogo */
   body.travado { overflow:hidden; }
   .modal { width:min(760px, 100%); padding:0; }
+  /* telas de trabalho (montar PCA) usam quase toda a janela: a largura
+     precisa vir do width — max-width sozinho não alarga o min() acima */
+  .modal.largo { width:min(1600px, 96vw); }
   .mhead { padding:18px 20px; display:flex; justify-content:space-between;
            gap:14px; align-items:flex-start; }
   .mhead h1 { font-size:16px; line-height:1.4; font-weight:600; }
@@ -282,7 +285,8 @@
     width:100%; padding:3px 6px; font-size:12.5px; }
   .linha .aviso-un { color:var(--warn); cursor:help; }
   .linha .tag-unico { font-size:9.5px; color:var(--warn); letter-spacing:.04em; }
-  #pca-lista { max-height:46vh; overflow-y:auto; }
+  #pca-lista { max-height:58vh; overflow-y:auto; }
+  .veu { padding-top:24px; }
   .cfg { padding:18px 20px; margin-bottom:14px; }
   .cfg h2 { font-size:14px; margin-bottom:10px; }
   .tcards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
@@ -428,7 +432,7 @@
 <!-- ═══ MONTAR PCA ═══ -->
 <div id="veu-pca" class="veu oculto" role="dialog" aria-modal="true"
      aria-label="Montar minuta do PCA">
-  <div class="card modal" style="max-width:1180px">
+  <div class="card modal largo">
     <div class="mhead">
       <div><h1>Montar minuta do PCA</h1>
         <div class="dim">Consolida o que o município já contratou e projeta o
