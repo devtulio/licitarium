@@ -100,6 +100,30 @@ def test_validar_exe_recusa_quando_nao_abre(api, monkeypatch):
     assert chamadas[0][1] == "--verificar"
 
 
+def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):
+    """Dentro do exe o pywebview resolve o caminho pelo _MEIPASS.
+
+    URI file:// (ainda mais com query string) faz o WebView2 procurar um
+    arquivo chamado "index.html?tema=..." e falhar com ERR_FILE_NOT_FOUND.
+    """
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "j.db")
+    capturado = {}
+
+    def falso_create_window(titulo, url, **kw):
+        capturado.update(titulo=titulo, url=url, kw=kw)
+        return object()
+    monkeypatch.setattr(licitarium.webview, "create_window", falso_create_window)
+    monkeypatch.setattr(licitarium.webview, "start", lambda: None)
+    licitarium.main()
+
+    url = capturado["url"]
+    assert "?" not in url and not url.startswith("file:")
+    assert url.endswith("index.html")
+    assert Path(url).exists()          # o arquivo tem de existir de verdade
+    assert capturado["kw"]["maximized"] is True
+
+
 def test_script_atualizacao():
     from pathlib import PureWindowsPath
     s = licitarium._script_atualizacao(

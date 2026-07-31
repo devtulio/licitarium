@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.9.0
+Versão 0.9.1
 """
 import csv
 import json
@@ -21,8 +21,10 @@ import webview
 import pncp
 import relatorios
 
-VERSAO = "0.9.0"
-DIR_APP = Path(__file__).resolve().parent
+VERSAO = "0.9.1"
+# dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
+# _MEIPASS é o caminho oficial para chegar até eles
+DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 DIR_DADOS = Path.home() / "AppData" / "Local" / "Licitarium"
 ARQUIVO_DB = DIR_DADOS / "licitarium.db"
 
@@ -757,14 +759,14 @@ def main():
         uf = pncp._config(db, "municipio_uf")
         # abre maximizado por padrão: as listas são largas
         maximizar = (pncp._config(db, "maximizar") or "1") == "1"
-        tema = pncp._config(db, "tema") or "portal"
     finally:
         db.close()
     titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
-    # o tema vai na URL para a splash já nascer na cor certa (sem piscar)
-    url = (DIR_APP / "ui" / "index.html").as_uri() + f"?tema={tema}"
+    # caminho simples: o pywebview resolve pelo _MEIPASS dentro do exe.
+    # (URI file:// com query string faz o WebView2 procurar um arquivo
+    # chamado "index.html?tema=..." e falhar com ERR_FILE_NOT_FOUND)
     api._janela = webview.create_window(
-        titulo, url, js_api=api,
+        titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600), maximized=maximizar)
     _fechar_splash_nativa()
     webview.start()

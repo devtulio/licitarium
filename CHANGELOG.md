@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.1 — 2026-07-31
+
+- **Correção crítica**: o executável da 0.9.0 abria com "Arquivo não
+  encontrado". A tela era carregada por um endereço com parâmetro
+  (`index.html?tema=…`) que funciona ao rodar pelo código-fonte, mas dentro
+  do executável faz o navegador embutido procurar um arquivo com esse nome
+  literal. O tema da tela de abertura passou a ser lido do armazenamento
+  local do próprio aplicativo.
+
 ## 0.9.0 — 2026-07-30
 
 - **Tela de abertura (splash)** em dois estágios: uma imagem aparece assim que

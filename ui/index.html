@@ -612,8 +612,19 @@ const ESTANDARTE_SVG = t =>
 
 const splashInicio = Date.now();
 
+// o tema fica espelhado no localStorage só para a splash nascer na cor
+// certa antes de qualquer consulta; o banco segue sendo a fonte da verdade
+function temaSalvo() {
+  // parâmetro da URL tem prioridade (serve para testes e depuração); no uso
+  // normal quem manda é o localStorage, escrito a cada troca de tema
+  const daUrl = new URLSearchParams(location.search).get("tema");
+  if (daUrl) return daUrl;
+  try { return localStorage.getItem("tema") || "portal"; }
+  catch { return "portal"; }
+}
+
 function montarSplash() {
-  const tema = new URLSearchParams(location.search).get("tema") || "portal";
+  const tema = temaSalvo();
   document.documentElement.dataset.theme = tema;
   $("splash").innerHTML = (SPLASH_POR_TEMA[tema] || SPLASH_POR_TEMA.portal)();
 }
@@ -660,6 +671,7 @@ window.addEventListener("pywebviewready", async () => {
 
 function aplicarTema(tema, salvar = true) {
   document.documentElement.dataset.theme = tema;
+  try { localStorage.setItem("tema", tema); } catch { /* sem storage: ok */ }
   document.querySelectorAll(".tcard").forEach(c =>
     c.classList.toggle("on", c.dataset.tema === tema));
   if (salvar && api) api.set_config("tema", tema);
