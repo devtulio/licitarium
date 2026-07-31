@@ -197,11 +197,16 @@
   .vazio svg { width:74px; height:74px; opacity:.28; margin-bottom:6px; }
   .vazio p { margin-bottom:12px; }
 
-  .rodape { display:flex; justify-content:space-between; align-items:center;
-            margin-top:12px; font-size:12px; color:var(--muted); gap:10px; flex-wrap:wrap; }
-  .rodape .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
-                 background:var(--ok); margin-right:6px; }
-  .rodape .dot.rodando { background:var(--warn); animation:pulsa 1s infinite; }
+  .rodape { display:flex; justify-content:center; align-items:center;
+            margin-top:12px; font-size:12px; color:var(--muted); }
+  /* estado da sincronização e origem dos dados ficam no topo, junto à marca */
+  .info-topo { margin-left:auto; margin-right:18px; text-align:right;
+               font-size:11.5px; line-height:1.6; color:var(--muted);
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+               min-width:0; }
+  .info-topo .dot { display:inline-block; width:8px; height:8px;
+                    border-radius:50%; background:var(--ok); margin-right:6px; }
+  .info-topo .dot.rodando { background:var(--warn); animation:pulsa 1s infinite; }
   @keyframes pulsa { 50% { opacity:.35; } }
   .paginacao { display:flex; gap:6px; align-items:center; }
 
@@ -284,6 +289,11 @@
       <svg viewBox="0 0 64 64" aria-hidden="true" id="svg-selo"></svg>
       <div class="mark">LICITARI<b>V</b>M<small id="sub-municipio"></small></div>
     </div>
+    <div class="info-topo">
+      <div id="sync-status"><span class="dot" id="sync-dot"></span>
+        <span id="sync-msg">–</span></div>
+      <div id="rodape-versao">PNCP · dados públicos</div>
+    </div>
     <div style="display:flex; gap:8px">
       <button class="btn ghost" id="btn-relatorios">Relatórios</button>
       <button class="btn ghost" id="btn-config">Configurações</button>
@@ -335,14 +345,11 @@
     </div>
     <div class="card lista" id="lista"></div>
     <div class="rodape">
-      <span id="sync-status"><span class="dot" id="sync-dot"></span>
-        <span id="sync-msg">–</span></span>
       <div class="paginacao">
         <button class="btn ghost" id="pag-ant" aria-label="Página anterior">‹</button>
         <span id="pag-info" class="dim"></span>
         <button class="btn ghost" id="pag-prox" aria-label="Próxima página">›</button>
       </div>
-      <span id="rodape-versao">PNCP · dados públicos</span>
     </div>
   </main>
 </div>
