@@ -195,6 +195,23 @@ pyinstaller --clean Licitarium.spec  # gera dist/Licitarium.exe
 A cada push, o CI roda os testes de Python e de interface no Windows; ao marcar
 uma tag `v*`, compila o executável e o anexa à release.
 
+## Sistemas irmãos
+
+Cinco sistemas livres para a administração pública municipal. Os quatro
+primeiros compartilham a mesma arquitetura (servidor Python + SQLite +
+frontend single-file, multiusuário em rede local); o Licitarium é um
+programa de desktop e apenas lê dados públicos.
+
+| Sistema | Cuida de | |
+|---|---|---|
+| **SGCD** — Contratação Direta | dispensas de licitação, do pedido ao contrato | [repositório](https://github.com/devtulio/sgcd) |
+| **SGCA** — Contratos e Atas | contratos administrativos e atas de registro de preços | [repositório](https://github.com/devtulio/sgca) |
+| **SGDP** — Documentos da Procuradoria | leis, decretos, portarias, pareceres e ofícios | [repositório](https://github.com/devtulio/sgdp) |
+| **SGEA** — Estoque do Almoxarifado | entradas, saídas, lote e validade com FEFO | [repositório](https://github.com/devtulio/sgea) |
+| **Licitarium** — Repositório do PNCP | espelho local das contratações do município | **(este)** |
+
+---
+
 ## Como citar
 
 Cada versão recebe um DOI no Zenodo. O DOI acima resolve sempre para a versão
