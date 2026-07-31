@@ -115,7 +115,7 @@ class Api:
 
 Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(...)")`.
 
-## 6. UI (ui/index.html, single-file)
+## 6. UI (ui/, três arquivos)
 
 - **4 abas**: Contratações | Contratos | Atas | PCA. Lista paginada com filtros:
   ano, modalidade, situação, órgão, busca no objeto.
@@ -127,6 +127,11 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
 - **Config**: município (trocar = confirmação + re-bootstrap), órgãos (CNPJs), tema.
 - Acessibilidade WCAG 2.1 AA (padrão da casa). Sem login — desktop single-user,
   dado 100% público.
+- Nasceu single-file; na 1.1.0 virou `index.html` + `estilo.css` + `app.js`,
+  quando o arquivo passou de 1.700 linhas. Para **por aí**: `app.js` continua
+  um script clássico. Fatiar em ES modules exigiria `type="module"`, e o
+  pywebview abre o index por caminho de arquivo — CORS bloqueia módulo em
+  `file://` e a janela abriria em branco.
 
 ## 7. Layout do repositório
 
@@ -134,7 +139,9 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
 Licitarium/
   licitarium.py        # entry: janela + classe Api
   pncp.py              # cliente da API de consulta + motor de sync
-  ui/index.html        # UI completa (CSS/JS inline)
+  ui/index.html        # marcação
+  ui/estilo.css        # três peles por data-theme
+  ui/app.js            # lógica + ponte com o Python
   ui/municipios.json   # tabela IBGE (código, nome, UF)
   tests/               # pytest: sync com HTTP mockado, upsert, catch-up
   Licitarium.spec      # PyInstaller (onefile, windowed, ícone)

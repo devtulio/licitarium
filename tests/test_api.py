@@ -1,4 +1,5 @@
 """Testes da ponte Api (listar/ordenação/detalhe) com banco temporário."""
+import re
 import sys
 from pathlib import Path
 
@@ -98,6 +99,22 @@ def test_validar_exe_recusa_quando_nao_abre(api, monkeypatch):
     assert api._validar_exe("C:/x/novo.exe") is False
     assert len(chamadas) == 3                      # tentou 3 vezes
     assert chamadas[0][1] == "--verificar"
+
+
+def test_assets_da_ui_existem_ao_lado_do_index():
+    """CSS e JS saíram do index.html (1.1.0) e viraram arquivos vizinhos.
+
+    O pywebview abre o index por caminho de arquivo: href/src relativo que
+    não exista no disco vira tela sem estilo, ou sem app, e sem erro visível.
+    """
+    ui = licitarium.DIR_APP / "ui"
+    html = (ui / "index.html").read_text(encoding="utf-8")
+    refs = re.findall(r'(?:href|src)="([^":]+)"', html)
+    assert {"estilo.css", "app.js", "tema.js"} <= set(refs)
+    for ref in refs:
+        assert (ui / ref).exists() or ref == "tema.js", ref  # tema.js é gerado
+    # nada de CSS/JS solto sobrando no HTML
+    assert "<style>" not in html and "<script>" not in html
 
 
 def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):

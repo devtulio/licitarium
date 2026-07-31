@@ -18,6 +18,9 @@ preços passou a entender palavras soltas.
   ritmo antigo.
 - **Compactação automática do acervo**: ao final da sincronização, quando o
   arquivo tem muito espaço ocioso, ele é compactado.
+- **Organização do código**: a interface, que era um arquivo único de 1.713
+  linhas, virou três (`ui/index.html`, `ui/estilo.css`, `ui/app.js`). Nada
+  muda para quem usa o programa.
 - **Manual com tema**: os três temas do programa (Pergaminho, Portal e
   Observatório) também valem para o manual, com seletor no canto da página.
   O estandarte da capa mantém as cores da marca em qualquer tema, e a
