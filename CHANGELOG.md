@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.9.0 — 2026-07-30
 
 - **Tela de abertura (splash)** em dois estágios: uma imagem aparece assim que
   o executável é aberto, enquanto o programa se prepara, e em seguida a tela
