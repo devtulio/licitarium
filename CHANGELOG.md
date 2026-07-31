@@ -1,6 +1,11 @@
 # Changelog
 
-## Não lançado
+## 1.0.0 — 2026-07-31
+
+Primeira versão estável. O acervo, os relatórios para o Tribunal de Contas,
+o banco de preços e a montagem do PCA estão completos e em uso real.
+
+**Novidades desta versão**
 
 - **Montar PCA**: novo módulo que usa o histórico de itens contratados para
   sugerir o Plano de Contratações Anual do próximo exercício. Agrupa por
@@ -10,6 +15,16 @@
   Sinaliza unidades divergentes e itens de ocorrência única. A lista é
   editável e os ajustes manuais sobrevivem a uma nova geração.
 - Exportação da minuta em CSV e novo relatório **Minuta do PCA**.
+- **Revisão em famílias**: os itens são agrupados por tipo (PNEU, FILTRO,
+  FRALDA…) e a lista pode ser filtrada por família.
+- **Curva ABC**: cada item recebe classe conforme o peso no valor total,
+  mostrando onde concentrar a revisão.
+- **Mesclar e dividir itens**: junta o que o agrupamento separou
+  indevidamente, somando quantidades e ponderando o preço pelo volume; dá
+  para desfazer a qualquer momento.
+- Novo aviso de **preço disperso** (grupo cujo maior preço é muitas vezes o
+  menor, sinal de lote lançado como item único) e agrupamento que ignora
+  aberturas de edital como "aquisição de" e "contratação de empresa para".
 
 ## 0.9.4 — 2026-07-31
 
