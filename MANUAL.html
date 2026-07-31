@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual do Licitarium v1.1.0</title>
+<title>Manual do Licitarium v1.1.1</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Manual do Licitarium v1.1.0"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Manual do Licitarium v1.1.1"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.1.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.1.1</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -270,7 +270,7 @@ processo no seu navegador.</p>
   <li><b>Itens (banco de preços):</b> é a última etapa e a mais demorada, pois
       consulta cada contratação individualmente — por isso é feita com várias
       consultas simultâneas. Depois da primeira carga, só revisita processos
-      novos ou alterados.</li>
+      novos ou alterados e, dentro deles, só os itens que mudaram.</li>
   <li><b>Compactação:</b> quando o arquivo do acervo acumula espaço ocioso, o
       Licitarium o compacta ao final da sincronização.</li>
 </ul>
@@ -419,8 +419,11 @@ Não é erro de coleta: é como o processo foi registrado no PNCP. Use a mediana
 e confira a descrição, a unidade e a quantidade de cada linha antes de tomar um
 valor como referência.</p>
 <h3>A primeira carga está lenta</h3>
-<p>Normal. O PNCP limita a frequência de consultas e o Licitarium respeita esse
-limite (meio segundo entre requisições) para não ser bloqueado.</p>
+<p>Normal: é todo o histórico do município desde 2021, e o PNCP responde uma
+consulta por vez. O Licitarium usa várias consultas simultâneas e, se o portal
+começar a recusar, reduz o ritmo sozinho — voltando ao normal assim que ele se
+recupera. As atualizações seguintes são muito mais rápidas, porque só buscam o
+que mudou.</p>
 <h3>Apareceu "falha na sincronização"</h3>
 <p>Quase sempre indisponibilidade momentânea do PNCP ou falta de internet.
 Os dados locais permanecem intactos; sincronize de novo mais tarde. Detalhes do

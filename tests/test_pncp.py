@@ -51,18 +51,33 @@ def test_paginar_percorre_todas_as_paginas(monkeypatch):
         2: {"data": [{"n": 3}], "totalPaginas": 2},
     }
     monkeypatch.setattr(pncp, "_get",
-                        lambda caminho, params: paginas[params["pagina"]])
+                        lambda caminho, params, **kw: paginas[params["pagina"]])
     itens = list(pncp._paginar("/x", {}, 50))
     assert [i["n"] for i in itens] == [1, 2, 3]
 
 
 def test_paginar_sem_dados(monkeypatch):
-    monkeypatch.setattr(pncp, "_get", lambda caminho, params: None)
+    monkeypatch.setattr(pncp, "_get", lambda caminho, params, **kw: None)
     assert list(pncp._paginar("/x", {}, 50)) == []
 
 
+def test_baixar_nao_perde_nem_duplica_consulta(monkeypatch):
+    """Fases 1 e 2 baixam em paralelo: os lotes chegam fora de ordem."""
+    monkeypatch.setattr(pncp, "_get", lambda caminho, params, **kw:
+                        {"data": [{"de": params["q"]}], "totalPaginas": 1}
+                        if params["pagina"] == 1 else None)
+    consultas = [(f"r{i}", {"q": i}) for i in range(12)]
+    colhido = list(pncp._baixar("/x", consultas, 50))
+    assert sorted(r for r, _ in colhido) == sorted(r for r, _ in consultas)
+    assert sorted(l[0]["de"] for _, l in colhido) == list(range(12))
+    # sem paralelismo o resultado é o mesmo, só que na ordem de entrada
+    monkeypatch.setattr(pncp, "_paralelismo_atual", lambda: 1)
+    assert [r for r, _ in pncp._baixar("/x", consultas, 50)] == \
+        [r for r, _ in consultas]
+
+
 def test_sync_contratacoes_idempotente(db, monkeypatch):
-    def fake_get(caminho, params):
+    def fake_get(caminho, params, **kw):
         if params["codigoModalidadeContratacao"] == 8 and params["pagina"] == 1:
             return {"data": [contratacao("PNCP-1"), contratacao("PNCP-2")],
                     "totalPaginas": 1}
@@ -80,7 +95,7 @@ def test_sync_contratacoes_idempotente(db, monkeypatch):
 
 
 def test_descobrir_orgaos(db, monkeypatch):
-    monkeypatch.setattr(pncp, "_get", lambda c, p:
+    monkeypatch.setattr(pncp, "_get", lambda c, p, **kw:
         {"data": [contratacao("A", cnpj="11111111000111"),
                   contratacao("B", cnpj="22222222000122")], "totalPaginas": 1}
         if p["codigoModalidadeContratacao"] == 8 and p["pagina"] == 1 else None)
@@ -99,7 +114,7 @@ def test_descobrir_orgaos(db, monkeypatch):
 def test_sincronizar_tudo_continua_apos_falha(db, monkeypatch):
     servido = []  # 1 registro numa única janela (como na API real, em que
                   # o item só aparece na janela da sua dataAtualizacao)
-    def fake_get(caminho, params, base=None):
+    def fake_get(caminho, params, base=None, **kw):
         if base == pncp.BASE_PNCP:
             return None            # fase 3 (itens) sem dados neste teste
         if "contratos" in caminho:
@@ -137,7 +152,7 @@ def test_sync_pca_idempotente_e_parametros(db, monkeypatch):
                  {"numeroItem": 2, "descricaoItem": "Consultoria",
                   "nomeClassificacaoCatalogo": "Serviço",
                   "quantidadeEstimada": 1.0, "valorTotal": 30000.0}]}
-    def fake_get(caminho, params):
+    def fake_get(caminho, params, **kw):
         assert "pca" in caminho
         params_vistos.append(params)
         if params["pagina"] == 1 and not servido:
@@ -168,13 +183,14 @@ def test_sync_itens_grava_resultado_e_marca_versao(db, monkeypatch):
     item = {"numeroItem": 1, "descricao": "PAPEL A4", "unidadeMedida": "RESMA",
             "quantidade": 100.0, "valorUnitarioEstimado": 24.9,
             "valorTotal": 2490.0, "temResultado": True,
+            "dataAtualizacao": "2026-06-20",
             "materialOuServicoNome": "Material",
             "situacaoCompraItemNome": "Homologado"}
     resultado = {"niFornecedor": "999", "nomeRazaoSocialFornecedor": "FORN X",
                  "valorUnitarioHomologado": 18.75, "valorTotalHomologado": 1875.0,
                  "quantidadeHomologada": 100.0, "dataResultado": "2026-06-20"}
 
-    def fake_get(caminho, params, base=None, pacing=True):
+    def fake_get(caminho, params, base=None, **kw):
         assert base == pncp.BASE_PNCP
         if caminho.endswith("/resultados"):
             return [resultado]
@@ -191,10 +207,76 @@ def test_sync_itens_grava_resultado_e_marca_versao(db, monkeypatch):
     assert db.execute("SELECT itens_versao FROM contratacoes").fetchone()[0] \
         == "2026-07-01"
     assert pncp.sync_itens(db) == 0
-    # contratação alterada no PNCP volta para a fila
+    # contratação alterada no PNCP volta para a fila, mas o item continua o
+    # mesmo: relê a listagem e para por aí, sem regravar nada
     db.execute("UPDATE contratacoes SET data_atualizacao='2026-07-15'")
     db.commit()
+    assert pncp.sync_itens(db) == 0
+    # item alterado de verdade é recoletado
+    item["dataAtualizacao"] = "2026-07-14"
+    item["valorUnitarioEstimado"] = 26.0
+    db.execute("UPDATE contratacoes SET data_atualizacao='2026-07-16'")
+    db.commit()
     assert pncp.sync_itens(db) == 1
+    assert db.execute(
+        "SELECT valor_unitario_estimado FROM itens").fetchone()[0] == 26.0
+
+
+def test_item_inalterado_nao_custa_requisicao_nem_apaga_preco(db, monkeypatch):
+    """A economia da revisita não pode custar o preço já homologado.
+
+    `_upsert_item` é INSERT OR REPLACE: regravar um item sem ter buscado o
+    resultado zeraria o valor homologado. Item inalterado é pulado inteiro.
+    """
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, data_atualizacao, data_publicacao)"
+        " VALUES ('C9', 2026, 7, '111', 'v1', '2026-01-01')")
+    db.execute(
+        "INSERT INTO itens (id, contratacao_controle, numero_item, descricao,"
+        " data_atualizacao, tem_resultado, valor_unitario_homologado)"
+        " VALUES ('C9#1', 'C9', 1, 'CANETA', '2026-05-05', 1, 3.5)")
+    db.commit()
+    item = {"numeroItem": 1, "descricao": "CANETA", "temResultado": True,
+            "dataAtualizacao": "2026-05-05"}
+    caminhos = []
+
+    def fake_get(caminho, params, base=None, **kw):
+        caminhos.append(caminho)
+        if caminho.endswith("/itens"):
+            return [item] if params.get("pagina") == 1 else []
+        return [{"valorUnitarioHomologado": 99.0}]   # não deve ser chamado
+    monkeypatch.setattr(pncp, "_get", fake_get)
+
+    assert pncp.sync_itens(db) == 0
+    assert not any(c.endswith("/resultados") for c in caminhos)
+    assert db.execute(
+        "SELECT valor_unitario_homologado FROM itens").fetchone()[0] == 3.5
+
+    # resultado que faltou (coleta interrompida) é buscado mesmo com a
+    # dataAtualizacao intacta — ela não muda por causa disso
+    db.execute("UPDATE itens SET valor_unitario_homologado=NULL")
+    db.execute("UPDATE contratacoes SET itens_versao=NULL")
+    db.commit()
+    assert pncp.sync_itens(db) == 1
+    assert db.execute(
+        "SELECT valor_unitario_homologado FROM itens").fetchone()[0] == 99.0
+
+
+def test_paralelismo_recupera_depois_da_janela(monkeypatch):
+    """429 da fase 1 não pode deixar a fase 3 sequencial para sempre."""
+    monkeypatch.setattr(pncp, "_bloqueios", pncp.collections.deque())
+    agora = [1000.0]
+    monkeypatch.setattr(pncp.time, "monotonic", lambda: agora[0])
+
+    assert pncp._paralelismo_atual() == pncp.CONEXOES_PARALELAS
+    pncp._registrar_bloqueio()
+    assert pncp._paralelismo_atual() == 2          # recuo intermediário
+    pncp._registrar_bloqueio()
+    pncp._registrar_bloqueio()
+    assert pncp._paralelismo_atual() == 1          # rajada: sequencial
+    agora[0] += pncp.JANELA_BLOQUEIOS + 1
+    assert pncp._paralelismo_atual() == pncp.CONEXOES_PARALELAS
 
 
 def test_sync_itens_sem_resultado_nao_busca_vencedor(db, monkeypatch):
@@ -204,7 +286,7 @@ def test_sync_itens_sem_resultado_nao_busca_vencedor(db, monkeypatch):
     db.commit()
     caminhos = []
 
-    def fake_get(caminho, params, base=None):
+    def fake_get(caminho, params, base=None, **kw):
         caminhos.append(caminho)
         if caminho.endswith("/itens"):
             return ([{"numeroItem": 7, "descricao": "CANETA",
@@ -222,7 +304,7 @@ def test_sync_pca_respeita_data_minima(db, monkeypatch):
     """Endpoint rejeita dataInicio < 2021-04-01; janela deve ser cortada."""
     datas = []
     monkeypatch.setattr(pncp, "_get",
-                        lambda c, p: datas.append(p["dataInicio"]))
+                        lambda c, p, **kw: datas.append(p["dataInicio"]))
     pncp.sync_pca(db, "1", date(2021, 1, 1), date(2021, 6, 1))
     assert datas and min(datas) == "20210401"
     datas.clear()
@@ -233,7 +315,7 @@ def test_sync_pca_respeita_data_minima(db, monkeypatch):
 def test_sync_incremental_com_sobreposicao(db, monkeypatch):
     """Segunda rodada parte de last_sync - 1 dia (catch-up seguro)."""
     chamadas = []
-    def fake_get(caminho, params):
+    def fake_get(caminho, params, **kw):
         if "contratacoes" in caminho:
             chamadas.append(params["dataInicial"])
         return None

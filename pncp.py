@@ -7,6 +7,7 @@ Endpoints /atualizacao permitem sync incremental por data de atualização.
 O JSON bruto de cada registro é guardado na coluna `raw` (fonte da verdade);
 as demais colunas são projeção para filtro/listagem.
 """
+import collections
 import concurrent.futures
 import json
 import threading
@@ -58,19 +59,34 @@ _trava_pacing = threading.Lock()
 # simultâneas: buscar os resultados de item em paralelo derruba a primeira
 # carga de ~20 min para poucos minutos
 CONEXOES_PARALELAS = 4
-_bloqueios = 0            # 429 observados; se insistirem, volta ao sequencial
+# Só contam os 429 RECENTES. Contador acumulado desde o início do processo não
+# serve: a fase 1 costuma levar 3 bloqueios logo de saída (medido: 3 em 13
+# requisições), e isso deixava a fase 3 sequencial para sempre — justo a fase
+# que precisa do paralelismo. Com a janela, uma rajada antiga não pesa mais.
+JANELA_BLOQUEIOS = 120  # s
+_bloqueios = collections.deque()  # instantes dos 429 observados
 _trava_bloqueios = threading.Lock()
 
 
 def _registrar_bloqueio():
-    global _bloqueios
     with _trava_bloqueios:
-        _bloqueios += 1
+        _bloqueios.append(time.monotonic())
+
+
+def _bloqueios_recentes():
+    limite = time.monotonic() - JANELA_BLOQUEIOS
+    with _trava_bloqueios:
+        while _bloqueios and _bloqueios[0] < limite:
+            _bloqueios.popleft()
+        return len(_bloqueios)
 
 
 def _paralelismo_atual():
-    with _trava_bloqueios:
-        return 1 if _bloqueios >= 3 else CONEXOES_PARALELAS
+    """Recua por degraus e volta sozinho quando o portal para de reclamar."""
+    n = _bloqueios_recentes()
+    if n >= 3:
+        return 1
+    return 2 if n else CONEXOES_PARALELAS
 
 
 def _get(caminho, params, tentativas=5, base=None, pacing=True):
@@ -118,18 +134,38 @@ def _get(caminho, params, tentativas=5, base=None, pacing=True):
             raise PncpErro(f"sem conexão com o PNCP ({e})") from e
 
 
-def _paginar(caminho, params, tamanho_pagina):
+def _paginar(caminho, params, tamanho_pagina, pacing=True):
     """Itera todos os registros de todas as páginas de uma consulta."""
     pagina = 1
     while True:
         dados = _get(caminho, {**params, "pagina": pagina,
-                               "tamanhoPagina": tamanho_pagina})
+                               "tamanhoPagina": tamanho_pagina},
+                     pacing=pacing)
         if not dados or not dados.get("data"):
             return
         yield from dados["data"]
         if pagina >= dados.get("totalPaginas", 1):
             return
         pagina += 1
+
+
+def _baixar(caminho, consultas, tamanho_pagina):
+    """Baixa várias consultas independentes e devolve (rótulo, registros).
+
+    Só as requisições vão para as threads — a gravação fica com quem chama,
+    numa conexão só. Os lotes chegam fora de ordem, por isso o rótulo.
+    """
+    conexoes = min(_paralelismo_atual(), len(consultas))
+    if conexoes <= 1:
+        for rotulo, params in consultas:
+            yield rotulo, list(_paginar(caminho, params, tamanho_pagina))
+        return
+    with concurrent.futures.ThreadPoolExecutor(conexoes) as ex:
+        futuros = {ex.submit(lambda p=p: list(_paginar(
+            caminho, p, tamanho_pagina, pacing=False))): rotulo
+            for rotulo, p in consultas}
+        for f in concurrent.futures.as_completed(futuros):
+            yield futuros[f], f.result()
 
 
 def _janelas(inicio, fim, max_dias=JANELA_MAX_DIAS):
@@ -231,19 +267,25 @@ def _upsert_ata(db, item):
 # ── fases de sincronização ──────────────────────────────────────────────────
 
 def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None):
-    """Fase 1: contratações do município, por modalidade e janela de datas."""
+    """Fase 1: contratações do município, por modalidade e janela de datas.
+
+    São 13 modalidades × janelas de data, todas independentes — a API exige
+    o loop por modalidade mesmo quando a maioria não devolve nada para um
+    município pequeno. Baixadas em paralelo; a gravação segue sequencial.
+    """
+    consultas = [(nome, {"dataInicial": _amd(a), "dataFinal": _amd(b),
+                         "codigoModalidadeContratacao": codigo,
+                         "codigoMunicipioIbge": codigo_ibge})
+                 for codigo, nome in MODALIDADES.items()
+                 for a, b in _janelas(inicio, fim)]
     total = 0
-    for codigo, nome in MODALIDADES.items():
+    for feitas, (nome, lote) in enumerate(
+            _baixar("/v1/contratacoes/atualizacao", consultas, 50), 1):
         if progresso:
-            progresso(f"Contratações — {nome}…")
-        for a, b in _janelas(inicio, fim):
-            for item in _paginar("/v1/contratacoes/atualizacao",
-                                 {"dataInicial": _amd(a), "dataFinal": _amd(b),
-                                  "codigoModalidadeContratacao": codigo,
-                                  "codigoMunicipioIbge": codigo_ibge},
-                                 tamanho_pagina=50):
-                total += _upsert_contratacao(db, item)
-            db.commit()  # transação curta por janela: não segurar trava
+            progresso(f"Contratações — {nome} ({feitas}/{len(consultas)})…")
+        for item in lote:
+            total += _upsert_contratacao(db, item)
+        db.commit()  # transação curta por lote: não segurar trava
     return total
 
 
@@ -258,27 +300,27 @@ def descobrir_orgaos(db):
 
 def sync_contratos(db, cnpj, inicio, fim, progresso=None):
     """Fase 2: contratos de um órgão (API não filtra por município)."""
-    total = 0
-    for a, b in _janelas(inicio, fim):
-        for item in _paginar("/v1/contratos/atualizacao",
-                             {"dataInicial": _amd(a), "dataFinal": _amd(b),
-                              "cnpjOrgao": cnpj},
-                             tamanho_pagina=500):
-            total += _upsert_contrato(db, item)
-        db.commit()  # transação curta por janela
-    return total
+    return _sync_por_janela(db, "/v1/contratos/atualizacao", _upsert_contrato,
+                            {"cnpjOrgao": cnpj}, inicio, fim)
 
 
 def sync_atas(db, cnpj, inicio, fim, progresso=None):
     """Fase 2: atas de registro de preços de um órgão."""
+    return _sync_por_janela(db, "/v1/atas/atualizacao", _upsert_ata,
+                            {"cnpj": cnpj}, inicio, fim)
+
+
+def _sync_por_janela(db, caminho, upsert, params, inicio, fim,
+                     chaves_data=("dataInicial", "dataFinal")):
+    """Baixa as janelas de data em paralelo e grava sequencialmente."""
+    ini, fi = chaves_data
+    consultas = [(a, {**params, ini: _amd(a), fi: _amd(b)})
+                 for a, b in _janelas(inicio, fim)]
     total = 0
-    for a, b in _janelas(inicio, fim):
-        for item in _paginar("/v1/atas/atualizacao",
-                             {"dataInicial": _amd(a), "dataFinal": _amd(b),
-                              "cnpj": cnpj},
-                             tamanho_pagina=500):
-            total += _upsert_ata(db, item)
-        db.commit()  # transação curta por janela
+    for _, lote in _baixar(caminho, consultas, 500):
+        for item in lote:
+            total += upsert(db, item)
+        db.commit()  # transação curta por lote
     return total
 
 
@@ -315,18 +357,12 @@ def sync_pca(db, cnpj, inicio, fim, progresso=None):
     Atenção: este endpoint usa dataInicio/dataFim — os demais usam
     dataInicial/dataFinal (verificado contra a API real em 2026-07-29).
     """
-    total = 0
     inicio = max(inicio, DATA_INICIO_PCA)  # endpoint rejeita datas anteriores
     if inicio > fim:
         return 0
-    for a, b in _janelas(inicio, fim):
-        for plano in _paginar("/v1/pca/atualizacao",
-                              {"dataInicio": _amd(a), "dataFim": _amd(b),
-                               "cnpj": cnpj},
-                              tamanho_pagina=500):
-            total += _upsert_pca(db, plano)
-        db.commit()  # transação curta por janela
-    return total
+    return _sync_por_janela(db, "/v1/pca/atualizacao", _upsert_pca,
+                            {"cnpj": cnpj}, inicio, fim,
+                            chaves_data=("dataInicio", "dataFim"))
 
 
 def _itens_da_compra(cnpj, ano, sequencial):
@@ -387,12 +423,43 @@ def _upsert_item(db, contratacao, item, resultado):
     return 1
 
 
+def _itens_pendentes(db, contratacao, itens):
+    """Filtra os itens que realmente precisam ser (re)gravados.
+
+    O PNCP mexe na dataAtualizacao da *contratação* por motivo cosmético e
+    isso devolvia a compra inteira para a fila: medido no acervo real,
+    1.815 requisições de resultado para zero item alterado. A listagem de
+    itens já traz a dataAtualizacao de cada um — comparar com a gravada
+    reduz isso à requisição da própria listagem.
+
+    Item inalterado é pulado por completo, e não regravado sem resultado:
+    `_upsert_item` faz INSERT OR REPLACE, então regravar com resultado nulo
+    apagaria o preço homologado.
+    """
+    gravados = {r["numero_item"]: r for r in db.execute(
+        """SELECT numero_item, data_atualizacao, valor_unitario_homologado
+           FROM itens WHERE contratacao_controle=?""",
+        (contratacao["numero_controle"],))}
+
+    def pendente(item):
+        antigo = gravados.get(item.get("numeroItem"))
+        if antigo is None or antigo["data_atualizacao"] != item.get("dataAtualizacao"):
+            return True
+        # resultado que ficou faltando (coleta interrompida antes dele) não
+        # se conserta sozinho: a dataAtualizacao do item não muda por isso
+        return bool(item.get("temResultado")) and \
+            antigo["valor_unitario_homologado"] is None
+
+    return [i for i in itens if pendente(i)]
+
+
 def sync_itens(db, progresso=None, limite=None):
     """Fase 3: itens e resultados das contratações — o banco de preços.
 
-    Custa uma requisição por contratação mais uma por item com resultado, e
-    por isso só visita contratação nova ou alterada desde a última coleta
-    (itens_versao guarda a dataAtualizacao vigente naquele momento).
+    Custa uma requisição por contratação mais uma por item *alterado* que
+    tenha resultado, e por isso só visita contratação nova ou alterada desde
+    a última coleta (itens_versao guarda a dataAtualizacao vigente naquele
+    momento) — e, dentro dela, só os itens que mudaram (_itens_pendentes).
     """
     pendentes = [dict(r) for r in db.execute(
         """SELECT numero_controle, orgao_cnpj, ano, sequencial, data_atualizacao
@@ -407,8 +474,9 @@ def sync_itens(db, progresso=None, limite=None):
         if progresso:
             progresso(f"Itens — contratação {i} de {len(pendentes)}…")
         try:
-            itens = list(_itens_da_compra(c["orgao_cnpj"], c["ano"],
-                                          c["sequencial"]))
+            itens = _itens_pendentes(
+                db, c, _itens_da_compra(c["orgao_cnpj"], c["ano"],
+                                        c["sequencial"]))
             # os resultados são independentes entre si: buscar em paralelo
             com_resultado = [i for i in itens if i.get("temResultado")]
             resultados = {}

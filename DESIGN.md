@@ -54,6 +54,20 @@ Fase 2 — CONTRATOS / ATAS / PCA (chave: CNPJ do órgão)
   normal com dados locais + aviso.
 - **Concorrência**: uma thread de sync por vez (lock); UI nunca bloqueia —
   abre com dados locais na hora, sync roda atrás com banner de progresso.
+- **Paralelismo (1.1.x)**: as três fases baixam com até 4 conexões (`_baixar`
+  na 1 e 2, executor próprio na 3). Só as *requisições* vão para as threads —
+  a gravação fica na conexão de quem chamou. Em paralelo o pacing de 0,5 s é
+  dispensado: quem regula o ritmo passa a ser o número de conexões.
+  Medido contra a API real: 4 conexões sem pacing fazem 13 consultas em 0,9 s
+  sem nenhum 429, enquanto a versão sequencial com pacing levava 38 s.
+  O recuo por 429 usa **janela de tempo** (`JANELA_BLOQUEIOS`), nunca contador
+  acumulado: o portal oscila (502/503 e 429 em rajada, sem relação com a nossa
+  taxa), e um contador que só cresce desligava o paralelismo para sempre.
+- **Revisita de itens**: `data_atualizacao` da contratação muda por motivo
+  cosmético e não implica item alterado — `_itens_pendentes` compara a data de
+  cada item antes de pedir o resultado. Item inalterado é pulado inteiro, e
+  não regravado: `_upsert_item` é INSERT OR REPLACE e apagaria o preço
+  homologado se fosse regravado sem o resultado em mãos.
 
 ## 4. Esquema SQLite
 

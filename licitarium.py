@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 1.0.0
+A versão vigente é a constante VERSAO, logo abaixo — e só ela.
 """
 import csv
 import json
@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.1.0"
+VERSAO = "1.1.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))

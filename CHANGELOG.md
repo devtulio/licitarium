@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.1 — 2026-07-31
+
+Sincronização muito mais rápida. Medido no acervo real, numa atualização
+depois de uma semana sem abrir o programa: **de 20 minutos para 33 segundos**,
+e de 1.724 para 69 consultas ao PNCP.
+
+**Correções**
+
+- A coleta em paralelo introduzida na 1.1.0 se desligava sozinha e não voltava
+  mais: bastavam três recusas do PNCP — comuns logo no início — para o
+  programa cair no ritmo lento pelo resto da execução, justamente na etapa
+  mais demorada. Agora só contam as recusas recentes, e o ritmo volta ao
+  normal assim que o portal se acalma.
+
+**Melhorias**
+
+- **Itens que não mudaram não são mais reconsultados.** O PNCP altera a data
+  da contratação por motivos que não têm nada a ver com os itens dela, e isso
+  fazia o programa rebuscar o preço de todos eles. Medido: 1.815 consultas
+  para nenhum item alterado. Agora a data de cada item é comparada antes.
+- **Editais, contratos, atas e PCA são baixados em paralelo**, como já
+  acontecia com os itens. A etapa dos editais caiu de 38 s para 4,5 s.
+
 ## 1.1.0 — 2026-07-31
 
 Versão de desempenho: a coleta ficou muito mais rápida e a busca do banco de
