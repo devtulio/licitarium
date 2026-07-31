@@ -108,6 +108,9 @@ def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):
     """
     monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
     monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "j.db")
+    # não escrever ui/tema.js de verdade: sujaria a árvore do projeto
+    temas = []
+    monkeypatch.setattr(licitarium, "_escrever_tema_da_splash", temas.append)
     capturado = {}
 
     def falso_create_window(titulo, url, **kw):
@@ -127,6 +130,19 @@ def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):
     # execução e a splash volta sempre ao padrão
     assert capturado["start"]["private_mode"] is False
     assert str(tmp_path) in capturado["start"]["storage_path"]
+    # o tema é entregue à página antes de a janela abrir
+    assert temas == ["portal"]
+
+
+def test_tema_da_splash_gravado_e_validado(tmp_path, monkeypatch):
+    monkeypatch.setattr(licitarium, "DIR_APP", tmp_path)
+    (tmp_path / "ui").mkdir()
+    licitarium._escrever_tema_da_splash("pergaminho")
+    assert (tmp_path / "ui" / "tema.js").read_text(encoding="utf-8") \
+        == 'window.__TEMA = "pergaminho";\n'
+    # valor fora da lista vira o padrão (o arquivo entra na página como JS)
+    licitarium._escrever_tema_da_splash("'; alert(1); //")
+    assert '"portal"' in (tmp_path / "ui" / "tema.js").read_text(encoding="utf-8")
 
 
 def test_script_atualizacao():

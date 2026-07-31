@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3 — 2026-07-31
+
+- **Fim da troca de tela na abertura**: a tela de abertura trocava de
+  composição no meio do carregamento — nascia numa e era substituída por
+  outra ao ler o tema. O tema passou a ser entregue à interface antes de ela
+  carregar, então a composição correta aparece já no primeiro instante e
+  permanece.
+
 ## 0.9.2 — 2026-07-31
 
 - **Tela de abertura no tema certo**: a janela passou a usar armazenamento

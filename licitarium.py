@@ -1,7 +1,7 @@
 """Licitarium — repositório local de contratações públicas municipais (PNCP).
 
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
-Versão 0.9.2
+Versão 0.9.3
 """
 import csv
 import json
@@ -21,7 +21,7 @@ import webview
 import pncp
 import relatorios
 
-VERSAO = "0.9.2"
+VERSAO = "0.9.3"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -759,8 +759,10 @@ def main():
         uf = pncp._config(db, "municipio_uf")
         # abre maximizado por padrão: as listas são largas
         maximizar = (pncp._config(db, "maximizar") or "1") == "1"
+        tema = pncp._config(db, "tema") or "portal"
     finally:
         db.close()
+    _escrever_tema_da_splash(tema)
     titulo = f"Licitarium — {municipio}/{uf}" if municipio else "Licitarium"
     # caminho puro, sem query nem fragmento: é a única forma comprovada de
     # o WebView2 achar o arquivo dentro do exe (ver CHANGELOG 0.9.1)
@@ -771,6 +773,24 @@ def main():
     # armazenamento persistente: sem isso o WebView2 abre um perfil novo a
     # cada execução e o localStorage (usado como reserva pela splash) some
     webview.start(private_mode=False, storage_path=str(DIR_DADOS / "webview"))
+
+
+def _escrever_tema_da_splash(tema):
+    """Entrega o tema à página antes de ela carregar.
+
+    A splash precisa da cor certa no primeiro quadro, e nem URL nem
+    localStorage servem: a URL não aceita parâmetro dentro do exe e o
+    localStorage vive numa origem cuja porta muda a cada execução. Um
+    arquivo ao lado do index.html é lido de forma síncrona pelo navegador,
+    então a composição já nasce correta.
+    """
+    if tema not in ("portal", "pergaminho", "observatorio"):
+        tema = "portal"
+    try:
+        (DIR_APP / "ui" / "tema.js").write_text(
+            f'window.__TEMA = "{tema}";\n', encoding="utf-8")
+    except OSError:
+        pass  # sem permissão de escrita: a página cai no tema padrão
 
 
 def _fechar_splash_nativa():

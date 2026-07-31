@@ -294,7 +294,12 @@
 </head>
 <body>
 
-<!-- ═══ SPLASH (montada antes de tudo, no tema vindo da URL) ═══ -->
+<!-- tema gravado pelo Python antes de abrir a janela; carregado de forma
+     síncrona para a splash nascer na composição certa (ver
+     _escrever_tema_da_splash em licitarium.py) -->
+<script src="tema.js"></script>
+
+<!-- ═══ SPLASH ═══ -->
 <div id="splash"></div>
 
 <!-- ═══ WIZARD ═══ -->
@@ -615,8 +620,10 @@ const splashInicio = Date.now();
 // o tema fica espelhado no localStorage só para a splash nascer na cor
 // certa antes de qualquer consulta; o banco segue sendo a fonte da verdade
 function temaSalvo() {
-  // parâmetro de URL só existe em teste/depuração; no app o tema vem do
-  // localStorage, que persiste porque a janela usa armazenamento próprio
+  // 1) tema.js escrito pelo Python (fonte da verdade, chega antes de tudo)
+  // 2) parâmetro de URL, só em teste/depuração
+  // 3) localStorage, última reserva
+  if (window.__TEMA) return window.__TEMA;
   const daUrl = new URLSearchParams(location.search).get("tema");
   if (daUrl) return daUrl;
   try { return localStorage.getItem("tema") || "portal"; }
@@ -657,10 +664,10 @@ window.addEventListener("pywebviewready", async () => {
   $("svg-selo").innerHTML = SELO;
   progressoSplash(0.35);
   const e = await api.get_estado();
-  // primeira abertura (sem tema guardado ainda): remonta a splash na
-  // composição certa em vez de deixá-la no tema padrão até o fim
   const temaBanco = e.tema || "portal";
-  if (temaBanco !== temaSalvo() && $("splash")) {
+  // só remonta se o tema.js não chegou (fallback): com ele, a splash já
+  // nasceu certa e remontar produziria a troca de composição no meio
+  if (!window.__TEMA && temaBanco !== temaSalvo() && $("splash")) {
     try { localStorage.setItem("tema", temaBanco); } catch {}
     montarSplash();
   }

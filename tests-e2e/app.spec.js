@@ -12,11 +12,14 @@ test.describe("splash", () => {
     await expect(page.locator("#splash")).toHaveCount(0, { timeout: 5000 });
   });
 
-  test("primeira abertura: sem tema guardado, assume o do banco",
+  test("sem tema.js (reserva): assume o do banco e remonta a splash",
       async ({ page }) => {
-    // sem localStorage a splash nasce em Portal; ao saber o tema do banco
-    // (pergaminho) ela é remontada na composição certa, ainda visível
-    await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
+    // cenário de fallback — o arquivo do Python não chegou; a splash nasce
+    // no padrão e é remontada quando o tema do banco é lido
+    await page.addInitScript(() => {
+      delete window.__TEMA;
+      try { localStorage.clear(); } catch {}
+    });
     await abrirApp(page, { temaBanco: "pergaminho" });
     await expect(page.locator("#splash .cx.diploma")).toBeVisible();
     await expect(page.locator("html"))
@@ -30,9 +33,9 @@ test.describe("splash", () => {
                                ["pergaminho", ".cx.diploma"],
                                ["observatorio", ".anel .giro"]]) {
     test(`composição do tema ${tema}`, async ({ page }) => {
-      // impede o boot para inspecionar a splash em pé
-      await page.addInitScript(() => { window.__semBoot = true; });
-      await page.goto(`${require("./harness").URL_UI}?tema=${tema}`);
+      // reproduz o que o Python faz: grava o tema antes de a página abrir
+      await page.addInitScript(t => { window.__TEMA = t; }, tema);
+      await page.goto(require("./harness").URL_UI);
       await expect(page.locator("#splash")).toBeVisible();
       await expect(page.locator(`#splash ${marca}`)).toBeVisible();
       await expect(page.locator("html")).toHaveAttribute("data-theme", tema);
