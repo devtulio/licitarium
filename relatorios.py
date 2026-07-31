@@ -30,7 +30,8 @@ TITULOS = {"contratacoes": "Relação de Contratações",
            "atas": "Relação de Atas de Registro de Preços",
            "executivo": "Resumo Executivo de Contratações",
            "fracionamento": "Alerta de Fracionamento — Dispensas × Limites",
-           "precos": "Pesquisa de Preços — Histórico de Contratações"}
+           "precos": "Pesquisa de Preços — Histórico de Contratações",
+           "minuta_pca": "Minuta do Plano de Contratações Anual"}
 
 # Valores do art. 75, I e II, da Lei 14.133/2021 conforme Decreto de
 # atualização — parametrizáveis nas configurações (confira o decreto vigente)
@@ -493,6 +494,44 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
                    tema=tema)
 
 
+def render_minuta_pca(d, municipio, uf, tema="pergaminho"):
+    linhas = "".join(f"""<tr>
+      <td class="num">{i+1}</td>
+      <td class="obj">{_e(l['descricao'])}</td>
+      <td class="ctr">{_e(l['categoria'])}</td>
+      <td class="ctr">{_e(l['unidade'])}</td>
+      <td class="num">{l['quantidade'] or 0:.2f}</td>
+      <td class="num">{moeda(l['valor_unitario'])}</td>
+      <td class="num">{moeda(l['valor_total'])}</td></tr>"""
+      for i, l in enumerate(d["itens"]))
+    p = d.get("parametros") or {}
+    base = {"media": "média dos exercícios", "ultimo": "último exercício",
+            "maior": "maior exercício", "soma": "soma do período"}.get(
+                p.get("base"), p.get("base", "—"))
+    est = {"mediana": "mediana", "media": "média", "recente": "mais recente",
+           "menor": "menor"}.get(p.get("estatistica"), p.get("estatistica", "—"))
+    corpo = f"""<div class="caixa-aviso"><b>Minuta para revisão.</b> Consolidação
+automática do que o município já contratou, segundo os registros do PNCP.
+Os itens publicados <b>não trazem código de catálogo</b> (CATMAT/CATSER),
+exigido no plano oficial — a classificação, o agrupamento definitivo e a
+conferência de especificação e unidade cabem ao gestor.<br>
+Quantidade pela <b>{base}</b>, acrescida da margem informada; preço unitário
+pela <b>{est}</b> dos valores homologados.</div>
+<div class="cards">
+<div class="card"><div class="n">{d['totais']['grupos']}</div><div class="l">itens no plano</div></div>
+<div class="card"><div class="n">{moeda(d['totais']['valor'])}</div><div class="l">valor estimado</div></div>
+<div class="card"><div class="n">{p.get('margem', '—')}%</div><div class="l">margem aplicada</div></div>
+</div>
+<h2>Itens da minuta</h2>
+<table><thead><tr><th class="num">#</th><th>Descrição</th>
+<th class="ctr">Tipo</th><th class="ctr">Unid.</th><th class="num">Quantidade</th>
+<th class="num">Unitário</th><th class="num">Total</th></tr></thead>
+<tbody>{linhas or '<tr><td colspan="7">Minuta vazia.</td></tr>'}</tbody></table>"""
+    titulo = f"{TITULOS['minuta_pca']} {d['ano']} — {municipio}"
+    return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
+                   paisagem=True, tema=tema)
+
+
 def render_precos(d, municipio, uf, tema="pergaminho"):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
@@ -614,6 +653,22 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         conteudo = render_executivo(d, municipio, uf, tema)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
+    elif tipo == "minuta_pca":
+        import pca_builder
+        if not ano:
+            ano = date.today().year + 1
+        itens = pca_builder.listar_minuta(db, ano, so_incluidos=True)
+        cfg = db.execute("SELECT parametros FROM pca_minuta WHERE ano_alvo=?",
+                         (ano,)).fetchone()
+        d = {"ano": ano, "itens": itens,
+             "totais": pca_builder.totais(itens),
+             "parametros": json.loads(cfg[0]) if cfg else {}}
+        conteudo = render_minuta_pca(d, municipio, uf, tema)
+        nome = f"minuta_pca_{ano}"
+        linhas_csv = [{k: i[k] for k in ("descricao", "unidade", "categoria",
+                                         "quantidade", "valor_unitario",
+                                         "margem", "valor_total")}
+                      for i in itens]
     elif tipo == "precos":
         termo = (params.get("termo") or "").strip()
         if not termo:

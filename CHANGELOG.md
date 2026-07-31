@@ -1,5 +1,16 @@
 # Changelog
 
+## Não lançado
+
+- **Montar PCA**: novo módulo que usa o histórico de itens contratados para
+  sugerir o Plano de Contratações Anual do próximo exercício. Agrupa por
+  semelhança de descrição, projeta o quantitativo (média dos anos, último,
+  maior ou soma), estima o preço (mediana, média, mais recente ou menor) e
+  aplica margem de segurança — tudo configurável, com padrão de 10%.
+  Sinaliza unidades divergentes e itens de ocorrência única. A lista é
+  editável e os ajustes manuais sobrevivem a uma nova geração.
+- Exportação da minuta em CSV e novo relatório **Minuta do PCA**.
+
 ## 0.9.4 — 2026-07-31
 
 - **Uma única tela de abertura**: a imagem fixa que aparecia logo ao clicar no

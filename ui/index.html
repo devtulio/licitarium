@@ -271,6 +271,18 @@
   .j-num   { color:var(--warn); }
   .j-bool, .j-null { color:var(--muted); font-weight:600; }
 
+  /* montador de PCA */
+  .pca-params { display:flex; gap:12px; flex-wrap:wrap; padding:0 20px 12px;
+                align-items:flex-end; }
+  .pca-params label { margin:0 0 4px; }
+  .pca-totais { padding:0 20px 10px; font-size:12.5px; color:var(--muted); }
+  .pca-totais b { color:var(--text); font-size:14px; }
+  .g-pca-minuta { grid-template-columns:34px minmax(0,1fr) 62px 96px 108px 60px 116px; }
+  .g-pca-minuta input[type=text], .g-pca-minuta input[type=number] {
+    width:100%; padding:3px 6px; font-size:12.5px; }
+  .linha .aviso-un { color:var(--warn); cursor:help; }
+  .linha .tag-unico { font-size:9.5px; color:var(--warn); letter-spacing:.04em; }
+  #pca-lista { max-height:46vh; overflow-y:auto; }
   .cfg { padding:18px 20px; margin-bottom:14px; }
   .cfg h2 { font-size:14px; margin-bottom:10px; }
   .tcards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
@@ -336,6 +348,7 @@
       <div id="rodape-versao">PNCP · dados públicos</div>
     </div>
     <div style="display:flex; gap:8px">
+      <button class="btn ghost" id="btn-pca">Montar PCA</button>
       <button class="btn ghost" id="btn-relatorios">Relatórios</button>
       <button class="btn ghost" id="btn-config">Configurações</button>
       <button class="btn" id="btn-sync">Sincronizar</button>
@@ -409,6 +422,58 @@
     </div>
     <details class="raw"><summary>Dados completos (JSON do PNCP)</summary>
       <pre id="det-raw"></pre></details>
+  </div>
+</div>
+
+<!-- ═══ MONTAR PCA ═══ -->
+<div id="veu-pca" class="veu oculto" role="dialog" aria-modal="true"
+     aria-label="Montar minuta do PCA">
+  <div class="card modal" style="max-width:1180px">
+    <div class="mhead">
+      <div><h1>Montar minuta do PCA</h1>
+        <div class="dim">Consolida o que o município já contratou e projeta o
+          próximo exercício. O resultado é uma <b>minuta para revisão</b> —
+          os itens do PNCP não trazem código de catálogo, exigido no plano
+          oficial.</div></div>
+      <button class="fechar" data-fecha="veu-pca" aria-label="Fechar">×</button>
+    </div>
+    <div class="pca-params">
+      <div><label for="pca-ano">Exercício do plano</label>
+        <select id="pca-ano"></select></div>
+      <div><label for="pca-base">Quantidade</label>
+        <select id="pca-base">
+          <option value="media">Média dos anos</option>
+          <option value="ultimo">Último exercício</option>
+          <option value="maior">Maior exercício</option>
+          <option value="soma">Soma do período</option>
+        </select></div>
+      <div><label for="pca-estatistica">Preço unitário</label>
+        <select id="pca-estatistica">
+          <option value="mediana">Mediana</option>
+          <option value="media">Média</option>
+          <option value="recente">Mais recente</option>
+          <option value="menor">Menor</option>
+        </select></div>
+      <div><label for="pca-margem">Margem (%)</label>
+        <input type="number" id="pca-margem" value="10" step="1" min="0"
+               max="100" style="width:90px"></div>
+      <div><label for="pca-palavras">Agrupar por</label>
+        <select id="pca-palavras">
+          <option value="2">2 palavras (amplo)</option>
+          <option value="3" selected>3 palavras</option>
+          <option value="4">4 palavras (restrito)</option>
+        </select></div>
+      <label class="check-filtro" style="align-self:end">
+        <input type="checkbox" id="pca-recorrentes" checked> Só recorrentes</label>
+      <button class="btn" id="pca-gerar" style="align-self:end">Gerar</button>
+    </div>
+    <div class="pca-totais" id="pca-totais"></div>
+    <div class="card lista" id="pca-lista" style="margin:0 20px"></div>
+    <div class="macoes">
+      <button class="btn ghost" id="pca-csv">Exportar CSV</button>
+      <button class="btn ghost" id="pca-relatorio">Relatório da minuta</button>
+      <span class="dim" id="pca-status" style="align-self:center"></span>
+    </div>
   </div>
 </div>
 
@@ -1261,6 +1326,103 @@ async function abrirDetalhe(nc) {
 }
 $("det-pncp").addEventListener("click", () =>
   api.abrir_pncp(estado.tipo, detalheAtual));
+
+// ── montador de minuta do PCA ─────────────────────────────────────────────
+$("btn-pca").addEventListener("click", async () => {
+  const anos = await api.anos_com_itens();
+  const sel = $("pca-ano");
+  if (!sel.options.length) {
+    const proximo = (anos.length ? Math.max(...anos) : new Date().getFullYear()) + 1;
+    for (let a = proximo; a >= proximo - 2; a--) sel.add(new Option(a, a));
+  }
+  if (!anos.length) {
+    $("pca-status").textContent =
+      "Sincronize os itens antes: a minuta vem do que já foi contratado.";
+  }
+  await carregarMinuta();
+  abrirModal("veu-pca");
+});
+
+function parametrosPca() {
+  return {
+    base: $("pca-base").value,
+    estatistica: $("pca-estatistica").value,
+    margem: parseFloat($("pca-margem").value) || 0,
+    palavras: +$("pca-palavras").value,
+    so_recorrentes: $("pca-recorrentes").checked,
+  };
+}
+
+$("pca-gerar").addEventListener("click", async () => {
+  $("pca-gerar").disabled = true;
+  $("pca-status").textContent = "Consolidando o histórico…";
+  const r = await api.gerar_minuta_pca(+$("pca-ano").value, parametrosPca());
+  $("pca-gerar").disabled = false;
+  $("pca-status").textContent = r.ok
+    ? `${r.grupos} grupos gerados · ajustes manuais foram preservados`
+    : `Falha: ${r.erro}`;
+  await carregarMinuta();
+});
+
+$("pca-ano").addEventListener("change", carregarMinuta);
+
+async function carregarMinuta() {
+  const dados = await api.listar_minuta_pca(+$("pca-ano").value);
+  const t = dados.totais;
+  $("pca-totais").innerHTML = dados.itens.length
+    ? `<b>${t.grupos}</b> itens no plano · <b>${dinheiro(t.valor)}</b>
+       ${t.excluidos ? ` · ${t.excluidos} excluído(s)` : ""}
+       ${dados.gerado_em ? ` · gerado em ${dataBr(dados.gerado_em)}` : ""}`
+    : `Nenhuma minuta para este exercício — ajuste os parâmetros e clique em
+       <b>Gerar</b>.`;
+  const cab = `<div class="linha cab g-pca-minuta">
+      <span title="Incluir no plano">✓</span><span>Descrição</span>
+      <span>Unid.</span><span class="num">Quantidade</span>
+      <span class="num">Unitário</span><span class="num">Margem</span>
+      <span class="num">Total</span></div>`;
+  const linhas = dados.itens.map(i => `
+    <div class="linha g-pca-minuta" data-id="${i.id}">
+      <span><input type="checkbox" data-campo="incluir"
+        ${i.incluir ? "checked" : ""} aria-label="Incluir"></span>
+      <span><input type="text" data-campo="descricao"
+        value="${esc(i.descricao ?? "")}">
+        ${i.origem && i.origem.recorrente === false
+          ? '<span class="tag-unico" title="Contratado uma única vez: confira se cabe no plano">OCORRÊNCIA ÚNICA</span>' : ""}</span>
+      <span><input type="text" data-campo="unidade" value="${esc(i.unidade ?? "")}">
+        ${i.origem && i.origem.unidades_divergentes
+          ? '<span class="aviso-un" title="O grupo tem unidades diferentes; confira">⚠</span>' : ""}</span>
+      <span><input type="number" data-campo="quantidade" step="0.01"
+        value="${i.quantidade ?? 0}"></span>
+      <span><input type="number" data-campo="valor_unitario" step="0.01"
+        value="${i.valor_unitario ?? 0}"></span>
+      <span><input type="number" data-campo="margem" step="1"
+        value="${i.margem ?? 0}"></span>
+      <span class="num">${dinheiro(i.valor_total)}</span>
+    </div>`).join("");
+  $("pca-lista").innerHTML = cab + (linhas ||
+    `<div class="vazio">Sem itens. Clique em <b>Gerar</b>.</div>`);
+  $("pca-lista").querySelectorAll("[data-campo]").forEach(campo =>
+    campo.addEventListener("change", async () => {
+      const linha = campo.closest(".linha");
+      const valor = campo.type === "checkbox" ? (campo.checked ? 1 : 0)
+                  : campo.type === "number" ? parseFloat(campo.value) || 0
+                  : campo.value;
+      await api.editar_item_minuta(+linha.dataset.id,
+                                   { [campo.dataset.campo]: valor });
+      await carregarMinuta();   // recalcula totais com o ajuste
+    }));
+}
+
+$("pca-csv").addEventListener("click", async () => {
+  const r = await api.exportar_csv("minuta_pca", { ano: +$("pca-ano").value });
+  $("pca-status").textContent = r.ok
+    ? `CSV com ${r.linhas} itens em ${r.arquivo}` : (r.erro || "");
+});
+$("pca-relatorio").addEventListener("click", async () => {
+  const r = await api.gerar_relatorio("minuta_pca", { ano: +$("pca-ano").value });
+  $("pca-status").textContent = r.ok ? "Relatório aberto no navegador"
+                                     : (r.erro || "Falha ao gerar");
+});
 
 // ── relatórios ────────────────────────────────────────────────────────────
 async function montarOpcoesRelatorio() {

@@ -219,6 +219,46 @@ test("resumo de preços abre o relatório com o termo preenchido",
   await expect(page.locator("#rel-termo")).toHaveValue("papel");
 });
 
+test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
+  await page.locator("#btn-pca").click();
+  await expect(page.locator("#veu-pca")).toBeVisible();
+  // exercício sugerido é o ano seguinte ao último com itens (2026 -> 2027)
+  await expect(page.locator("#pca-ano")).toHaveValue("2027");
+  await page.locator("#pca-gerar").click();
+  await expect(page.locator("#pca-status")).toContainText("2 grupos");
+  const linhas = page.locator("#pca-lista .linha:not(.cab)");
+  await expect(linhas).toHaveCount(2);
+  // sinalizações que orientam a revisão
+  await expect(linhas.nth(0).locator(".aviso-un")).toBeVisible();
+  await expect(linhas.nth(1).locator(".tag-unico")).toContainText("ÚNICA");
+  await expect(page.locator("#pca-totais")).toContainText("522.000,00");
+  // editar a quantidade recalcula o total
+  await linhas.nth(0).locator('[data-campo="quantidade"]').fill("300");
+  await linhas.nth(0).locator('[data-campo="quantidade"]').blur();
+  await expect(page.locator("#pca-totais")).toContainText("530.000,00");
+  // excluir um item sai da conta e é contado como excluído
+  await linhas.nth(1).locator('[data-campo="incluir"]').uncheck();
+  await expect(page.locator("#pca-totais")).toContainText("1 excluído");
+  const chamadas = await page.evaluate(() => window.__chamadas.filter(
+    c => c.metodo === "editar_item_minuta"));
+  expect(chamadas.map(c => c.campos)).toEqual([
+    { quantidade: 300 }, { incluir: 0 }]);
+});
+
+test("parâmetros do PCA chegam ao motor", async ({ page }) => {
+  await page.locator("#btn-pca").click();
+  await page.locator("#pca-base").selectOption("ultimo");
+  await page.locator("#pca-estatistica").selectOption("recente");
+  await page.locator("#pca-margem").fill("25");
+  await page.locator("#pca-palavras").selectOption("2");
+  await page.locator("#pca-recorrentes").uncheck();
+  await page.locator("#pca-gerar").click();
+  const c = await page.evaluate(() => window.__chamadas.find(
+    x => x.metodo === "gerar_minuta_pca"));
+  expect(c.params).toEqual({ base: "ultimo", estatistica: "recente",
+                             margem: 25, palavras: 2, so_recorrentes: false });
+});
+
 test("valor sem homologação é marcado como estimado", async ({ page }) => {
   const linhas = page.locator(".linha:not(.cab)");
   // X-1 tem homologado: valor limpo, sem marca

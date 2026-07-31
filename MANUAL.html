@@ -235,7 +235,36 @@ dados continuam disponíveis no PNCP; nada público se perde).</p>
 atual mostra (todas as páginas), pronto para abrir no Excel ou LibreOffice —
 separador ponto e vírgula, acentuação correta.</p>
 
-<h2>8. Relatórios</h2>
+<h2>8. Montar o PCA</h2>
+<p>O botão <b>Montar PCA</b> usa tudo o que o município já contratou para
+sugerir o <b>Plano de Contratações Anual</b> do próximo exercício. Ele agrupa
+os itens por semelhança de descrição, soma as quantidades, projeta o
+quantitativo e estima o preço.</p>
+<div class="caixa alerta"><b>É uma minuta para revisão, não o plano pronto.</b>
+Os itens publicados no PNCP não trazem código de catálogo (CATMAT/CATSER),
+exigido no plano oficial. A classificação, o agrupamento definitivo e a
+conferência de especificação, unidade e quantidade são sempre do gestor.</div>
+<h3>Como usar</h3>
+<ol>
+  <li>Escolha o <b>exercício</b> do plano.</li>
+  <li>Ajuste os parâmetros: <b>quantidade</b> (média dos anos, último
+      exercício, maior exercício ou soma do período), <b>preço unitário</b>
+      (mediana, média, mais recente ou menor), <b>margem</b> de segurança
+      (10% por padrão) e o quanto o agrupamento deve ser amplo.</li>
+  <li>Deixe <b>Só recorrentes</b> marcado para trazer apenas o que se repete —
+      obras e contratações isoladas ficam de fora.</li>
+  <li>Clique em <b>Gerar</b> e revise a lista: dá para corrigir descrição e
+      unidade, mudar quantidade, preço e margem, e desmarcar o que não entra.</li>
+  <li>Exporte em <b>CSV</b> para a planilha do setor ou gere o
+      <b>relatório da minuta</b>.</li>
+</ol>
+<p>Dois avisos aparecem na lista: <b>⚠</b> na unidade indica que o grupo reuniu
+unidades diferentes (confira), e <b>OCORRÊNCIA ÚNICA</b> marca item contratado
+uma só vez — provavelmente obra ou serviço isolado.</p>
+<p><b>Seus ajustes são preservados:</b> ao gerar de novo com outros parâmetros,
+as linhas que você editou permanecem como estavam; as demais são recalculadas.</p>
+
+<h2>9. Relatórios</h2>
 <p>O botão <b>Relatórios</b> no topo gera documentos timbrados prontos para
 imprimir ou salvar em PDF — pensados para responder solicitações do Tribunal
 de Contas e para prestação de contas interna:</p>
@@ -251,6 +280,9 @@ de Contas e para prestação de contas interna:</p>
   <tr><td>Resumo Executivo Anual</td><td>Indicadores do exercício, quadro por
     modalidade, evolução mensal, maiores fornecedores e vigências a vencer em
     90 dias</td></tr>
+  <tr><td>Minuta do PCA</td><td>Os itens da minuta montada em "Montar PCA",
+    com quantidade, preço unitário e valor total, e o registro dos critérios
+    usados</td></tr>
   <tr><td>Pesquisa de Preços</td><td>Histórico de preços unitários homologados
     para um termo, com menor/mediana/média/maior, fornecedor e processo de
     origem de cada item — apoio à pesquisa de preços do art. 23</td></tr>
@@ -265,13 +297,13 @@ correto) e sai na paleta do tema escolhido nas configurações — mas a
 <b>impressão usa sempre a paleta clara</b>, seja qual for o tema. As relações geram também um <b>CSV</b> na mesma pasta
 (<code>%LOCALAPPDATA%\Licitarium\relatorios</code>), para planilha.</p>
 
-<h2>9. Onde ficam os dados</h2>
+<h2>10. Onde ficam os dados</h2>
 <p>Em <code>%LOCALAPPDATA%\Licitarium\licitarium.db</code> (banco SQLite).
 O banco é um <b>espelho reconstruível</b>: se for apagado ou corromper, basta
 abrir o programa e refazer o download — a fonte oficial é sempre o PNCP.
 Por isso o Licitarium não precisa de sistema de backup próprio.</p>
 
-<h2>10. Perguntas frequentes</h2>
+<h2>11. Perguntas frequentes</h2>
 <h3>Um processo aparece com situação diferente da plataforma de pregão
 (BLL, BNC, Compras.gov…)</h3>
 <p>O Licitarium espelha o <b>PNCP</b>. Se um processo foi suspenso na plataforma
@@ -294,7 +326,7 @@ erro em Configurações → Sincronizações recentes.</p>
 <h3>O programa não abre no Windows 10</h3>
 <p>Instale o WebView2 Runtime (seção 2).</p>
 
-<h2>11. Sobre</h2>
+<h2>12. Sobre</h2>
 <p><b>Licitarium</b> — do latim <i>licitatio</i> (lance em leilão) +
 <i>-arium</i> (lugar que guarda): o lugar que guarda as licitações. A divisa
 <i>SVB HASTA PVBLICA</i> vem do leilão público romano, anunciado com uma lança

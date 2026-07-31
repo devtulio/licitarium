@@ -18,6 +18,7 @@ from pathlib import Path
 
 import webview
 
+import pca_builder
 import pncp
 import relatorios
 
@@ -67,6 +68,13 @@ CREATE TABLE IF NOT EXISTS pca_itens (
   numero_item INTEGER, descricao TEXT, categoria TEXT, grupo TEXT,
   quantidade REAL, valor_total REAL, data_atualizacao TEXT,
   raw TEXT, sync_em TEXT);
+CREATE TABLE IF NOT EXISTS pca_minuta (
+  ano_alvo INTEGER PRIMARY KEY, parametros TEXT, gerado_em TEXT);
+CREATE TABLE IF NOT EXISTS pca_minuta_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ano_alvo INTEGER, chave TEXT,
+  descricao TEXT, unidade TEXT, categoria TEXT, quantidade REAL,
+  valor_unitario REAL, margem REAL, incluir INTEGER DEFAULT 1,
+  editado INTEGER DEFAULT 0, origem TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, iniciado_em TEXT, tipo TEXT,
   janela_ini TEXT, janela_fim TEXT, registros INTEGER, status TEXT, erro TEXT);
@@ -542,6 +550,57 @@ class Api:
         finally:
             db.close()
 
+    # ── minuta de PCA ───────────────────────────────────────────────────
+
+    def gerar_minuta_pca(self, ano_alvo, params=None):
+        db = abrir_db()
+        try:
+            n = pca_builder.gerar_minuta(db, int(ano_alvo), params or {},
+                                         (params or {}).get("orgao"))
+            return {"ok": True, "grupos": n}
+        except Exception as e:
+            return {"ok": False, "erro": str(e)}
+        finally:
+            db.close()
+
+    def listar_minuta_pca(self, ano_alvo):
+        db = abrir_db()
+        try:
+            itens = pca_builder.listar_minuta(db, int(ano_alvo))
+            cfg = db.execute("SELECT * FROM pca_minuta WHERE ano_alvo=?",
+                             (int(ano_alvo),)).fetchone()
+            return {"itens": itens,
+                    "totais": pca_builder.totais(itens),
+                    "parametros": json.loads(cfg["parametros"]) if cfg else None,
+                    "gerado_em": cfg["gerado_em"] if cfg else None}
+        finally:
+            db.close()
+
+    def editar_item_minuta(self, item_id, campos):
+        permitidos = {"descricao", "unidade", "categoria", "quantidade",
+                      "valor_unitario", "margem", "incluir"}
+        campos = {k: v for k, v in (campos or {}).items() if k in permitidos}
+        if not campos:
+            return {"ok": False, "erro": "nada a alterar"}
+        sets = ", ".join(f"{k}=?" for k in campos) + ", editado=1"
+        db = abrir_db()
+        try:
+            db.execute(f"UPDATE pca_minuta_itens SET {sets} WHERE id=?",
+                       list(campos.values()) + [int(item_id)])
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def anos_com_itens(self):
+        db = abrir_db()
+        try:
+            return [r[0] for r in db.execute(
+                "SELECT DISTINCT ano FROM itens WHERE ano IS NOT NULL"
+                " AND valor_unitario_homologado IS NOT NULL ORDER BY 1")]
+        finally:
+            db.close()
+
     # ── relatórios ──────────────────────────────────────────────────────
 
     def gerar_relatorio(self, tipo, params=None):
@@ -696,7 +755,34 @@ class Api:
 
     # ── exportação ──────────────────────────────────────────────────────
 
+    def _linhas_minuta_csv(self, ano):
+        db = abrir_db()
+        try:
+            return [{k: i[k] for k in
+                     ("descricao", "unidade", "categoria", "quantidade",
+                      "valor_unitario", "margem", "valor_total")}
+                    for i in pca_builder.listar_minuta(db, int(ano),
+                                                       so_incluidos=True)]
+        finally:
+            db.close()
+
     def exportar_csv(self, tipo, filtros=None):
+        if tipo == "minuta_pca":
+            ano = (filtros or {}).get("ano") or date.today().year + 1
+            linhas = self._linhas_minuta_csv(ano)
+            if not linhas:
+                return {"ok": False, "erro": "gere a minuta antes de exportar"}
+            destino = self._janela.create_file_dialog(
+                webview.SAVE_DIALOG, save_filename=f"minuta_pca_{ano}.csv",
+                file_types=("CSV (*.csv)",))
+            if not destino:
+                return {"ok": False, "erro": None}
+            caminho = destino if isinstance(destino, str) else destino[0]
+            with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.DictWriter(f, fieldnames=linhas[0].keys(), delimiter=";")
+                w.writeheader()
+                w.writerows(linhas)
+            return {"ok": True, "arquivo": caminho, "linhas": len(linhas)}
         if tipo not in TABELAS:
             return {"ok": False, "erro": "tipo inválido"}
         destino = self._janela.create_file_dialog(

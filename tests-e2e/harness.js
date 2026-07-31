@@ -118,7 +118,42 @@ function scriptPonte(temaBanco = "portal") {
       listar_orgaos: async () => [],
       ultimo_log: async () => [],
       municipios: async () => [],
-      gerar_relatorio: async () => ({ ok: true }),
+      gerar_relatorio: async (tipo, params) => {
+        window.__chamadas.push({ metodo: "gerar_relatorio", tipo, params });
+        return { ok: true };
+      },
+      anos_com_itens: async () => [2025, 2026],
+      gerar_minuta_pca: async (ano, params) => {
+        window.__chamadas.push({ metodo: "gerar_minuta_pca", ano, params });
+        window.__minuta = [
+          { id: 1, chave: "FILTRO AR MOTOR", descricao: "FILTRO DE AR",
+            unidade: "UND", categoria: "Material", quantidade: 220,
+            valor_unitario: 100, margem: 10, incluir: 1, valor_total: 22000,
+            origem: { recorrente: true, unidades_divergentes: true } },
+          { id: 2, chave: "REFORMA PRACA", descricao: "REFORMA DE PRAÇA",
+            unidade: "UN", categoria: "Serviço", quantidade: 1,
+            valor_unitario: 500000, margem: 10, incluir: 1,
+            valor_total: 500000, origem: { recorrente: false } },
+        ];
+        return { ok: true, grupos: 2 };
+      },
+      listar_minuta_pca: async () => {
+        const itens = window.__minuta || [];
+        const inc = itens.filter(i => i.incluir);
+        return { itens, gerado_em: "2026-07-31T10:00:00",
+                 parametros: { margem: 10, base: "media" },
+                 totais: { grupos: inc.length, excluidos: itens.length - inc.length,
+                           valor: inc.reduce((s, i) => s + i.valor_total, 0) } };
+      },
+      editar_item_minuta: async (id, campos) => {
+        window.__chamadas.push({ metodo: "editar_item_minuta", id, campos });
+        const i = (window.__minuta || []).find(x => x.id === id);
+        if (i) {
+          Object.assign(i, campos);
+          i.valor_total = (i.quantidade || 0) * (i.valor_unitario || 0);
+        }
+        return { ok: true };
+      },
       exportar_csv: async () => ({ ok: false, erro: null }),
       abrir_pncp: async () => true,
     }};
