@@ -168,6 +168,62 @@ def _baixar(caminho, consultas, tamanho_pagina):
             yield futuros[f], f.result()
 
 
+# medidos no acervo real de Orindiúva (131 contratações, 2.674 itens,
+# 12,8 MB) — servem para dizer ao usuário o tamanho da encrenca antes de
+# ele mandar baixar o município. Conferidos: para as 131 contratações a
+# estimativa dá 2.672 itens contra 2.674 reais.
+ITENS_POR_CONTRATACAO = 20.4
+KB_POR_ITEM = 2.4
+FRACAO_COM_RESULTADO = 0.84   # 2.257 dos 2.674 itens têm preço homologado
+
+
+def estimar_volume(codigo_ibge, inicio=DATA_INICIO_PNCP, fim=None):
+    """Quantas contratações um município tem, sem baixar nenhuma.
+
+    Lê `totalRegistros` do envelope da primeira página de cada consulta. O
+    caminho ingênuo — paginar tudo para contar — custa centenas de
+    requisições e, num município médio, não termina: Olímpia-SP tem 1.663
+    dispensas só em 2025, contra 131 contratações de Orindiúva em cinco anos.
+    """
+    fim = fim or date.today()
+    consultas = [((codigo, a), {"dataInicial": _amd(a), "dataFinal": _amd(b),
+                                "codigoModalidadeContratacao": codigo,
+                                "codigoMunicipioIbge": str(codigo_ibge),
+                                "pagina": 1, "tamanhoPagina": 10})
+                 for codigo in MODALIDADES
+                 for a, b in _janelas(inicio, fim)]
+    conexoes = min(_paralelismo_atual(), len(consultas))
+    total = 0
+
+    falhas = 0
+
+    def uma(params):
+        # consulta que não responde não pode derrubar a estimativa inteira:
+        # é melhor avisar "pelo menos N" do que não avisar nada
+        nonlocal falhas
+        try:
+            d = _get("/v1/contratacoes/atualizacao", params,
+                     pacing=conexoes <= 1)
+        except PncpErro:
+            falhas += 1
+            return 0
+        return (d or {}).get("totalRegistros") or 0
+
+    if conexoes <= 1:
+        total = sum(uma(p) for _, p in consultas)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(conexoes) as ex:
+            total = sum(ex.map(lambda c: uma(c[1]), consultas))
+    itens = round(total * ITENS_POR_CONTRATACAO)
+    # a fase 3 custa uma requisição por contratação mais uma por item com
+    # resultado — é ela que define se a coleta leva minutos ou uma noite
+    requisicoes = total + itens * FRACAO_COM_RESULTADO
+    minutos = round(requisicoes * 0.9 / max(CONEXOES_PARALELAS, 1) / 60)
+    return {"contratacoes": total, "itens": itens,
+            "mb": round(itens * KB_POR_ITEM / 1024, 1),
+            "minutos": minutos, "parcial": falhas > 0}
+
+
 def _janelas(inicio, fim, max_dias=JANELA_MAX_DIAS):
     """Fatia [inicio, fim] em janelas de no máximo max_dias."""
     atual = inicio

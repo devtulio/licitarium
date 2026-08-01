@@ -350,6 +350,18 @@ class Api:
         finally:
             db.close()
 
+    def estimar_municipio_referencia(self, codigo):
+        """Peso da coleta antes de o usuário mandar baixar.
+
+        Município médio muda a ordem de grandeza: Olímpia-SP tem 5.982
+        contratações contra 131 de Orindiúva — 286 MB e quase 7 horas de
+        coleta. Sem este aviso, o usuário descobriria isso no meio da noite.
+        """
+        try:
+            return pncp.estimar_volume(str(codigo))
+        except pncp.PncpErro as e:
+            return {"erro": str(e)}
+
     def adicionar_municipio_referencia(self, codigo, nome, uf):
         """Entra na lista; os preços chegam na próxima sincronização."""
         codigo = str(codigo)

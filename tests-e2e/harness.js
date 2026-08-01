@@ -109,6 +109,15 @@ const DADOS = {
 function scriptPonte(temaBanco = "portal") {
   return `
     window.__chamadas = [];
+    // 3533908 = cidade média (coleta de horas); 3533007 não
+    // publica no PNCP; 9999999 simula falha de consulta
+    window.__estimativas = {
+      "3533908": { contratacoes: 5982, itens: 122033, mb: 286,
+                   minutos: 407, parcial: false },
+      "3533007": { contratacoes: 0, itens: 0, mb: 0, minutos: 0,
+                   parcial: false },
+      "9999999": { erro: "sem conexão com o PNCP" },
+    };
     window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812 }];
     window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
@@ -156,6 +165,12 @@ function scriptPonte(temaBanco = "portal") {
         window.__chamadas.push({ metodo: "set_titulo", t }); return true; },
       listar_orgaos: async () => [],
       listar_municipios_referencia: async () => window.__referencia,
+      estimar_municipio_referencia: async (c) => {
+        window.__chamadas.push({ metodo: "estimar_municipio_referencia", c });
+        return window.__estimativas[String(c)]
+          ?? { contratacoes: 207, itens: 4223, mb: 9.9, minutos: 14,
+               parcial: false };
+      },
       adicionar_municipio_referencia: async (c, n, uf) => {
         window.__chamadas.push({ metodo: "adicionar_municipio_referencia", c, n, uf });
         window.__referencia = [...window.__referencia,
@@ -170,7 +185,9 @@ function scriptPonte(temaBanco = "portal") {
       municipios: async (texto, uf) => {
         window.__chamadas.push({ metodo: "municipios", texto, uf });
         return [{ c: 3536604, n: "Paulo de Faria", uf: "SP" },
-                { c: 3535002, n: "Palestina", uf: "SP" }]
+                { c: 3535002, n: "Palestina", uf: "SP" },
+                { c: 3533908, n: "Olímpia", uf: "SP" },
+                { c: 3533007, n: "Nova Granada", uf: "SP" }]
           .filter(m => m.n.toLowerCase().includes((texto || "").toLowerCase()));
       },
       ultimo_log: async () => [],

@@ -1012,6 +1012,42 @@ async function renderReferencia() {
     }));
 }
 
+// O peso varia em ordens de grandeza entre municípios: um vizinho pequeno
+// custa minutos, uma cidade média custa horas e centenas de MB. Perguntar
+// antes evita a descoberta desagradável no meio da coleta.
+async function confirmarVolume(codigo, nome) {
+  if (!api.estimar_municipio_referencia) return true;
+  $("sync-msg").textContent = `Consultando o volume de ${nome}…`;
+  const e = await api.estimar_municipio_referencia(codigo);
+  $("sync-msg").textContent = "";
+  const nl = "\n";
+  if (!e || e.erro) {
+    return confirm(`Não consegui consultar o volume de ${nome}`
+      + `${e && e.erro ? ` (${e.erro})` : ""}.${nl}${nl}`
+      + "Adicionar mesmo assim?");
+  }
+  if (!e.contratacoes) {
+    alert(`${nome} não tem contratações publicadas no PNCP — não traria `
+      + "nenhum preço.");
+    return false;
+  }
+  const tempo = e.minutos >= 60
+    ? `${(e.minutos / 60).toFixed(1).replace(".", ",")} horas`
+    : `${e.minutos} minutos`;
+  // coleta de horas merece aviso destacado: é o caso de cidade média
+  const pesado = e.minutos >= 60
+    ? `${nl}${nl}ATENÇÃO: é uma coleta longa. Ela roda em segundo plano e `
+      + "você pode continuar usando o programa, mas leva bastante tempo."
+    : "";
+  return confirm(
+    `${nome} tem ${e.contratacoes.toLocaleString("pt-BR")} contratações`
+    + `${e.parcial ? " (pelo menos — algumas consultas falharam)" : ""}.`
+    + `${nl}${nl}A coleta deve trazer cerca de `
+    + `${e.itens.toLocaleString("pt-BR")} preços, ocupar `
+    + `${String(e.mb).replace(".", ",")} MB e levar aproximadamente `
+    + `${tempo}.${pesado}${nl}${nl}Adicionar mesmo assim?`);
+}
+
 function ligarBuscaReferencia() {
   const uf = $("ref-uf");
   if (uf.options.length === 0) {
@@ -1030,10 +1066,11 @@ function ligarBuscaReferencia() {
     caixa.classList.remove("oculto");
     caixa.querySelectorAll("button[data-c]").forEach(b =>
       b.addEventListener("click", async () => {
-        const r = await api.adicionar_municipio_referencia(
-          b.dataset.c, b.dataset.n, b.dataset.uf);
         caixa.classList.add("oculto");
         $("ref-busca").value = "";
+        if (!await confirmarVolume(b.dataset.c, b.dataset.n)) return;
+        const r = await api.adicionar_municipio_referencia(
+          b.dataset.c, b.dataset.n, b.dataset.uf);
         if (r && r.ok === false) { alert(r.erro); return; }
         await renderReferencia();
         // os preços só chegam na próxima coleta: dizer isso evita a

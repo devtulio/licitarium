@@ -549,7 +549,9 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
   await expect(secao).toContainText("Palestina");
   await expect(secao).toContainText("812 preços");
 
-  // adicionar pelo autocomplete
+  // adicionar pelo autocomplete (o volume da coleta é confirmado antes —
+  // ver tests-e2e/volume.spec.js)
+  page.once("dialog", d => d.accept());
   await page.locator("#ref-busca").fill("paulo");
   await page.locator('#ref-sugestoes button[data-c="3536604"]').click();
   const enviado = await page.evaluate(() => window.__chamadas
