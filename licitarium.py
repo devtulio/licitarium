@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.2.4"
+VERSAO = "1.2.5"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -721,12 +721,14 @@ class Api:
             if remota > local:
                 self._atualizacao = d.get("html_url")
                 self._nova_versao = tag
-                # o nome do exe passou a carregar a versão
-                # ("Licitarium v1.2.4.exe"), então casa por padrão e não por
-                # nome fixo — assim segue achando as releases antigas também
+                # o nome do exe carrega a versão, então casa por padrão e
+                # não por nome fixo — e o GitHub troca o espaço do nome do
+                # arquivo por ponto ao publicar o anexo ("Licitarium.v1.2.4
+                # .exe"), por isso os dois separadores. Segue achando as
+                # releases antigas, que se chamavam só "Licitarium.exe".
                 self._asset_url = next(
                     (a.get("browser_download_url") for a in d.get("assets", [])
-                     if re.fullmatch(r"Licitarium( v[\d.]+)?\.exe",
+                     if re.fullmatch(r"Licitarium([ .]v[\d.]+)?\.exe",
                                      a.get("name") or "")), None)
                 # instalação automática só faz sentido rodando como exe e
                 # sem Smart App Control barrando o binário novo

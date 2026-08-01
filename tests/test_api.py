@@ -312,11 +312,14 @@ def test_asset_do_auto_update_aceita_nome_com_versao():
     O casamento por nome fixo pararia de achar o download da release nova;
     o padrão continua aceitando as releases antigas, sem versão no nome.
     """
-    padrao = re.compile(r"Licitarium( v[\d.]+)?\.exe")
+    padrao = re.compile(r"Licitarium([ .]v[\d.]+)?\.exe")
+    # o GitHub troca espaço por ponto no nome do anexo: o arquivo sobe como
+    # "Licitarium v1.2.4.exe" e a release publica "Licitarium.v1.2.4.exe"
+    assert padrao.fullmatch("Licitarium.v1.2.4.exe")
     assert padrao.fullmatch("Licitarium v1.2.4.exe")
     assert padrao.fullmatch("Licitarium.exe")          # releases até a 1.2.3
     for fora in ("licitarium.exe", "OutroLicitarium.exe",
-                 "Licitarium v1.2.4.zip", "Licitarium.exe.txt"):
+                 "Licitarium.v1.2.4.zip", "Licitarium.exe.txt"):
         assert not padrao.fullmatch(fora), fora
     # e é o mesmo padrão que o código usa
     fonte = (licitarium.DIR_APP / "licitarium.py").read_text(encoding="utf-8")

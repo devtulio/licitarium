@@ -1,9 +1,17 @@
 # Changelog
 
+## 1.2.5 — 2026-08-01
+
+- **Correção da atualização automática da 1.2.4.** Ao publicar um anexo, o
+  GitHub troca o espaço do nome do arquivo por ponto: o executável sobe como
+  "Licitarium v1.2.4.exe" e fica disponível como **"Licitarium.v1.2.4.exe"**.
+  A 1.2.4 procurava o nome com espaço e não encontrava o download, então não
+  oferecia a troca automática. Agora os dois formatos são reconhecidos.
+
 ## 1.2.4 — 2026-08-01
 
 - **O executável passa a trazer a versão no nome**: o arquivo baixado da
-  página de releases se chama **"Licitarium v1.2.4.exe"**, no mesmo padrão do
+  página de releases se chama **"Licitarium.v1.2.4.exe"**, no mesmo padrão do
   manual. Dá para saber qual versão você tem só de olhar o arquivo, e as
   versões guardadas não se sobrescrevem.
 - Ao atualizar sozinho, o programa também **renomeia o arquivo** para a versão

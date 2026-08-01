@@ -129,7 +129,7 @@ para checar se saiu versão nova, para a API pública do GitHub.
 
 ## Instalação
 
-**Executável (recomendado):** baixe o `Licitarium vX.Y.Z.exe` da página de
+**Executável (recomendado):** baixe o `Licitarium.vX.Y.Z.exe` da página de
 [releases](../../releases) e execute. Não precisa instalar nada, nem ter Python,
 nem direitos de administrador.
 
