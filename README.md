@@ -42,8 +42,8 @@ ordenação por clique, colunas ajustáveis com o mouse e exportação CSV:
 | Aba | Conteúdo |
 |---|---|
 | **Contratações** | Editais e avisos: pregões, dispensas, inexigibilidades e demais modalidades da Lei 14.133 |
-| **Contratos** | Contratos firmados, com fornecedor, valor global e vigência |
-| **Atas** | Atas de registro de preços, com objeto e vigência |
+| **Contratos** | Contratos firmados, com fornecedor, valor global e vigência, com selo de situação (vigente / vence em 60 dias / encerrado) |
+| **Atas** | Atas de registro de preços, com objeto e vigência, com o mesmo selo de situação |
 | **PCA** | Itens do Plano de Contratações Anual de cada órgão |
 | **Preços** | Banco de preços: cada item contratado, com unidade, quantidade, valor unitário homologado e fornecedor vencedor |
 

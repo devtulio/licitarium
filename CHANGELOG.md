@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2.0 — 2026-08-01
+
+**Novidades desta versão**
+
+- **Situação da vigência em contratos e atas.** Cada registro passa a exibir,
+  ao lado das datas, um selo com a sua situação: **Vigente** (verde),
+  **Vence em N dias** (amarelo, nos 60 dias finais — o mesmo prazo do alerta
+  do topo da tela) e **Encerrado** (vermelho). Dá para ver de relance o que
+  precisa de atenção sem abrir registro por registro.
+- O selo traz sempre o texto junto da cor, e a data completa no rótulo de
+  passagem do mouse: quem não distingue as cores, ou imprime em preto e
+  branco, continua lendo a informação.
+
+**Correções**
+
+- Os selos de situação (inclusive os das contratações, que já existiam)
+  tinham **contraste insuficiente** entre texto e fundo nos temas claros,
+  abaixo do mínimo de acessibilidade para textos pequenos. A tinta foi
+  escurecida nos três temas até passar no critério AA.
+
 ## 1.1.1 — 2026-07-31
 
 Sincronização muito mais rápida. Medido no acervo real, numa atualização

@@ -374,6 +374,40 @@ function badgeSituacao(s) {
   return `<span class="badge ${cl}" title="${esc(s)}">${esc(curto)}</span>`;
 }
 
+// Situação da vigência de contratos e atas. O limiar de 60 dias é o mesmo
+// do chip de alerta e do KPI do topo — dois números diferentes para "vence
+// logo" na mesma tela confundiriam mais do que ajudariam.
+const DIAS_VENCENDO = 60;
+
+function hojeISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    + `-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function statusVigencia(fim) {
+  if (!fim) return null;              // registro sem vigência: nada a dizer
+  const dia = String(fim).slice(0, 10);
+  const hoje = hojeISO();
+  // comparação entre datas ISO é textual de propósito: `new Date("2026-01-01")`
+  // é lido como meia-noite UTC e, no nosso fuso, cai no dia anterior
+  if (dia < hoje) return { cl: "err", txt: "Encerrado" };
+  const dias = Math.round(
+    (Date.parse(`${dia}T00:00:00Z`) - Date.parse(`${hoje}T00:00:00Z`)) / 864e5);
+  if (dias <= DIAS_VENCENDO)
+    return { cl: "warn", txt: dias === 0 ? "Vence hoje" : `Vence em ${dias} d` };
+  return { cl: "ok", txt: "Vigente" };
+}
+
+// a cor sozinha não informa (daltonismo, impressão em preto e branco): o selo
+// leva sempre o texto do estado, e a data completa fica no title
+function badgeVigencia(d) {
+  const s = statusVigencia(d.vigencia_fim);
+  if (!s) return "";
+  return ` <span class="badge ${s.cl}" title="Vigência até `
+    + `${dataBr(d.vigencia_fim)}">${s.txt}</span>`;
+}
+
 // valor da contratação: homologado é definitivo, estimado é estimativa —
 // exibir os dois igual faria um processo em andamento parecer fechado
 function valorContratacao(d) {
@@ -395,7 +429,7 @@ function renderLinha(tipo, d) {
     return `<span class="dim">${esc(numContrato(d))}</span>
       <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
-      <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>
+      <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
   if (tipo === "itens") {
     const homologado = d.valor_unitario_homologado != null;
@@ -420,7 +454,7 @@ function renderLinha(tipo, d) {
   return `<span class="dim">${esc(d.numero_ata ?? "–")}/${esc(d.ano_ata ?? "")}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
     <span class="obj">${esc(d.objeto ?? "–")}</span>
-    <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}</span>`;
+    <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
 }
 
 async function mostrarResumoPrecos() {

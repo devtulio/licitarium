@@ -411,3 +411,94 @@ test("chip de vencimento navega para contratos vigentes", async ({ page }) => {
     .toHaveClass(/on/);
   await expect(page.locator("#f-vigentes")).toBeChecked();
 });
+
+test("contratos e atas mostram a situação da vigência por cor e texto",
+    async ({ page }) => {
+  for (const [aba, esperado] of [
+      ["contratos", [["ok", "Vigente"], ["warn", /Vence em \d+ d/],
+                     ["err", "Encerrado"]]],
+      ["atas", [["ok", "Vigente"], ["warn", /Vence em \d+ d/],
+                ["err", "Encerrado"]]]]) {
+    await page.locator(`nav.abas button[data-tipo="${aba}"]`).click();
+    const selos = page.locator(".linha:not(.cab) .badge");
+    await expect(selos).toHaveCount(3);
+    for (const [i, [classe, texto]] of esperado.entries()) {
+      await expect(selos.nth(i)).toHaveClass(new RegExp(`badge ${classe}$`));
+      await expect(selos.nth(i)).toHaveText(texto);
+      // cor não pode ser o único indicador (WCAG 1.4.1): o title carrega a data
+      await expect(selos.nth(i)).toHaveAttribute("title", /Vigência até \d{2}\//);
+    }
+  }
+});
+
+test("situação da vigência não escorrega de dia por causa do fuso",
+    async ({ page }) => {
+  // `new Date("2026-01-01")` é meia-noite UTC e, no nosso fuso, cai no dia
+  // anterior — o que faria um contrato que vence hoje aparecer como encerrado
+  const r = await page.evaluate(() => {
+    const d = new Date();
+    const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1)
+      .padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    const mais = n => { const y = new Date(); y.setDate(y.getDate() + n); return iso(y); };
+    return {
+      hoje: window.statusVigencia(iso(d)),
+      ontem: window.statusVigencia(mais(-1)),
+      amanha: window.statusVigencia(mais(1)),
+      limite: window.statusVigencia(mais(60)),
+      passouDoLimite: window.statusVigencia(mais(61)),
+      semData: window.statusVigencia(null),
+      comHora: window.statusVigencia(`${mais(5)}T00:00:00`),
+    };
+  });
+  expect(r.hoje).toEqual({ cl: "warn", txt: "Vence hoje" });
+  expect(r.ontem.cl).toBe("err");
+  expect(r.amanha).toEqual({ cl: "warn", txt: "Vence em 1 d" });
+  expect(r.limite.cl).toBe("warn");        // 60 dias ainda alerta
+  expect(r.passouDoLimite.cl).toBe("ok");  // 61 já é rotina
+  expect(r.semData).toBeNull();            // registro sem vigência: sem selo
+  expect(r.comHora.cl).toBe("warn");       // tolera timestamp completo
+});
+
+test("selos de situação atingem o contraste AA nos três temas",
+    async ({ page }) => {
+  for (const tema of ["portal", "pergaminho", "observatorio"]) {
+    await abrirApp(page, { tema, temaBanco: tema });
+    await page.locator('nav.abas button[data-tipo="contratos"]').click();
+    const medidas = await page.evaluate(() => {
+      // o navegador devolve color-mix como `color(srgb r g b / a)`, com
+      // componentes de 0 a 1 — e não como rgb() de 0 a 255
+      const cor = s => {
+        const n = (s.match(/[\d.]+/g) || []).map(Number);
+        const srgb = s.startsWith("color(");
+        const [r, g, b] = srgb ? n.slice(0, 3).map(v => v * 255) : n.slice(0, 3);
+        const a = srgb ? (n[3] ?? 1) : (n[3] ?? 1);
+        return { rgb: [r, g, b], a };
+      };
+      // fundo do selo é translúcido: compõe até achar algo opaco atrás
+      const fundoOpaco = el => {
+        for (let e = el; e; e = e.parentElement) {
+          const c = cor(getComputedStyle(e).backgroundColor);
+          if (c.a === 1) return c.rgb;
+        }
+        return [255, 255, 255];
+      };
+      const lum = ([r, g, b]) => {
+        const f = v => (v /= 255) <= 0.03928 ? v / 12.92
+          : Math.pow((v + 0.055) / 1.055, 2.4);
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      return [...document.querySelectorAll(".linha:not(.cab) .badge")].map(b => {
+        const e = getComputedStyle(b);
+        const selo = cor(e.backgroundColor), atras = fundoOpaco(b.parentElement);
+        const fundo = selo.rgb.map((v, i) => v * selo.a + atras[i] * (1 - selo.a));
+        const [hi, lo] = [lum(cor(e.color).rgb), lum(fundo)].sort((x, y) => y - x);
+        return { classe: b.className, razao: (hi + 0.05) / (lo + 0.05) };
+      });
+    });
+    expect(medidas.length).toBe(3);
+    // AA para texto pequeno: 4.5:1 (o selo tem 10,5px)
+    const reprovados = medidas.filter(m => m.razao < 4.5)
+      .map(m => `${tema}/${m.classe} = ${m.razao.toFixed(2)}`);
+    expect(reprovados).toEqual([]);
+  }
+});

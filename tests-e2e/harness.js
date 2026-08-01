@@ -4,6 +4,15 @@ const path = require("path");
 const URL_UI = "file://" +
   path.resolve(__dirname, "..", "ui", "index.html").replace(/\\/g, "/");
 
+// Vigências relativas a hoje: com data fixa, o mesmo registro mudaria de
+// estado (vigente -> vencido) com a passagem do tempo e os testes de cor
+// passariam a falhar sozinhos, num dia qualquer.
+const emDias = n => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
 const DADOS = {
   contratacoes: [
     { numero_controle: "X-1", ano: 2026, sequencial: 12,
@@ -24,13 +33,31 @@ const DADOS = {
       objeto: "Serviços de assessoria e consultoria técnica na área da educação",
       fornecedor_nome: "DANILO HENRIQUE NUNES CONSULTORIA",
       valor_global: 30294, vigencia_inicio: "2026-05-28",
-      vigencia_fim: "2027-05-28", data_publicacao: "2026-07-13" },
+      vigencia_fim: emDias(300), data_publicacao: "2026-07-13" },
+    { numero_controle: "Y-2", numero_contrato: "0041/26", ano_contrato: 2026,
+      objeto: "Manutenção preventiva da frota municipal",
+      fornecedor_nome: "OFICINA CENTRAL LTDA",
+      valor_global: 88000, vigencia_inicio: "2026-02-01",
+      vigencia_fim: emDias(20), data_publicacao: "2026-02-05" },
+    { numero_controle: "Y-3", numero_contrato: "0012/25", ano_contrato: 2025,
+      objeto: "Locação de impressoras para as unidades escolares",
+      fornecedor_nome: "COPIADORA REGIONAL ME",
+      valor_global: 14500, vigencia_inicio: "2025-01-10",
+      vigencia_fim: emDias(-45), data_publicacao: "2025-01-15" },
   ],
   atas: [
     { numero_controle: "Z-1", numero_ata: "13", ano_ata: 2026,
       objeto: "Registro de preços de óleos lubrificantes para a frota",
       contratacao_controle: "45148970000177-1-000061/2025",
-      vigencia_inicio: "2026-04-10", vigencia_fim: "2027-04-10" },
+      vigencia_inicio: "2026-04-10", vigencia_fim: emDias(250) },
+    { numero_controle: "Z-2", numero_ata: "07", ano_ata: 2026,
+      objeto: "Registro de preços de material de limpeza",
+      contratacao_controle: "45148970000177-1-000044/2025",
+      vigencia_inicio: "2026-01-15", vigencia_fim: emDias(12) },
+    { numero_controle: "Z-3", numero_ata: "02", ano_ata: 2025,
+      objeto: "Registro de preços de gêneros alimentícios",
+      contratacao_controle: "45148970000177-1-000028/2025",
+      vigencia_inicio: "2025-03-01", vigencia_fim: emDias(-90) },
   ],
   pca: [],
   itens: [

@@ -3,6 +3,7 @@
   --bg:#f8f9fa; --surface:#ffffff; --surface2:#f1f3f5;
   --text:#1b1b1b; --muted:#5c6670; --border:#e3e6e8;
   --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#a26a00;
+  --erro:#b00020; --badge-tom:85%;
   --radius:8px; --pill:99px; --font-ui:system-ui,'Segoe UI',sans-serif;
   --shadow:0 1px 3px rgba(0,0,0,.08); --mark-v:var(--accent);
 }
@@ -10,12 +11,14 @@
   --bg:#f5efe2; --surface:#fbf7ee; --surface2:#efe6d2;
   --text:#2b2115; --muted:#6f5b3e; --border:#d9cbaa;
   --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#8a6d1f;
+  --erro:#8b2e2e; --badge-tom:85%;
   --radius:3px; --pill:3px; --shadow:0 1px 2px rgba(43,33,21,.12); --mark-v:#8b2e2e;
 }
 [data-theme="observatorio"] {
   --bg:#10151c; --surface:#1a212b; --surface2:#141a23;
   --text:#dce3ec; --muted:#8b97a7; --border:#232c38;
   --accent:#f0a836; --accent-fg:#10151c; --ok:#2dd4a7; --warn:#f0a836;
+  --erro:#ff8a80; --badge-tom:100%;
   --radius:8px; --pill:6px; --shadow:0 1px 4px rgba(0,0,0,.4); --mark-v:#f0a836;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -83,8 +86,15 @@ input, select { background:var(--surface); color:var(--text);
         border-radius:var(--radius); box-shadow:var(--shadow); }
 .badge { font-size:10.5px; padding:3px 10px; border-radius:var(--pill);
          letter-spacing:.04em; white-space:nowrap; }
-.badge.ok   { background:color-mix(in srgb, var(--ok) 15%, transparent); color:var(--ok); }
-.badge.warn { background:color-mix(in srgb, var(--warn) 15%, transparent); color:var(--warn); }
+/* Nos temas claros a cor cheia sobre o fundo translúcido não alcança 4.5:1
+   no corpo de 10,5px do selo (WCAG 1.4.3) — daí a tinta escurecida. No
+   Observatório o fundo é escuro e a cor cheia já passa folgado. */
+.badge.ok   { background:color-mix(in srgb, var(--ok) 15%, transparent);
+              color:color-mix(in srgb, var(--ok) var(--badge-tom), black); }
+.badge.warn { background:color-mix(in srgb, var(--warn) 15%, transparent);
+              color:color-mix(in srgb, var(--warn) var(--badge-tom), black); }
+.badge.err  { background:color-mix(in srgb, var(--erro) 15%, transparent);
+              color:color-mix(in srgb, var(--erro) var(--badge-tom), black); }
 .badge.mut  { background:var(--surface2); color:var(--muted); }
 [data-theme="pergaminho"] .badge.ok { background:var(--ok); color:var(--accent-fg); }
 label { font-size:12px; color:var(--muted); display:block; margin:12px 0 5px; }
