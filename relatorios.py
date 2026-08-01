@@ -85,7 +85,9 @@ def data_br(s):
 # ── consultas ───────────────────────────────────────────────────────────────
 
 def dados_contratacoes(db, ano=None, modalidade=None, orgao=None):
-    where, args = [], []
+    # relatório oficial: só o município do usuário (ver referencia=0 no
+    # esquema — município de referência existe apenas para preços)
+    where, args = ["referencia=0"], []
     if ano:
         where.append("ano=?")
         args.append(ano)
@@ -169,13 +171,14 @@ def dados_executivo(db, ano, orgao=None):
     modalidades = [dict(r) for r in db.execute(
         f"""SELECT modalidade_nome, COUNT(*) n,
                   SUM(valor_estimado) estimado, SUM(valor_homologado) homologado
-           FROM contratacoes WHERE ano=?{og} GROUP BY 1
+           FROM contratacoes WHERE referencia=0 AND ano=?{og} GROUP BY 1
            ORDER BY COALESCE(SUM(COALESCE(valor_homologado, valor_estimado)),0)
            DESC""", [ano] + og_args)]
     meses = {r[0]: {"n": r[1], "valor": r[2] or 0} for r in db.execute(
         f"""SELECT substr(data_publicacao,6,2), COUNT(*),
                   SUM(COALESCE(valor_homologado, valor_estimado))
-           FROM contratacoes WHERE ano=? AND data_publicacao IS NOT NULL{og}
+           FROM contratacoes
+           WHERE referencia=0 AND ano=? AND data_publicacao IS NOT NULL{og}
            GROUP BY 1""", [ano] + og_args)}
     fornecedores = [dict(r) for r in db.execute(
         f"""SELECT fornecedor_nome, fornecedor_ni, COUNT(*) n,
@@ -228,7 +231,8 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
     unidades = [dict(r) for r in db.execute(
         f"""SELECT COALESCE(unidade,'(sem unidade)') unidade, COUNT(*) n,
                    SUM(COALESCE(valor_homologado, valor_estimado, 0)) total
-            FROM contratacoes WHERE ano=? AND modalidade_id=8{og}
+            FROM contratacoes
+            WHERE referencia=0 AND ano=? AND modalidade_id=8{og}
             GROUP BY 1 ORDER BY total DESC""", [ano] + og_args)]
     for u in unidades:
         u["pct"] = u["total"] / limite_compras * 100 if limite_compras else 0
@@ -236,7 +240,8 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
         f"""SELECT sequencial, ano, unidade, objeto,
                    COALESCE(valor_homologado, valor_estimado) valor,
                    data_publicacao
-            FROM contratacoes WHERE ano=? AND modalidade_id=8{og}
+            FROM contratacoes
+            WHERE referencia=0 AND ano=? AND modalidade_id=8{og}
             ORDER BY unidade, data_publicacao""", [ano] + og_args)]
     return {"ano": ano, "unidades": unidades, "dispensas": dispensas,
             "limite_compras": limite_compras, "limite_obras": limite_obras,

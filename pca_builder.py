@@ -97,8 +97,13 @@ def _quantidade(por_ano, base):
 def consolidar(db, anos=None, palavras=PALAVRAS_CHAVE_PADRAO,
                base="media", estatistica="mediana", margem=MARGEM_PADRAO,
                orgao=None, so_recorrentes=False):
-    """Agrupa os itens contratados e projeta o próximo exercício."""
-    where = ["valor_unitario_homologado IS NOT NULL"]
+    """Agrupa os itens contratados e projeta o próximo exercício.
+
+    Só itens do próprio município: o plano é do que ESTE órgão vai contratar,
+    e item de município de referência (que existe só para consulta de preço)
+    inflaria o quantitativo com compra alheia.
+    """
+    where = ["referencia=0", "valor_unitario_homologado IS NOT NULL"]
     args = []
     if anos:
         where.append("ano IN (%s)" % ",".join("?" * len(anos)))

@@ -41,7 +41,11 @@ CREATE TABLE IF NOT EXISTS contratacoes (
   valor_estimado REAL, valor_homologado REAL,
   data_encerramento_proposta TEXT,
   data_publicacao TEXT, data_atualizacao TEXT,
-  itens_versao TEXT, itens_sync_em TEXT, raw TEXT, sync_em TEXT);
+  itens_versao TEXT, itens_sync_em TEXT,
+  -- 0 = município do usuário; 1 = município de referência, que alimenta
+  -- só o banco de preços e nunca os relatórios oficiais
+  referencia INTEGER DEFAULT 0,
+  raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS contratos (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
   numero_contrato TEXT, ano_contrato INTEGER, sequencial_contrato INTEGER,
@@ -62,7 +66,8 @@ CREATE TABLE IF NOT EXISTS itens (
   valor_unitario_homologado REAL, valor_total_homologado REAL,
   quantidade_homologada REAL, fornecedor_ni TEXT, fornecedor_nome TEXT,
   fornecedor_porte TEXT, data_resultado TEXT, situacao TEXT,
-  data_atualizacao TEXT, raw TEXT, sync_em TEXT);
+  data_atualizacao TEXT, referencia INTEGER DEFAULT 0,
+  raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS pca_itens (
   id TEXT PRIMARY KEY, id_pca TEXT, ano INTEGER, orgao_cnpj TEXT, unidade TEXT,
   numero_item INTEGER, descricao TEXT, categoria TEXT, grupo TEXT,
@@ -159,6 +164,12 @@ def abrir_db():
                    " numero_ata=json_extract(raw,'$.numeroAtaRegistroPreco'),"
                    " ano_ata=json_extract(raw,'$.anoAta')")
         db.commit()
+    for tabela in ("contratacoes", "itens"):
+        cols = {r[1] for r in db.execute(f"PRAGMA table_info({tabela})")}
+        if cols and "referencia" not in cols:
+            db.execute(f"ALTER TABLE {tabela} ADD COLUMN"
+                       " referencia INTEGER DEFAULT 0")
+            db.commit()
     colunas_m = {r[1] for r in db.execute("PRAGMA table_info(pca_minuta_itens)")}
     if colunas_m and "mesclado_de" not in colunas_m:
         db.execute("ALTER TABLE pca_minuta_itens ADD COLUMN mesclado_de TEXT")
@@ -258,10 +269,12 @@ class Api:
         ano = str(date.today().year)
         hoje = date.today().isoformat()
         n_contratacoes = db.execute(
-            "SELECT COUNT(*) FROM contratacoes").fetchone()[0]
+            "SELECT COUNT(*) FROM contratacoes WHERE referencia=0"
+        ).fetchone()[0]
         homologado_ano = db.execute(
             "SELECT COALESCE(SUM(valor_homologado),0) FROM contratacoes "
-            "WHERE substr(data_publicacao,1,4)=?", (ano,)).fetchone()[0]
+            "WHERE referencia=0 AND substr(data_publicacao,1,4)=?",
+            (ano,)).fetchone()[0]
         vigentes = db.execute(
             "SELECT COUNT(*) FROM contratos WHERE substr(vigencia_fim,1,10)>=?",
             (hoje,)).fetchone()[0]
@@ -272,7 +285,8 @@ class Api:
             " BETWEEN date('now') AND date('now','+60 day'))").fetchone()[0]
         propostas_abertas = db.execute(
             "SELECT COUNT(*) FROM contratacoes"
-            " WHERE datetime(data_encerramento_proposta) >= datetime('now')"
+            " WHERE referencia=0"
+            " AND datetime(data_encerramento_proposta) >= datetime('now')"
         ).fetchone()[0]
         return {"contratacoes": n_contratacoes,
                 "homologado_ano": homologado_ano, "vigentes": vigentes,
@@ -373,6 +387,10 @@ class Api:
             return {"itens": [], "total": 0}
         f = filtros or {}
         where, args = [], []
+        # município de referência alimenta só o banco de preços (aba
+        # Preços): no acervo ele não existe
+        if tipo == "contratacoes":
+            where.append("referencia=0")
         if f.get("ano"):
             if tipo == "itens":
                 where.append("ano=?")
@@ -502,14 +520,16 @@ class Api:
         db = abrir_db()
         try:
             anos = [r[0] for r in db.execute(
-                "SELECT DISTINCT ano FROM contratacoes "
-                "WHERE ano IS NOT NULL ORDER BY 1 DESC")]
+                "SELECT DISTINCT ano FROM contratacoes"
+                " WHERE referencia=0 AND ano IS NOT NULL ORDER BY 1 DESC")]
             situacoes = [r[0] for r in db.execute(
-                "SELECT DISTINCT situacao FROM contratacoes "
-                "WHERE situacao IS NOT NULL ORDER BY 1")]
+                "SELECT DISTINCT situacao FROM contratacoes"
+                " WHERE referencia=0 AND situacao IS NOT NULL ORDER BY 1")]
             modalidades = [{"id": r[0], "nome": r[1]} for r in db.execute(
-                "SELECT DISTINCT modalidade_id, modalidade_nome FROM contratacoes"
-                " WHERE modalidade_id IS NOT NULL ORDER BY 2")]
+                "SELECT DISTINCT modalidade_id, modalidade_nome"
+                " FROM contratacoes"
+                " WHERE referencia=0 AND modalidade_id IS NOT NULL"
+                " ORDER BY 2")]
             orgaos = [{"cnpj": r[0], "nome": r[1]} for r in db.execute(
                 "SELECT cnpj, razao_social FROM orgaos ORDER BY razao_social")]
             return {"anos": anos, "situacoes": situacoes,
@@ -667,7 +687,8 @@ class Api:
         db = abrir_db()
         try:
             return [r[0] for r in db.execute(
-                "SELECT DISTINCT ano FROM itens WHERE ano IS NOT NULL"
+                "SELECT DISTINCT ano FROM itens"
+                " WHERE referencia=0 AND ano IS NOT NULL"
                 " AND valor_unitario_homologado IS NOT NULL ORDER BY 1")]
         finally:
             db.close()
