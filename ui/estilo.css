@@ -245,6 +245,9 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 /* datas e selo centralizados na célula, com respiro entre eles: o selo em
    bloco próprio garante a linha separada mesmo quando a coluna é alargada */
 .linha .vig .badge { display:block; width:fit-content; margin:6px auto 0; }
+/* preço vindo de município de referência: discreto, mas sempre visível —
+   o usuário não pode confundir a própria série com a de fora */
+.de-fora { color:var(--warn); font-size:10.5px; }
 .vazio { padding:30px 34px 34px; text-align:center; color:var(--muted);
          font-size:13px; }
 .vazio svg { width:74px; height:74px; opacity:.28; margin-bottom:6px; }

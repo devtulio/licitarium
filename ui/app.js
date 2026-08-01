@@ -40,6 +40,8 @@ const SELO = `
 
 const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
                  ord:null, dir:"desc" };
+// há município de referência? decide se a aba Preços mostra a origem
+let temReferencia = false;
 let api = null;
 
 // ── splash ────────────────────────────────────────────────────────────────
@@ -212,6 +214,8 @@ $("wiz-ok").addEventListener("click", async () => {
 // ── app ───────────────────────────────────────────────────────────────────
 async function iniciarApp(e) {
   estado.municipio = e.municipio;
+  if (api.listar_municipios_referencia)
+    temReferencia = (await api.listar_municipios_referencia()).length > 0;
   $("wizard").classList.add("oculto");
   $("app").classList.remove("oculto");
   $("sub-municipio").textContent =
@@ -303,6 +307,7 @@ function filtrosAtuais() {
            propostas: $("f-propostas").checked || null,
            vigentes: $("f-vigentes").checked || null,
            so_homologados: $("f-homologados").checked || null,
+           origem: $("f-so-meu").checked ? "proprio" : null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
@@ -443,7 +448,14 @@ function renderLinha(tipo, d) {
       <span class="num">${unit}</span>
       <span class="dim" title="${esc(d.fornecedor_nome ?? "")}"
         >${esc(fornecedorCurto(d.fornecedor_nome))}</span>
-      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>`;
+      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}${
+        // o município só aparece quando o preço vem de fora: no acervo
+        // próprio seria a mesma etiqueta em toda linha
+        d.referencia
+          ? `<br><small class="de-fora"
+               title="Preço de município de referência">${
+               esc(d.municipio_nome ?? "outro município")}</small>`
+          : ""}</span>`;
   }
   if (tipo === "pca")
     return `<span class="dim">${esc(d.numero_item)}</span>
@@ -465,12 +477,17 @@ async function mostrarResumoPrecos() {
     return;
   }
   const s = await api.estatisticas_preco(termo,
-    $("f-ano").value ? +$("f-ano").value : null);
+    $("f-ano").value ? +$("f-ano").value : null,
+    $("f-so-meu").checked ? "proprio" : null);
   if (!s) { caixa.classList.add("oculto"); return; }
   const cel = (v, r, destaque) =>
     `<div class="cel${destaque ? " destaque" : ""}">
        <div class="v">${v}</div><div class="r">${r}</div></div>`;
-  caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
+  // quem decide precisa saber quanto do resultado é da própria série
+  const origem = s.referencia
+    ? ` <small class="dim">— ${s.proprios} do seu município e ${s.referencia} de referência</small>`
+    : "";
+  caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"${origem}</h3>
     <div class="grade">
       ${cel(dinheiro(s.minimo), "menor unitário")}
       ${cel(dinheiro(s.mediana), "mediana", true)}
@@ -653,6 +670,8 @@ document.querySelectorAll("nav.abas button").forEach(b =>
       !["contratos", "atas"].includes(estado.tipo));
     const ehItens = estado.tipo === "itens";
     $("cx-homologados").classList.toggle("oculto", !ehItens);
+    // o filtro de origem só faz sentido havendo município de referência
+    $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
     $("f-busca").placeholder = ehItens
       ? "Buscar item — ex.: papel A4, óleo, pneu…"
       : "Buscar no objeto…";
@@ -660,7 +679,7 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("f-vigentes").checked = false;
     carregarLista();
   }));
-["f-propostas", "f-vigentes", "f-homologados"].forEach(id =>
+["f-propostas", "f-vigentes", "f-homologados", "f-so-meu"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 
 // navegação programática (KPIs e alertas)

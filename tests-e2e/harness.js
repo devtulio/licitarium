@@ -89,6 +89,14 @@ const DADOS = {
       fornecedor_nome: "COOPERATIVA DE CRÉDITO, POUPANÇA E INVESTIMENTO DO "
         + "NOROESTE DO ESTADO DE SÃO PAULO - SICREDI NOROESTE -SP",
       data_resultado: "2026-07-02" },
+    { id: "REF#1", contratacao_controle: "R-1", ano: 2026, sequencial: 7,
+      numero_item: 1, descricao: "PAPEL SULFITE A4 75G RESMA 500 FOLHAS",
+      unidade: "RESMA", quantidade: 200, quantidade_homologada: 200,
+      valor_unitario_estimado: 23.0, valor_unitario_homologado: 16.4,
+      fornecedor_nome: "DISTRIBUIDORA VIZINHA LTDA",
+      data_resultado: "2026-05-20",
+      referencia: 1, municipio_ibge: "3535002",
+      municipio_nome: "Palestina" },
     { id: "X-3#2", contratacao_controle: "X-3", ano: 2025, sequencial: 50,
       numero_item: 2, descricao: "CANETA ESFEROGRÁFICA AZUL",
       unidade: "UN", quantidade: 500, quantidade_homologada: 500,
@@ -125,13 +133,16 @@ function scriptPonte(temaBanco = "portal") {
         let itens = DADOS[tipo] || [];
         if (tipo === "itens" && filtros && filtros.so_homologados)
           itens = itens.filter(i => i.valor_unitario_homologado != null);
+        if (tipo === "itens" && filtros && filtros.origem === "proprio")
+          itens = itens.filter(i => !i.referencia);
         return { itens, total: itens.length };
       },
       estatisticas_preco: async (busca, ano) => {
         window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano });
         if (!/papel/i.test(busca || "")) return null;
         return { n: 3, minimo: 15.4, maximo: 24.9, media: 19.68,
-                 mediana: 18.75, fornecedores: 2 };
+                 mediana: 18.75, fornecedores: 2,
+                 proprios: 2, referencia: 1 };
       },
       detalhe: async (tipo, nc) =>
         ({ ...(DADOS[tipo] || []).find(d => d.numero_controle === nc),

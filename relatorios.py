@@ -272,9 +272,22 @@ def dados_precos(db, termo, ano=None, orgao=None):
         f"""SELECT descricao, unidade, quantidade_homologada, unidade,
                    valor_unitario_homologado, valor_total_homologado,
                    fornecedor_nome, fornecedor_ni, data_resultado,
-                   sequencial, ano, contratacao_controle
+                   sequencial, ano, contratacao_controle,
+                   referencia, municipio_ibge
             FROM itens{sql_where}
             ORDER BY valor_unitario_homologado""", args)]
+    # de onde veio cada preço: o documento tem de dizer, porque parâmetro
+    # de outro ente é admitido pelo art. 23, §1º, I, mas precisa estar claro
+    nomes = {r["ibge"]: r["nome"] for r in
+             db.execute("SELECT ibge, nome FROM municipios_referencia")}
+    proprio = db.execute(
+        "SELECT valor FROM config WHERE chave='municipio_ibge'").fetchone()
+    nome_proprio = db.execute(
+        "SELECT valor FROM config WHERE chave='municipio_nome'").fetchone()
+    if proprio:
+        nomes[proprio[0]] = nome_proprio[0] if nome_proprio else proprio[0]
+    for l in linhas:
+        l["municipio_nome"] = nomes.get(l["municipio_ibge"]) or "–"
     valores = [l["valor_unitario_homologado"] for l in linhas]
     resumo = None
     if valores:
@@ -584,6 +597,7 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
       <td class="num">{moeda(l['valor_total_homologado'])}</td>
       <td class="forn">{_e(l['fornecedor_nome'])}</td>
+      <td class="ctr">{_e(l['municipio_nome'])}</td>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="num">{data_br(l['data_resultado'])}</td></tr>"""
       for l in d["linhas"])
@@ -598,6 +612,7 @@ Termo pesquisado: <b>{_e(d['termo'])}</b>.</div>
 <table><thead><tr><th>Descrição</th><th class="ctr">Unid.</th>
 <th class="num">Qtde</th><th class="num">Unitário</th>
 <th class="num">Total</th><th class="forn">Fornecedor</th>
+<th class="ctr">Município</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
 <tbody>{linhas}</tbody></table>"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"

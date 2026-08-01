@@ -176,6 +176,14 @@ def abrir_db():
         if cols and "municipio_ibge" not in cols:
             db.execute(f"ALTER TABLE {tabela} ADD COLUMN municipio_ibge TEXT")
             db.commit()
+        # tudo o que já estava no banco é do município do usuário: sem isso a
+        # coluna Origem da aba Preços nasceria vazia no acervo inteiro
+        if cols:
+            db.execute(
+                f"UPDATE {tabela} SET municipio_ibge ="
+                " (SELECT valor FROM config WHERE chave='municipio_ibge')"
+                " WHERE municipio_ibge IS NULL AND referencia=0")
+            db.commit()
     colunas_m = {r[1] for r in db.execute("PRAGMA table_info(pca_minuta_itens)")}
     if colunas_m and "mesclado_de" not in colunas_m:
         db.execute("ALTER TABLE pca_minuta_itens ADD COLUMN mesclado_de TEXT")
@@ -479,6 +487,8 @@ class Api:
                 "datetime(data_encerramento_proposta) >= datetime('now')")
         if f.get("so_homologados") and tipo == "itens":
             where.append("valor_unitario_homologado IS NOT NULL")
+        if f.get("origem") == "proprio" and tipo == "itens":
+            where.append("referencia=0")
         if f.get("busca"):
             termo = _termo_fts(f["busca"]) if tipo == "itens" else None
             if termo:
@@ -510,14 +520,26 @@ class Api:
             linhas = db.execute(
                 f"SELECT * FROM {tabela}{sql_where} ORDER BY {ordem} "
                 f"LIMIT 50 OFFSET ?", args + [(max(1, pagina) - 1) * 50])
+            nomes = self._nomes_de_municipio(db) if tipo == "itens" else {}
             itens = []
             for r in linhas:
                 d = dict(r)
                 d.pop("raw", None)  # listagem não precisa do JSON completo
+                if tipo == "itens":
+                    d["municipio_nome"] = nomes.get(d.get("municipio_ibge"))
                 itens.append(d)
             return {"itens": itens, "total": total}
         finally:
             db.close()
+
+    @staticmethod
+    def _nomes_de_municipio(db):
+        nomes = {r["ibge"]: r["nome"] for r in db.execute(
+            "SELECT ibge, nome FROM municipios_referencia")}
+        proprio = pncp._config(db, "municipio_ibge")
+        if proprio:
+            nomes[proprio] = pncp._config(db, "municipio_nome") or proprio
+        return nomes
 
     def detalhe(self, tipo, numero_controle):
         tabela = TABELAS.get(tipo)
@@ -536,7 +558,7 @@ class Api:
         finally:
             db.close()
 
-    def estatisticas_preco(self, busca, ano=None):
+    def estatisticas_preco(self, busca, ano=None, origem=None):
         """Resumo do valor unitário homologado para um termo — a resposta de
         'quanto pagamos por isso?' que instrui a pesquisa de preços."""
         if not (busca or "").strip():
@@ -554,6 +576,8 @@ class Api:
         if ano:
             where.append("ano=?")
             args.append(ano)
+        if origem == "proprio":
+            where.append("referencia=0")
         db = abrir_db()
         try:
             valores = [r[0] for r in db.execute(
@@ -568,9 +592,15 @@ class Api:
             fornecedores = db.execute(
                 "SELECT COUNT(DISTINCT fornecedor_ni) FROM itens WHERE "
                 + " AND ".join(where), args).fetchone()[0]
+            # quanto do resultado é do próprio município: quem decide precisa
+            # saber se está olhando a própria série ou a de fora
+            proprios = db.execute(
+                "SELECT COUNT(*) FROM itens WHERE referencia=0 AND "
+                + " AND ".join(where), args).fetchone()[0]
             return {"n": n, "minimo": valores[0], "maximo": valores[-1],
                     "media": sum(valores) / n, "mediana": mediana,
-                    "fornecedores": fornecedores}
+                    "fornecedores": fornecedores,
+                    "proprios": proprios, "referencia": n - proprios}
         finally:
             db.close()
 

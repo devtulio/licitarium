@@ -106,7 +106,8 @@ test("aba Preços lista itens e resume o histórico do termo buscado",
   await expect(page.locator("#f-busca"))
     .toHaveAttribute("placeholder", /papel A4/);
   // "só com preço fechado" vem ligado: o item sem resultado não aparece
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
+  // (4 do município + 1 de referência)
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
   await expect(page.locator(".linha:not(.cab)").first())
     .toContainText("PAPEL SULFITE");
   // resumo estatístico aparece ao buscar
@@ -117,19 +118,22 @@ test("aba Preços lista itens e resume o histórico do termo buscado",
   await expect(page.locator("#precos-resumo")).toContainText("18,75");
   // desmarcar traz também o item sem preço fechado
   await page.locator("#f-homologados").uncheck();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(6);
 });
 
 test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
     async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(4);
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
   const m = await page.evaluate(() => {
     const quebrou = [], truncou = [];
     document.querySelectorAll(".linha:not(.cab)").forEach(linha => {
       [...linha.children].forEach((cel, i) => {
         if (i === 0) return;                     // descrição pode quebrar
+        // preço de município de referência leva a origem numa 2ª linha,
+        // de propósito: é o que distingue a série própria da de fora
+        if (cel.querySelector(".de-fora")) return;
         const uma = parseFloat(getComputedStyle(cel).lineHeight) || 18;
         const txt = cel.textContent.trim();
         if (cel.scrollHeight > uma * 1.6) quebrou.push(txt);
@@ -565,4 +569,28 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
   await page.locator('#cfg-referencia button[data-remover="3535002"]').click();
   await expect(secao).not.toContainText("Palestina");
   await expect(secao).toContainText("Paulo de Faria");
+});
+
+test("aba Preços mostra a origem e permite ficar só com o município",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  const deFora = page.locator(".linha:not(.cab) .de-fora");
+  await expect(deFora).toHaveCount(1);
+  await expect(deFora).toHaveText("Palestina");
+  await expect(deFora).toHaveAttribute("title", /município de referência/);
+  // o item do próprio município não recebe etiqueta: seria ruído em todas
+  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
+
+  // o resumo diz quanto do resultado é da própria série
+  await page.locator("#f-busca").fill("papel");
+  await expect(page.locator("#precos-resumo h3"))
+    .toContainText("do seu município");
+
+  // filtro de origem só aparece havendo referência, e funciona
+  await expect(page.locator("#cx-so-meu")).toBeVisible();
+  await page.locator("#f-so-meu").check();
+  await expect(page.locator(".linha:not(.cab) .de-fora")).toHaveCount(0);
+  const enviado = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar" && c.tipo === "itens").pop());
+  expect(enviado.filtros.origem).toBe("proprio");
 });
