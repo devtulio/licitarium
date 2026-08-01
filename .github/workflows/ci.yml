@@ -24,9 +24,10 @@ jobs:
           node-version: "20"
       - run: npm install
       - run: npx playwright install chromium
-      # screenshots.spec.js fica de fora: regrava docs/screenshots/*.png,
-      # que são versionados e regerados à mão quando a interface muda
-      - run: npx playwright test tests-e2e/app.spec.js tests-e2e/manual.spec.js
+      # todos os specs, sem lista: listar um a um já deixou teste novo fora
+      # do CI em silêncio, duas vezes. screenshots.spec.js regrava PNGs, mas
+      # o workspace do runner é descartado — no CI isso é inofensivo
+      - run: npx playwright test
 
   build:
     if: startsWith(github.ref, 'refs/tags/v')
