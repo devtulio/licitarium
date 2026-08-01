@@ -129,7 +129,7 @@ para checar se saiu versão nova, para a API pública do GitHub.
 
 ## Instalação
 
-**Executável (recomendado):** baixe o `Licitarium.exe` da página de
+**Executável (recomendado):** baixe o `Licitarium vX.Y.Z.exe` da página de
 [releases](../../releases) e execute. Não precisa instalar nada, nem ter Python,
 nem direitos de administrador.
 
@@ -189,7 +189,7 @@ ansata, a divisa *sub hasta publica*): [design/IDENTIDADE.md](design/IDENTIDADE.
 pip install -r requirements.txt pytest
 python -m pytest tests/              # motor de sync, API e relatórios
 npm install && npx playwright test   # interface (Chromium)
-pyinstaller --clean Licitarium.spec  # gera dist/Licitarium.exe
+pyinstaller --clean Licitarium.spec  # gera dist/"Licitarium vX.Y.Z.exe"
 ```
 
 A cada push, o CI roda os testes de Python e de interface no Windows; ao marcar

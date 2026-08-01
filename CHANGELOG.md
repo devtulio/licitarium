@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.4 — 2026-08-01
+
+- **O executável passa a trazer a versão no nome**: o arquivo baixado da
+  página de releases se chama **"Licitarium v1.2.4.exe"**, no mesmo padrão do
+  manual. Dá para saber qual versão você tem só de olhar o arquivo, e as
+  versões guardadas não se sobrescrevem.
+- Ao atualizar sozinho, o programa também **renomeia o arquivo** para a versão
+  nova — do contrário o nome passaria a mentir sobre o conteúdo. Se você tiver
+  um atalho apontando para o executável, refaça-o depois da primeira
+  atualização.
+
+> Quem está na 1.2.3 ou anterior continua recebendo o aviso de versão nova,
+> mas precisará **baixar manualmente desta vez**: aquelas versões procuram um
+> arquivo com o nome antigo. Da 1.2.4 em diante a atualização automática volta
+> a funcionar normalmente.
+
 ## 1.2.3 — 2026-08-01
 
 - **Nome do manual em PDF segue o padrão dos sistemas irmãos.** Ao imprimir ou

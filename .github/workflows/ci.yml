@@ -42,6 +42,12 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller
       - run: pyinstaller --clean Licitarium.spec
       - name: Anexar exe à release
-        run: gh release upload ${{ github.ref_name }} dist/Licitarium.exe
+        # o nome do exe carrega a versão ("Licitarium v1.2.4.exe"), então o
+        # caminho vem por glob; falha explicitamente se não gerou exatamente um
+        shell: pwsh
+        run: |
+          $exe = @(Get-ChildItem dist/*.exe)
+          if ($exe.Count -ne 1) { throw "esperava 1 exe em dist/, achei $($exe.Count)" }
+          gh release upload ${{ github.ref_name }} $exe[0].FullName
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

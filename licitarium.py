@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.2.3"
+VERSAO = "1.2.4"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -720,9 +720,14 @@ class Api:
             remota = [int(x) for x in tag.split(".")] if tag else []
             if remota > local:
                 self._atualizacao = d.get("html_url")
+                self._nova_versao = tag
+                # o nome do exe passou a carregar a versão
+                # ("Licitarium v1.2.4.exe"), então casa por padrão e não por
+                # nome fixo — assim segue achando as releases antigas também
                 self._asset_url = next(
                     (a.get("browser_download_url") for a in d.get("assets", [])
-                     if a.get("name") == "Licitarium.exe"), None)
+                     if re.fullmatch(r"Licitarium( v[\d.]+)?\.exe",
+                                     a.get("name") or "")), None)
                 # instalação automática só faz sentido rodando como exe e
                 # sem Smart App Control barrando o binário novo
                 auto = bool(self._asset_url and getattr(sys, "frozen", False)
@@ -804,7 +809,14 @@ class Api:
                                 "(antivírus ou política do Windows) — a versão "
                                 "atual foi mantida"}
             bat = destino / "atualizar.bat"
-            bat.write_text(_script_atualizacao(Path(sys.executable), novo),
+            # o nome do arquivo carrega a versão: trocar o conteúdo sem
+            # renomear deixaria "Licitarium v1.2.3.exe" rodando a 1.2.4
+            atual = Path(sys.executable)
+            versao_nova = getattr(self, "_nova_versao", None)
+            final = (atual.with_name(f"Licitarium v{versao_nova}.exe")
+                     if versao_nova and atual.name.startswith("Licitarium")
+                     else atual)
+            bat.write_text(_script_atualizacao(atual, novo, final),
                            encoding="ascii", errors="replace")
             subprocess.Popen(
                 ["cmd", "/c", str(bat)],
@@ -885,8 +897,11 @@ class Api:
             db.close()
 
 
-def _script_atualizacao(exe_atual, exe_novo):
+def _script_atualizacao(exe_atual, exe_novo, exe_final=None):
     """Gera o .bat que espera o app fechar, troca o exe e reabre.
+
+    `exe_final` permite que o arquivo assuma o nome da versão nova; quando
+    igual ao atual, a troca é no lugar (comportamento de sempre).
 
     A folga antes do start dá tempo de o Windows liberar o arquivo recém
     movido. Não há retry aqui de propósito: quando o bootloader falha, ele
@@ -894,6 +909,7 @@ def _script_atualizacao(exe_atual, exe_novo):
     checagem por tasklist daria falso positivo — a defesa é validar o exe
     antes da troca (ver Api._validar_exe).
     """
+    exe_final = exe_final or exe_atual
     return f"""@echo off
 :espera
 del "{exe_atual}" >nul 2>&1
@@ -901,9 +917,9 @@ if exist "{exe_atual}" (
   timeout /t 1 /nobreak >nul
   goto espera
 )
-move /y "{exe_novo}" "{exe_atual}" >nul
+move /y "{exe_novo}" "{exe_final}" >nul
 timeout /t 3 /nobreak >nul
-start "" "{exe_atual}"
+start "" "{exe_final}"
 del "%~f0"
 """
 

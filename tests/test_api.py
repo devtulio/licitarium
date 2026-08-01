@@ -304,3 +304,46 @@ def test_indice_de_busca_reconstruido_em_banco_antigo(api, tmp_path):
 def test_filtro_ano_pca(api):
     assert api.listar("pca", {"ano": 2026})["total"] == 2
     assert api.listar("pca", {"ano": 2024})["total"] == 0
+
+
+def test_asset_do_auto_update_aceita_nome_com_versao():
+    """O exe passou a se chamar "Licitarium vX.Y.Z.exe" (1.2.4).
+
+    O casamento por nome fixo pararia de achar o download da release nova;
+    o padrão continua aceitando as releases antigas, sem versão no nome.
+    """
+    padrao = re.compile(r"Licitarium( v[\d.]+)?\.exe")
+    assert padrao.fullmatch("Licitarium v1.2.4.exe")
+    assert padrao.fullmatch("Licitarium.exe")          # releases até a 1.2.3
+    for fora in ("licitarium.exe", "OutroLicitarium.exe",
+                 "Licitarium v1.2.4.zip", "Licitarium.exe.txt"):
+        assert not padrao.fullmatch(fora), fora
+    # e é o mesmo padrão que o código usa
+    fonte = (licitarium.DIR_APP / "licitarium.py").read_text(encoding="utf-8")
+    assert padrao.pattern in fonte
+
+
+def test_spec_nomeia_o_exe_com_a_versao_do_codigo():
+    spec = (licitarium.DIR_APP / "Licitarium.spec").read_text(encoding="utf-8")
+    assert "name=f'Licitarium v{VERSAO}'" in spec
+    # a versão é lida de licitarium.py; cópia fixa aqui sairia de sincronia
+    assert "licitarium.py" in spec and "re.search" in spec
+
+
+def test_troca_do_exe_assume_o_nome_da_versao_nova():
+    """Trocar só o conteúdo deixaria "Licitarium v1.2.3.exe" rodando a 1.2.4."""
+    atual = Path("C:/Users/x/Desktop/Licitarium v1.2.3.exe")
+    baixado = Path("C:/tmp/Licitarium.novo.exe")
+    final = Path("C:/Users/x/Desktop/Licitarium v1.2.4.exe")
+    bat = licitarium._script_atualizacao(atual, baixado, final)
+    assert f'move /y "{baixado}" "{final}"' in bat
+    assert f'start "" "{final}"' in bat
+    # o app espera o arquivo ANTIGO ser liberado antes de mover
+    assert f'del "{atual}"' in bat
+    # caminho com espaço sempre entre aspas, senão o cmd quebra o comando
+    for linha in bat.splitlines():
+        if "Licitarium" in linha:
+            assert linha.count('"') >= 2, linha
+    # sem destino informado, troca no lugar (comportamento das versões antigas)
+    velho = licitarium._script_atualizacao(atual, baixado)
+    assert f'move /y "{baixado}" "{atual}"' in velho
