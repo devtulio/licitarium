@@ -175,3 +175,39 @@ def test_relatorio_segue_tema_mas_imprime_claro(db, tmp_path):
 def test_tipo_desconhecido(db, tmp_path):
     with pytest.raises(ValueError):
         relatorios.gerar(db, "xxx", {}, "T", "SP", tmp_path)
+
+
+def test_documento_distingue_cnpj_de_cpf():
+    """O `niFornecedor` do PNCP guarda os dois — no acervo real há 34 CPFs.
+
+    Máscara de CNPJ aplicada às cegas transformaria 01472188616 em
+    "01.472.188/616-" e o relatório sairia com o documento adulterado.
+    """
+    assert relatorios.documento("13286494000164") == "13.286.494/0001-64"
+    assert relatorios.documento("01472188616") == "014.721.886-16"
+    # já formatado na origem continua correto (idempotente)
+    assert relatorios.documento("13.286.494/0001-64") == "13.286.494/0001-64"
+    # o que não é nenhum dos dois sai como veio, sem inventar pontuação
+    assert relatorios.documento("A1B2") == "A1B2"
+    assert relatorios.documento("123") == "123"
+    assert relatorios.documento(None) == "–"
+    assert relatorios.documento("") == "–"
+
+
+def test_relatorios_imprimem_documento_com_mascara(db):
+    db.execute(
+        "INSERT INTO contratos (numero_controle, orgao_cnpj, fornecedor_ni,"
+        " fornecedor_nome, objeto, valor_global, data_publicacao, raw)"
+        " VALUES ('K-1','111','13286494000164','FORN LTDA','Objeto',10.0,"
+        " '2026-02-02','{}')")
+    db.execute(
+        "INSERT INTO contratos (numero_controle, orgao_cnpj, fornecedor_ni,"
+        " fornecedor_nome, objeto, valor_global, data_publicacao, raw)"
+        " VALUES ('K-2','111','01472188616','JOSE DA SILVA','Objeto',10.0,"
+        " '2026-02-03','{}')")
+    db.commit()
+    html = relatorios.render_contratos(
+        relatorios.dados_contratos(db, ano=2026), "Orindiúva", "SP", "2026")
+    assert "13.286.494/0001-64" in html
+    assert "014.721.886-16" in html
+    assert "13286494000164" not in html      # nada de número cru

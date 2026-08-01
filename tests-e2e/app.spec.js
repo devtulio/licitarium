@@ -503,21 +503,38 @@ test("selos de situação atingem o contraste AA nos três temas",
   }
 });
 
-test("selo de vigência fica na mesma altura do fornecedor", async ({ page }) => {
+test("selo de vigência: centralizado na célula e com respiro da data",
+    async ({ page }) => {
   await page.setViewportSize({ width: 1300, height: 900 });
-  await page.locator('nav.abas button[data-tipo="contratos"]').click();
-  const linhas = await page.evaluate(() =>
-    [...document.querySelectorAll(".linha:not(.cab)")].map(l => {
-      const forn = l.children[1].querySelector(".dim");
-      const selo = l.querySelector(".badge");
-      const meio = e => { const r = e.getBoundingClientRect();
-                          return r.top + r.height / 2; };
-      return { alturaObjeto: l.children[1].getBoundingClientRect().height,
-               desvio: Math.abs(meio(selo) - meio(forn)) };
-    }));
-  expect(linhas.length).toBe(3);
-  // o caso que motivou o ajuste: objeto de várias linhas empurra o fornecedor
-  // para baixo e a célula de vigência, centralizada, ficava boiando no meio
-  expect(Math.max(...linhas.map(l => l.alturaObjeto))).toBeGreaterThan(80);
-  for (const l of linhas) expect(l.desvio).toBeLessThanOrEqual(2);
+  for (const aba of ["contratos", "atas"]) {
+    await page.locator(`nav.abas button[data-tipo="${aba}"]`).click();
+    const m = await page.evaluate(() =>
+      [...document.querySelectorAll(".linha:not(.cab)")].map(l => {
+        const cel = l.querySelector(".vig");
+        const selo = cel.querySelector(".badge");
+        const rc = cel.getBoundingClientRect(), rs = selo.getBoundingClientRect();
+        const rl = l.getBoundingClientRect();
+        return {
+          alturaLinha: rl.height,
+          // quanto o centro da célula desvia do centro da linha
+          desvioCentro: Math.abs((rc.top + rc.height / 2)
+                                 - (rl.top + rl.height / 2)),
+          // respiro entre as datas e o selo, e selo em bloco próprio
+          respiro: parseFloat(getComputedStyle(selo).marginTop),
+          seloEmBloco: getComputedStyle(selo).display === "block",
+          // o selo não encosta nas bordas: fica centralizado sob as datas
+          centradoNaCelula: Math.abs((rs.left + rs.width / 2)
+                                     - (rc.left + rc.width / 2)) <= 2,
+        };
+      }));
+    expect(m.length).toBe(3);
+    // uma das linhas tem objeto longo: é onde o alinhamento aparecia errado
+    expect(Math.max(...m.map(x => x.alturaLinha))).toBeGreaterThan(90);
+    for (const x of m) {
+      expect(x.desvioCentro).toBeLessThanOrEqual(2);   // centralizado
+      expect(x.respiro).toBeGreaterThanOrEqual(4);     // com espaçamento
+      expect(x.seloEmBloco).toBe(true);
+      expect(x.centradoNaCelula).toBe(true);
+    }
+  }
 });

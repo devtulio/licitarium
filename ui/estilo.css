@@ -230,10 +230,9 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .g-itens > :nth-child(2), .g-itens > :nth-child(3),
 .g-itens > :nth-child(5), .g-itens > :nth-child(6) { text-align:center; }
 .linha .obj { display:block; text-align:justify; hyphens:auto; }
-/* a célula de vigência encosta no rodapé da linha para que o selo fique na
-   mesma altura do fornecedor, que é a última linha da célula do objeto —
-   com objeto de 5 linhas, centralizada, ela flutuava no meio */
-.linha .vig { align-self:end; }
+/* datas e selo centralizados na célula, com respiro entre eles: o selo em
+   bloco próprio garante a linha separada mesmo quando a coluna é alargada */
+.linha .vig .badge { display:block; width:fit-content; margin:6px auto 0; }
 .vazio { padding:30px 34px 34px; text-align:center; color:var(--muted);
          font-size:13px; }
 .vazio svg { width:74px; height:74px; opacity:.28; margin-bottom:6px; }

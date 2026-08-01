@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.2 — 2026-08-01
+
+- **CNPJ e CPF com máscara nos relatórios.** O documento do fornecedor saía
+  como um bloco de dígitos (`13286494000164`) nas relações impressas. Agora
+  sai pontuado — e o programa distingue os dois: pessoa jurídica em
+  `00.000.000/0000-00`, pessoa física em `000.000.000-00`, porque o campo
+  do PNCP guarda os dois tipos. A exportação em CSV continua com o número
+  puro, para não atrapalhar quem for tratar os dados em planilha.
+- **Selo de vigência centralizado.** Na 1.2.1 o selo passou a acompanhar o
+  rodapé da linha e, em contratos de objeto longo, ficava distante demais das
+  datas. Voltou ao centro da célula, agora com um espaçamento entre a data e
+  o selo.
+
 ## 1.2.1 — 2026-08-01
 
 - **Alinhamento do selo de vigência.** Em contratos e atas com objeto longo,

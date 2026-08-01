@@ -43,6 +43,22 @@ def _e(v):
     return html.escape(str(v)) if v is not None else "–"
 
 
+def documento(v):
+    """Formata o identificador do fornecedor conforme o que ele é.
+
+    O campo do PNCP (`niFornecedor`) guarda CNPJ e também CPF — no acervo
+    real são 14 registros de pessoa física em contratos e 20 em itens.
+    Máscara de CNPJ aplicada às cegas estragaria justamente esses.
+    """
+    digitos = re.sub(r"\D", "", str(v or ""))
+    if len(digitos) == 14:
+        return (f"{digitos[:2]}.{digitos[2:5]}.{digitos[5:8]}"
+                f"/{digitos[8:12]}-{digitos[12:]}")
+    if len(digitos) == 11:
+        return f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+    return str(v) if v else "–"    # identificador estrangeiro ou ausente
+
+
 def moeda(v):
     if v is None:
         return "–"
@@ -421,7 +437,7 @@ def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho"):
       <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
                           or l['numero_controle'])}</td>
       <td class="ctr">{_e(l['fornecedor_nome'])}<br>
-          <small>{_e(l['fornecedor_ni'])}</small></td>
+          <small>{_e(documento(l['fornecedor_ni']))}</small></td>
       <td class="obj">{_e(l['objeto'])}</td>
       <td class="num">{moeda(l['valor_global'])}</td>
       <td class="num">{data_br(l['vigencia_inicio'])} – {data_br(l['vigencia_fim'])}</td>
@@ -611,7 +627,7 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
       <td><span class="barra" style="width:{round(d['meses'].get(f'{i:02d}', {}).get('valor', 0) / maior * 220)}px"></span></td></tr>"""
       for i in range(1, 13))
     forn = "".join(f"""<tr><td>{_e(f['fornecedor_nome'])}<br>
-      <small>{_e(f['fornecedor_ni'])}</small></td>
+      <small>{_e(documento(f['fornecedor_ni']))}</small></td>
       <td class="num">{f['n']}</td><td class="num">{moeda(f['total'])}</td></tr>"""
       for f in d["fornecedores"])
     venc = "".join(f"""<tr><td class="ctr">{_e(v['tipo'])}</td>
