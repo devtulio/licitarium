@@ -117,6 +117,22 @@ def test_assets_da_ui_existem_ao_lado_do_index():
     assert "<style>" not in html and "<script>" not in html
 
 
+def test_manual_segue_o_padrao_de_nome_da_familia():
+    """O navegador usa o <title> como nome do PDF ao salvar/imprimir.
+
+    O padrão da família é "Manual Operacional — SIGLA vX.Y.Z", para os
+    manuais dos cinco sistemas ficarem juntos e ordenados na pasta. Este
+    teste também pega bump de versão esquecido no manual.
+    """
+    man = (licitarium.DIR_APP / "MANUAL.html").read_text(encoding="utf-8")
+    esperado = f"Manual Operacional — Licitarium v{licitarium.VERSAO}"
+    assert f"<title>{esperado}</title>" in man
+    # cabeçalho de cada página impressa: mesma ordem dos irmãos
+    cabecalho = f'"Licitarium v{licitarium.VERSAO} — Manual Operacional"'
+    assert f"content: {cabecalho}" in man
+    assert f"VERSÃO {licitarium.VERSAO}" in man        # capa
+
+
 def test_url_da_janela_e_caminho_simples(tmp_path, monkeypatch):
     """Dentro do exe o pywebview resolve o caminho pelo _MEIPASS.
 

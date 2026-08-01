@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3 — 2026-08-01
+
+- **Nome do manual em PDF segue o padrão dos sistemas irmãos.** Ao imprimir ou
+  salvar o manual, o arquivo sai como **"Manual Operacional — Licitarium
+  v1.2.3"**, no mesmo formato usado por SGCD, SGCA, SGDP e SGEA — assim os
+  manuais dos cinco ficam juntos e ordenados na pasta. O cabeçalho de cada
+  página impressa também acompanha o padrão.
+
 ## 1.2.2 — 2026-08-01
 
 - **CNPJ e CPF com máscara nos relatórios.** O documento do fornecedor saía
