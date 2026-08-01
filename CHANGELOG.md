@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — 2026-08-01
+
+- **Alinhamento do selo de vigência.** Em contratos e atas com objeto longo,
+  o selo ficava no meio da linha, longe do nome do fornecedor. Agora ele
+  acompanha a última linha da descrição, na mesma altura do fornecedor.
+
 ## 1.2.0 — 2026-08-01
 
 **Novidades desta versão**

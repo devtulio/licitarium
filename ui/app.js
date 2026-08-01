@@ -429,7 +429,7 @@ function renderLinha(tipo, d) {
     return `<span class="dim">${esc(numContrato(d))}</span>
       <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
         <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
-      <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>
+      <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
   if (tipo === "itens") {
     const homologado = d.valor_unitario_homologado != null;
@@ -454,7 +454,7 @@ function renderLinha(tipo, d) {
   return `<span class="dim">${esc(d.numero_ata ?? "–")}/${esc(d.ano_ata ?? "")}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
     <span class="obj">${esc(d.objeto ?? "–")}</span>
-    <span class="dim">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
+    <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
 }
 
 async function mostrarResumoPrecos() {

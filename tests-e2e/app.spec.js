@@ -502,3 +502,22 @@ test("selos de situação atingem o contraste AA nos três temas",
     expect(reprovados).toEqual([]);
   }
 });
+
+test("selo de vigência fica na mesma altura do fornecedor", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await page.locator('nav.abas button[data-tipo="contratos"]').click();
+  const linhas = await page.evaluate(() =>
+    [...document.querySelectorAll(".linha:not(.cab)")].map(l => {
+      const forn = l.children[1].querySelector(".dim");
+      const selo = l.querySelector(".badge");
+      const meio = e => { const r = e.getBoundingClientRect();
+                          return r.top + r.height / 2; };
+      return { alturaObjeto: l.children[1].getBoundingClientRect().height,
+               desvio: Math.abs(meio(selo) - meio(forn)) };
+    }));
+  expect(linhas.length).toBe(3);
+  // o caso que motivou o ajuste: objeto de várias linhas empurra o fornecedor
+  // para baixo e a célula de vigência, centralizada, ficava boiando no meio
+  expect(Math.max(...linhas.map(l => l.alturaObjeto))).toBeGreaterThan(80);
+  for (const l of linhas) expect(l.desvio).toBeLessThanOrEqual(2);
+});
