@@ -63,6 +63,17 @@ Fase 2 — CONTRATOS / ATAS / PCA (chave: CNPJ do órgão)
   O recuo por 429 usa **janela de tempo** (`JANELA_BLOQUEIOS`), nunca contador
   acumulado: o portal oscila (502/503 e 429 em rajada, sem relação com a nossa
   taxa), e um contador que só cresce desligava o paralelismo para sempre.
+- **Municípios de referência (1.3.0)**: `referencia` (0/1) e `municipio_ibge`
+  em `contratacoes` e `itens`, mais a tabela `municipios_referencia`. Para
+  esses municípios roda **só a fase 1**; os itens saem na fase 3 junto com os
+  próprios. Tudo que representa o município — KPIs, abas do acervo, filtros,
+  `descobrir_orgaos`, PCA e os relatórios oficiais — filtra `referencia=0`;
+  só o banco de preços e o relatório de Pesquisa de Preços enxergam os dois.
+  A blindagem é testada em `tests/test_referencia.py`, que inclusive lê o HTML
+  gerado. Motivação e medições: `design/BRIEFING-precos-referencia.md`.
+  O `raw` do item de referência é mantido (medido: ~25 MB para quatro
+  vizinhos) — descartá-lo economizaria pouco e quebraria o princípio de que
+  o JSON bruto é a fonte da verdade.
 - **Revisita de itens**: `data_atualizacao` da contratação muda por motivo
   cosmético e não implica item alterado — `_itens_pendentes` compara a data de
   cada item antes de pedir o resultado. Item inalterado é pulado inteiro, e

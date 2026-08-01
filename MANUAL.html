@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.2.5</title>
+<title>Manual Operacional — Licitarium v1.3.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.2.5 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.3.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.2.5</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.3.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.2.5.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.3.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -248,6 +248,34 @@ abaixo a lista completa dos itens.</p>
 importam (<i>oleo</i> acha <i>ÓLEO</i>) e palavra pela metade vale como
 começo (<i>sulfit</i> acha <i>SULFITE</i>). Cada palavra a mais estreita o
 resultado, porque todas precisam aparecer no item.</p>
+<h3>Preços de municípios de referência</h3>
+<p>Um município pequeno compra pouco e compra variado: muitos itens aparecem
+uma única vez no seu histórico, e uma mediana sobre um preço só não sustenta
+uma pesquisa. Para resolver isso, você pode indicar <b>municípios de
+referência</b> em <b>Configurações → Municípios de referência</b>. Os itens
+deles passam a aparecer no banco de preços ao lado dos seus.</p>
+<p>O <b>art. 23, §1º, I</b> da Lei 14.133/2021 admite expressamente, como
+parâmetro, contratações similares feitas pela Administração Pública —
+inclusive de outros entes. Por isso o relatório de pesquisa de preços traz uma
+coluna <b>Município</b>: o valor de fora é aceitável, mas precisa estar
+identificado.</p>
+<table>
+  <tr><td><b>Onde a referência aparece</b></td>
+      <td>Aba Preços, resumo estatístico e relatório de Pesquisa de Preços</td></tr>
+  <tr><td><b>Onde ela nunca aparece</b></td>
+      <td>Indicadores da tela inicial, abas Contratações, Contratos, Atas e
+      PCA, Montar PCA e todos os demais relatórios</td></tr>
+</table>
+<p>Na lista, o preço vindo de fora traz o nome do município logo abaixo do
+processo; o que não tem essa marca é do seu município. O resumo informa a
+composição (por exemplo, <i>12 do seu município e 47 de referência</i>) e a
+caixa <b>Só do meu município</b> isola a sua própria série a qualquer
+momento.</p>
+<div class="caixa alerta"><b>Nem todo vizinho publica.</b> Alguns municípios
+não têm registro algum no PNCP. Depois de adicionar e sincronizar, confira em
+Configurações quantos preços cada um trouxe — se ficou em zero, ele não
+publica no portal e pode ser removido.</div>
+
 <p>O botão <b>Relatório de pesquisa de preços</b> gera o documento timbrado
 com esse levantamento, do menor para o maior preço unitário — subsídio para a
 pesquisa de preços do art. 23 da Lei 14.133/2021. A caixa <b>Só com preço
@@ -325,6 +353,18 @@ Windows prepara o executável; é normal.</p>
 <p>A opção <b>Abrir a janela maximizada</b> (ligada por padrão) faz o programa
 iniciar ocupando a tela inteira — útil porque as listas são largas. Desmarque
 se preferir abrir em janela.</p>
+<h3>Municípios de referência</h3>
+<p>Serve para dar base de comparação ao banco de preços (seção 4). Digite o
+nome do município — a lista é a mesma do assistente inicial — e ele entra na
+relação. <b>Os preços chegam na próxima sincronização</b>, não na hora.</p>
+<p>Cada município da lista mostra quantos preços já trouxe. <b>Remover</b>
+tira o município e apaga os preços que vieram dele; o seu acervo não é
+tocado.</p>
+<div class="caixa"><b>O que a referência não faz.</b> Ela alimenta apenas o
+banco de preços. Contratos, atas e o PCA desses municípios não são baixados, e
+os órgãos deles não entram na lista de órgãos monitorados. Seus relatórios
+oficiais continuam sendo exclusivamente do seu município.</div>
+
 <h3>Órgãos monitorados</h3>
 <p>Os órgãos do município (prefeitura, câmara, fundos, autarquias) são
 <b>descobertos automaticamente</b> a partir das contratações publicadas. Se um

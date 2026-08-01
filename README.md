@@ -66,6 +66,14 @@ Para cada termo: **menor preço, mediana, média, maior preço**, quantos itens 
 quantos fornecedores — subsídio direto à pesquisa de preços do **art. 23 da Lei
 14.133/2021**, com a origem de cada valor rastreável até o processo no PNCP.
 
+**Municípios de referência.** Um município pequeno compra pouco e compra
+variado — no acervo do piloto, 98% das descrições aparecem uma única vez, e
+mediana sobre um preço só não sustenta pesquisa. Por isso é possível indicar
+municípios vizinhos cujos itens alimentam **apenas o banco de preços**, com
+amparo no art. 23, §1º, I (contratações similares de outros entes). A origem
+de cada valor fica visível na tela e no relatório; o acervo, os indicadores,
+o PCA e os demais relatórios continuam exclusivamente do seu município.
+
 ### Montar PCA
 
 Usa o histórico de itens já contratados para sugerir o **Plano de Contratações

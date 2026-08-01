@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.0 — 2026-08-01
+
+**Municípios de referência no banco de preços**
+
+Um município pequeno compra pouco e compra variado: no acervo do piloto, 98%
+das descrições de item aparecem uma única vez. Buscar *papel A4* devolvia um
+único preço, e mediana sobre um preço só não sustenta uma pesquisa perante o
+Tribunal de Contas.
+
+- Em **Configurações → Municípios de referência** dá para indicar municípios
+  vizinhos. Os itens deles passam a aparecer no **banco de preços**, ao lado
+  dos seus, com amparo no **art. 23, §1º, I** da Lei 14.133/2021, que admite
+  contratações similares de outros entes como parâmetro.
+- **A referência não entra em mais nada.** Indicadores da tela inicial, abas
+  Contratações, Contratos, Atas e PCA, o módulo Montar PCA e todos os
+  relatórios oficiais continuam exclusivamente do seu município.
+- Na lista, o preço vindo de fora traz o **nome do município** logo abaixo do
+  processo; o resumo informa a composição (*12 do seu município e 47 de
+  referência*) e a caixa **Só do meu município** isola a sua série.
+- O **relatório de Pesquisa de Preços** ganhou coluna **Município**: valor de
+  fora é aceitável, mas precisa estar identificado no documento.
+- Cada município da lista mostra quantos preços trouxe. Remover apaga os
+  preços dele sem tocar no seu acervo.
+
+> Nem todo vizinho publica no PNCP — na região do piloto, um município de 21
+> mil habitantes não tem registro algum. Depois de sincronizar, confira a
+> contagem em Configurações.
+
 ## 1.2.5 — 2026-08-01
 
 - **Correção da atualização automática da 1.2.4.** Ao publicar um anexo, o
