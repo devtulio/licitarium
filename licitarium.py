@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS contratacoes (
   itens_versao TEXT, itens_sync_em TEXT,
   -- 0 = município do usuário; 1 = município de referência, que alimenta
   -- só o banco de preços e nunca os relatórios oficiais
-  referencia INTEGER DEFAULT 0,
+  referencia INTEGER DEFAULT 0, municipio_ibge TEXT,
   raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS contratos (
   numero_controle TEXT PRIMARY KEY, contratacao_controle TEXT, orgao_cnpj TEXT,
@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS itens (
   valor_unitario_homologado REAL, valor_total_homologado REAL,
   quantidade_homologada REAL, fornecedor_ni TEXT, fornecedor_nome TEXT,
   fornecedor_porte TEXT, data_resultado TEXT, situacao TEXT,
-  data_atualizacao TEXT, referencia INTEGER DEFAULT 0,
+  data_atualizacao TEXT,
+  referencia INTEGER DEFAULT 0, municipio_ibge TEXT,
   raw TEXT, sync_em TEXT);
 CREATE TABLE IF NOT EXISTS pca_itens (
   id TEXT PRIMARY KEY, id_pca TEXT, ano INTEGER, orgao_cnpj TEXT, unidade TEXT,
@@ -80,6 +81,8 @@ CREATE TABLE IF NOT EXISTS pca_minuta_itens (
   descricao TEXT, unidade TEXT, categoria TEXT, quantidade REAL,
   valor_unitario REAL, margem REAL, incluir INTEGER DEFAULT 1,
   editado INTEGER DEFAULT 0, origem TEXT, mesclado_de TEXT);
+CREATE TABLE IF NOT EXISTS municipios_referencia (
+  ibge TEXT PRIMARY KEY, nome TEXT, uf TEXT, adicionado_em TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, iniciado_em TEXT, tipo TEXT,
   janela_ini TEXT, janela_fim TEXT, registros INTEGER, status TEXT, erro TEXT);
@@ -169,6 +172,9 @@ def abrir_db():
         if cols and "referencia" not in cols:
             db.execute(f"ALTER TABLE {tabela} ADD COLUMN"
                        " referencia INTEGER DEFAULT 0")
+            db.commit()
+        if cols and "municipio_ibge" not in cols:
+            db.execute(f"ALTER TABLE {tabela} ADD COLUMN municipio_ibge TEXT")
             db.commit()
     colunas_m = {r[1] for r in db.execute("PRAGMA table_info(pca_minuta_itens)")}
     if colunas_m and "mesclado_de" not in colunas_m:
@@ -320,6 +326,58 @@ class Api:
         achados = [m for m in self._municipios
                    if texto in m["n"].lower() and (not uf or m["uf"] == uf)]
         return achados[:12]
+
+    # ── municípios de referência (só banco de preços) ────────────────────
+
+    def listar_municipios_referencia(self):
+        db = abrir_db()
+        try:
+            return [{"ibge": r["ibge"], "nome": r["nome"], "uf": r["uf"],
+                     "itens": r["itens"]} for r in db.execute(
+                """SELECT m.ibge, m.nome, m.uf,
+                          (SELECT COUNT(*) FROM itens i
+                           WHERE i.municipio_ibge = m.ibge
+                             AND i.valor_unitario_homologado IS NOT NULL) itens
+                   FROM municipios_referencia m ORDER BY m.nome""")]
+        finally:
+            db.close()
+
+    def adicionar_municipio_referencia(self, codigo, nome, uf):
+        """Entra na lista; os preços chegam na próxima sincronização."""
+        codigo = str(codigo)
+        db = abrir_db()
+        try:
+            if codigo == (pncp._config(db, "municipio_ibge") or ""):
+                return {"ok": False,
+                        "erro": "este já é o município do acervo"}
+            db.execute(
+                "INSERT OR IGNORE INTO municipios_referencia"
+                " (ibge, nome, uf, adicionado_em) VALUES (?,?,?,?)",
+                (codigo, nome, uf, datetime.now().isoformat()))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def remover_municipio_referencia(self, codigo):
+        """Sai da lista e leva junto os registros que trouxe.
+
+        Só apaga o que tem `referencia=1`: se o mesmo processo existisse no
+        acervo próprio, ele não pode ser tocado.
+        """
+        codigo = str(codigo)
+        db = abrir_db()
+        try:
+            for tabela in ("itens", "contratacoes"):
+                db.execute(f"DELETE FROM {tabela}"
+                           " WHERE referencia=1 AND municipio_ibge=?", (codigo,))
+            db.execute("DELETE FROM municipios_referencia WHERE ibge=?",
+                       (codigo,))
+            pncp._config(db, f"last_sync_ref_{codigo}", "")
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
 
     def configurar_municipio(self, codigo, nome, uf):
         db = abrir_db()

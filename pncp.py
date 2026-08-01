@@ -191,7 +191,7 @@ def _primeiro(item, *chaves):
 
 # ── upserts (raw sempre guardado; INSERT OR REPLACE é idempotente) ──────────
 
-def _upsert_contratacao(db, item):
+def _upsert_contratacao(db, item, ibge=None, referencia=0):
     numero = item.get("numeroControlePNCP")
     if not numero:
         return False
@@ -202,8 +202,9 @@ def _upsert_contratacao(db, item):
            (numero_controle, ano, sequencial, orgao_cnpj, orgao_nome, unidade,
             modalidade_id, modalidade_nome, situacao, objeto,
             valor_estimado, valor_homologado, data_encerramento_proposta,
-            data_publicacao, data_atualizacao, raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            data_publicacao, data_atualizacao,
+            referencia, municipio_ibge, raw, sync_em)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (numero, item.get("anoCompra"), item.get("sequencialCompra"),
          orgao.get("cnpj"), orgao.get("razaoSocial"), unidade.get("nomeUnidade"),
          item.get("modalidadeId"), item.get("modalidadeNome"),
@@ -211,6 +212,7 @@ def _upsert_contratacao(db, item):
          item.get("valorTotalEstimado"), item.get("valorTotalHomologado"),
          item.get("dataEncerramentoProposta"),
          item.get("dataPublicacaoPncp"), item.get("dataAtualizacao"),
+         referencia, ibge,
          json.dumps(item, ensure_ascii=False), datetime.now().isoformat()))
     return True
 
@@ -266,7 +268,8 @@ def _upsert_ata(db, item):
 
 # ── fases de sincronização ──────────────────────────────────────────────────
 
-def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None):
+def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None,
+                      referencia=0):
     """Fase 1: contratações do município, por modalidade e janela de datas.
 
     São 13 modalidades × janelas de data, todas independentes — a API exige
@@ -284,7 +287,8 @@ def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None):
         if progresso:
             progresso(f"Contratações — {nome} ({feitas}/{len(consultas)})…")
         for item in lote:
-            total += _upsert_contratacao(db, item)
+            total += _upsert_contratacao(db, item, codigo_ibge,
+                                         referencia)
         db.commit()  # transação curta por lote: não segurar trava
     return total
 
@@ -294,7 +298,8 @@ def descobrir_orgaos(db):
     db.execute(
         """INSERT OR IGNORE INTO orgaos (cnpj, razao_social, ativo, origem)
            SELECT DISTINCT orgao_cnpj, orgao_nome, 1, 'descoberto'
-           FROM contratacoes WHERE orgao_cnpj IS NOT NULL""")
+           FROM contratacoes
+           WHERE referencia=0 AND orgao_cnpj IS NOT NULL""")
     db.commit()
 
 
@@ -404,8 +409,8 @@ def _upsert_item(db, contratacao, item, resultado):
             valor_unitario_homologado, valor_total_homologado,
             quantidade_homologada, fornecedor_ni, fornecedor_nome,
             fornecedor_porte, data_resultado, situacao, data_atualizacao,
-            raw, sync_em)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            referencia, municipio_ibge, raw, sync_em)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (f"{contratacao['numero_controle']}#{numero}",
          contratacao["numero_controle"], contratacao["orgao_cnpj"],
          contratacao["ano"], contratacao["sequencial"], numero,
@@ -418,6 +423,7 @@ def _upsert_item(db, contratacao, item, resultado):
          r.get("nomeRazaoSocialFornecedor"), r.get("porteFornecedorNome"),
          r.get("dataResultado"), item.get("situacaoCompraItemNome"),
          item.get("dataAtualizacao"),
+         contratacao["referencia"], contratacao["municipio_ibge"],
          json.dumps({"item": item, "resultado": r}, ensure_ascii=False),
          datetime.now().isoformat()))
     return 1
@@ -462,7 +468,8 @@ def sync_itens(db, progresso=None, limite=None):
     momento) — e, dentro dela, só os itens que mudaram (_itens_pendentes).
     """
     pendentes = [dict(r) for r in db.execute(
-        """SELECT numero_controle, orgao_cnpj, ano, sequencial, data_atualizacao
+        """SELECT numero_controle, orgao_cnpj, ano, sequencial,
+                  data_atualizacao, referencia, municipio_ibge
            FROM contratacoes
            WHERE orgao_cnpj IS NOT NULL AND sequencial IS NOT NULL
              AND (itens_versao IS NULL OR itens_versao <> data_atualizacao)
@@ -573,6 +580,25 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
             resumo[tipo] = total
         else:
             resumo[tipo] = None
+
+    # municípios de referência: só a fase 1, e sem a fase 2 — contratos e
+    # atas alheios não têm uso aqui. Os itens deles saem na fase 3, junto
+    # com os nossos, numa passada só.
+    referencia = [dict(r) for r in db.execute(
+        "SELECT ibge, nome FROM municipios_referencia ORDER BY nome")]
+    for m in referencia:
+        chave = f"last_sync_ref_{m['ibge']}"
+        inicio = janela_de(f"ref_{m['ibge']}")
+        try:
+            if progresso:
+                progresso(f"Preços de referência — {m['nome']}…")
+            n = sync_contratacoes(db, m["ibge"], inicio, hoje, progresso,
+                                  referencia=1)
+            _config(db, chave, hoje.isoformat())
+            _log(db, f"referencia:{m['nome']}", inicio, hoje, n, "ok")
+        except PncpErro as e:
+            # um município de referência fora do ar não pode derrubar o sync
+            _log(db, f"referencia:{m['nome']}", inicio, hoje, 0, "erro", str(e))
 
     # fase 3 — itens das contratações (banco de preços); é a mais custosa,
     # então vem no fim: se falhar, o resto do acervo já está gravado

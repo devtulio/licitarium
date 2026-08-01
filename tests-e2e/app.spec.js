@@ -538,3 +538,31 @@ test("selo de vigência: centralizado na célula e com respiro da data",
     }
   }
 });
+
+test("municípios de referência: lista, adiciona e remove", async ({ page }) => {
+  await page.locator("#btn-config").click();
+  const secao = page.locator("#cfg-referencia");
+  await expect(secao).toContainText("Palestina");
+  await expect(secao).toContainText("812 preços");
+
+  // adicionar pelo autocomplete
+  await page.locator("#ref-busca").fill("paulo");
+  await page.locator('#ref-sugestoes button[data-c="3536604"]').click();
+  const enviado = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "adicionar_municipio_referencia").pop());
+  expect(enviado.n).toBe("Paulo de Faria");
+  await expect(secao).toContainText("Paulo de Faria");
+  // o usuário precisa saber que os preços ainda não chegaram
+  await expect(page.locator("#sync-msg"))
+    .toContainText("chegam na próxima sincronização");
+
+  // remover pede confirmação e leva os dados junto
+  page.once("dialog", d => {
+    expect(d.message()).toContain("Palestina");
+    expect(d.message()).toContain("saem do banco");
+    d.accept();
+  });
+  await page.locator('#cfg-referencia button[data-remover="3535002"]').click();
+  await expect(secao).not.toContainText("Palestina");
+  await expect(secao).toContainText("Paulo de Faria");
+});

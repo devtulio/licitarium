@@ -101,6 +101,7 @@ const DADOS = {
 function scriptPonte(temaBanco = "portal") {
   return `
     window.__chamadas = [];
+    window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812 }];
     window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
     window.pywebview = { api: {
@@ -143,8 +144,25 @@ function scriptPonte(temaBanco = "portal") {
       set_titulo: async t => {
         window.__chamadas.push({ metodo: "set_titulo", t }); return true; },
       listar_orgaos: async () => [],
+      listar_municipios_referencia: async () => window.__referencia,
+      adicionar_municipio_referencia: async (c, n, uf) => {
+        window.__chamadas.push({ metodo: "adicionar_municipio_referencia", c, n, uf });
+        window.__referencia = [...window.__referencia,
+                               { ibge: String(c), nome: n, uf, itens: 0 }];
+        return { ok: true };
+      },
+      remover_municipio_referencia: async (c) => {
+        window.__chamadas.push({ metodo: "remover_municipio_referencia", c });
+        window.__referencia = window.__referencia.filter(m => m.ibge !== String(c));
+        return { ok: true };
+      },
+      municipios: async (texto, uf) => {
+        window.__chamadas.push({ metodo: "municipios", texto, uf });
+        return [{ c: 3536604, n: "Paulo de Faria", uf: "SP" },
+                { c: 3535002, n: "Palestina", uf: "SP" }]
+          .filter(m => m.n.toLowerCase().includes((texto || "").toLowerCase()));
+      },
       ultimo_log: async () => [],
-      municipios: async () => [],
       gerar_relatorio: async (tipo, params) => {
         window.__chamadas.push({ metodo: "gerar_relatorio", tipo, params });
         return { ok: true };

@@ -972,6 +972,60 @@ $("rel-gerar").addEventListener("click", async () => {
     : (r.erro || "Falha ao gerar");
 });
 
+// ── municípios de referência (banco de preços) ────────────────────────────
+async function renderReferencia() {
+  const lista = await api.listar_municipios_referencia();
+  $("cfg-referencia").innerHTML = lista.map(m =>
+    `<div class="ref-linha"><span class="cresce">${esc(m.nome)} — ${esc(m.uf)}
+       <small class="dim">${m.itens} ${m.itens === 1 ? "preço" : "preços"}</small></span>
+     <button class="btn ghost" data-remover="${esc(m.ibge)}">Remover</button></div>`)
+    .join("") || `<div class="dim">Nenhum — o banco de preços usa só o seu
+      município.</div>`;
+  $("cfg-referencia").querySelectorAll("button[data-remover]").forEach(b =>
+    b.addEventListener("click", async () => {
+      const nome = b.closest(".ref-linha").querySelector(".cresce")
+        .firstChild.textContent.trim();
+      if (!confirm(`Remover ${nome}?\n\n`
+                   + "Os preços que ele trouxe saem do banco.")) return;
+      b.disabled = true;
+      await api.remover_municipio_referencia(b.dataset.remover);
+      await renderReferencia();
+    }));
+}
+
+function ligarBuscaReferencia() {
+  const uf = $("ref-uf");
+  if (uf.options.length === 0) {
+    uf.add(new Option("UF", ""));
+    UFS.forEach(u => uf.add(new Option(u, u)));
+  }
+  const caixa = $("ref-sugestoes");
+  $("ref-busca").addEventListener("input", async () => {
+    const texto = $("ref-busca").value.trim();
+    if (texto.length < 2) { caixa.classList.add("oculto"); return; }
+    const achados = await api.municipios(texto, uf.value || null);
+    caixa.innerHTML = achados.map(m =>
+      `<button data-c="${m.c}" data-n="${esc(m.n)}" data-uf="${m.uf}">
+         ${esc(m.n)} — ${m.uf}</button>`).join("")
+      || `<button disabled>nenhum município encontrado</button>`;
+    caixa.classList.remove("oculto");
+    caixa.querySelectorAll("button[data-c]").forEach(b =>
+      b.addEventListener("click", async () => {
+        const r = await api.adicionar_municipio_referencia(
+          b.dataset.c, b.dataset.n, b.dataset.uf);
+        caixa.classList.add("oculto");
+        $("ref-busca").value = "";
+        if (r && r.ok === false) { alert(r.erro); return; }
+        await renderReferencia();
+        // os preços só chegam na próxima coleta: dizer isso evita a
+        // impressão de que o município entrou vazio
+        $("sync-msg").textContent =
+          `${b.dataset.n} adicionado — os preços chegam na próxima sincronização`;
+      }));
+  });
+}
+ligarBuscaReferencia();
+
 // ── config ────────────────────────────────────────────────────────────────
 $("btn-config").addEventListener("click", async () => {
   const e = await api.get_estado();
@@ -988,6 +1042,7 @@ $("btn-config").addEventListener("click", async () => {
   $("cfg-orgaos").querySelectorAll("input[data-cnpj]").forEach(c =>
     c.addEventListener("change", () =>
       api.set_orgao_ativo(c.dataset.cnpj, c.checked)));
+  await renderReferencia();
   aplicarLimCompras(parseFloat(e.limite_dispensa_compras) || 0);
   aplicarLimObras(parseFloat(e.limite_dispensa_obras) || 0);
   const log = await api.ultimo_log();

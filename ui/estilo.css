@@ -112,6 +112,18 @@ label { font-size:12px; color:var(--muted); display:block; margin:12px 0 5px; }
 #wiz-sugestoes button { display:block; width:100%; text-align:left; border:none;
   background:var(--surface); color:var(--text); padding:8px 10px; font-size:13px; }
 #wiz-sugestoes button:hover, #wiz-sugestoes button:focus { background:var(--surface2); }
+/* mesma lista de sugestões do assistente, reaproveitada nas configurações */
+.sugestoes { text-align:left; border:1px solid var(--border);
+  border-radius:var(--radius); margin-top:4px; max-height:160px;
+  overflow-y:auto; }
+.sugestoes button { display:block; width:100%; text-align:left; border:none;
+  background:var(--surface); color:var(--text); padding:8px 10px;
+  font-size:13px; cursor:pointer; }
+.sugestoes button:hover, .sugestoes button:focus { background:var(--surface2); }
+.ref-linha { display:flex; align-items:center; gap:10px; padding:7px 0;
+  border-bottom:1px solid var(--border); font-size:13px; }
+.ref-linha:last-child { border-bottom:none; }
+.ref-linha .cresce { flex:1; }
 .wnota { margin:16px 0 18px; font-size:12px; color:var(--muted); text-align:left; }
 
 /* ══ APP ══ */

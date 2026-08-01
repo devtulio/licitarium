@@ -157,3 +157,76 @@ def test_banco_antigo_ganha_a_coluna_como_municipio_proprio(api):
                           " WHERE numero_controle='ANTIGO'").fetchone()[0] == 0
     finally:
         db.close()
+
+
+# ── ciclo completo: adicionar, sincronizar, remover ─────────────────────
+
+def test_sync_de_referencia_marca_origem_e_nao_cria_orgao(api, monkeypatch):
+    """Fase 1 do município de referência: entra marcado e sem virar órgão."""
+    import pncp
+    from datetime import date
+    api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
+
+    def fake_get(caminho, params, base=None, **kw):
+        if base == pncp.BASE_PNCP:
+            return None                       # sem itens neste teste
+        if "contratacoes" not in caminho or params.get("pagina") != 1:
+            return None
+        ibge = params.get("codigoMunicipioIbge")
+        if ibge != "3536604" or params["codigoModalidadeContratacao"] != 8:
+            return None
+        return {"data": [{"numeroControlePNCP": "PF-1", "anoCompra": ANO,
+                          "sequencialCompra": 9,
+                          "orgaoEntidade": {"cnpj": "999",
+                                            "razaoSocial": "PREF PAULO DE FARIA"},
+                          "objetoCompra": "Papel de outro municipio",
+                          "valorTotalHomologado": 50.0,
+                          "dataAtualizacao": "2026-03-01"}], "totalPaginas": 1}
+    monkeypatch.setattr(pncp, "_get", fake_get)
+
+    db = _db()
+    try:
+        pncp.sincronizar_tudo(db, "3534203")
+        linha = db.execute("SELECT referencia, municipio_ibge FROM contratacoes"
+                           " WHERE numero_controle='PF-1'").fetchone()
+        assert (linha["referencia"], linha["municipio_ibge"]) == (1, "3536604")
+        # o órgão de fora não pode entrar no filtro de órgãos do acervo
+        assert not db.execute("SELECT 1 FROM orgaos WHERE cnpj='999'").fetchone()
+    finally:
+        db.close()
+    # e continua fora da aba Contratações
+    assert all(i["numero_controle"] != "PF-1"
+               for i in api.listar("contratacoes", {})["itens"])
+
+
+def test_remover_referencia_leva_os_dados_junto(api):
+    api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET municipio_ibge='3536604'"
+                   " WHERE referencia=1")
+        db.execute("UPDATE itens SET municipio_ibge='3536604'"
+                   " WHERE referencia=1")
+        db.commit()
+    finally:
+        db.close()
+    assert api.estatisticas_preco("papel sulfite")["n"] == 2
+
+    assert api.remover_municipio_referencia("3536604")["ok"]
+    assert api.listar_municipios_referencia() == []
+    # o preço de fora sai do banco; o de casa fica intacto
+    s = api.estatisticas_preco("papel sulfite")
+    assert s["n"] == 1 and s["maximo"] == 1000.0
+    assert api.listar("contratacoes", {})["total"] == 1
+
+
+def test_nao_aceita_o_proprio_municipio_como_referencia(api):
+    db = _db()
+    try:
+        import pncp
+        pncp._config(db, "municipio_ibge", "3534203")
+    finally:
+        db.close()
+    r = api.adicionar_municipio_referencia("3534203", "Orindiúva", "SP")
+    assert r["ok"] is False
+    assert api.listar_municipios_referencia() == []
