@@ -102,13 +102,39 @@ Regra de bolso resultante: **cada 100 contratações de um município de
 referência custam cerca de 5 MB** e, no ritmo atual de sincronização,
 poucos minutos na primeira carga.
 
-**Não medido ainda:** o volume real dos municípios vizinhos. Tentei levantar
-Paulo de Faria, Icém, Nova Granada, Palestina e Olímpia enquanto redigia este
-briefing, mas o PNCP entrou em instabilidade (timeouts sucessivos) e só
-consegui confirmar o nosso próprio (131 contratações desde 2021, em 40 s).
-**Antes de implementar, essa medição precisa ser refeita** — ela define se o
-banco cresce para 30 MB ou para 300 MB, e se a primeira carga leva minutos ou
-uma hora.
+**Medido em 2026-08-01** (`pncp.estimar_volume`, lendo `totalRegistros` do
+envelope — contar paginando levava minutos por município e falhava no maior):
+
+| município | contratações | preços | tamanho | coleta |
+|---|---:|---:|---:|---:|
+| Paulo de Faria | 223 | ~4.549 | 10,7 MB | 15 min |
+| Riolândia | 207 | ~4.223 | 9,9 MB | 14 min |
+| Guaraci | 166 | ~3.386 | 7,9 MB | 11 min |
+| Icém | 87 (parcial) | ~1.775 | 4,2 MB | 6 min |
+| Palestina | 24 | ~490 | 1,1 MB | 2 min |
+| Nova Granada | 0 | — | — | — |
+| **Olímpia** | **5.982** | **~122.033** | **286 MB** | **6,8 h** |
+| *Orindiúva (nosso)* | *131* | *2.674 reais* | *12,8 MB reais* | — |
+
+A estimativa foi conferida contra o acervo real: para Orindiúva prevê 2.672
+itens contra 2.674 gravados.
+
+**Decisão (2026-08-01): os cinco vizinhos pequenos entram; Olímpia fica de
+fora.** Somados, os cinco são 707 contratações — cerca de 14.400 preços, 34 MB
+e 48 minutos de coleta, uma vez. A base de preços sai de 2.257 para perto de
+16.600, sete vezes maior. Olímpia sozinha custaria oito vezes mais que os cinco
+juntos, em tamanho e em tempo; se um dia for adicionada, o aviso de volume
+torna a escolha explícita.
+
+**Duas lições que a medição trouxe:**
+
+- **População não prediz volume.** Nova Granada tem 21 mil habitantes e nenhum
+  registro no PNCP; Palestina, 11 mil habitantes e 24 contratações; Riolândia,
+  porte parecido e 207. Só a consulta responde — daí o aviso antes de aceitar.
+- **Cidade média muda a ordem de grandeza.** O briefing assumiu que referência
+  custa alguns MB; isso vale entre vizinhos de porte parecido e não vale para
+  uma cidade de 53 mil habitantes. Foi o que motivou o aviso de volume,
+  implementado antes da entrega.
 
 ## 7. Interface
 
