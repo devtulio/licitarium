@@ -578,6 +578,12 @@ test("aba Preços mostra a origem e permite ficar só com o município",
   await page.locator('nav.abas button[data-tipo="itens"]').click();
   // a coluna Município existe sempre e vale para as duas origens
   await expect(page.locator(".cab")).toContainText("Município");
+  // e é ordenável como as demais
+  const cabMunicipio = page.locator('.cab span[data-ord="municipio"]');
+  await cabMunicipio.click();
+  await expect(cabMunicipio).toHaveAttribute("aria-sort", "ascending");
+  expect((await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop())).filtros.ord).toBe("municipio");
   const municipios = page.locator(".linha:not(.cab) > span:nth-child(6)");
   await expect(municipios.first()).toHaveText("Orindiúva");
   const deFora = page.locator(".linha:not(.cab) .de-fora");

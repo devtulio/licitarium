@@ -230,3 +230,31 @@ def test_nao_aceita_o_proprio_municipio_como_referencia(api):
     r = api.adicionar_municipio_referencia("3534203", "Orindiúva", "SP")
     assert r["ok"] is False
     assert api.listar_municipios_referencia() == []
+
+
+def test_ordenacao_por_municipio_usa_o_nome_e_nao_o_codigo(api):
+    """A tabela guarda o código IBGE; a ordem tem de ser a que se lê.
+
+    Aqui o próprio município ("Orindiúva", vindo da config) vem depois do de
+    referência no alfabeto, mas o código dele (3534203) é menor — ordenar
+    pelo código daria a ordem inversa da esperada.
+    """
+    db = _db()
+    try:
+        import pncp
+        pncp._config(db, "municipio_ibge", "3534203")
+        pncp._config(db, "municipio_nome", "Orindiúva")
+        db.execute("INSERT INTO municipios_referencia (ibge, nome, uf)"
+                   " VALUES ('3505500', 'Barretos', 'SP')")
+        db.execute("UPDATE itens SET municipio_ibge='3534203' WHERE referencia=0")
+        db.execute("UPDATE itens SET municipio_ibge='3505500' WHERE referencia=1")
+        db.commit()
+    finally:
+        db.close()
+
+    asc = api.listar("itens", {"so_homologados": True,
+                               "ord": "municipio", "dir": "asc"})["itens"]
+    assert [i["municipio_nome"] for i in asc] == ["Barretos", "Orindiúva"]
+    desc = api.listar("itens", {"so_homologados": True,
+                                "ord": "municipio", "dir": "desc"})["itens"]
+    assert [i["municipio_nome"] for i in desc] == ["Orindiúva", "Barretos"]

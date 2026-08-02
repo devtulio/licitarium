@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.3.1"
+VERSAO = "1.3.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -142,6 +142,13 @@ ORDENAVEIS = {
               "unitario": "COALESCE(valor_unitario_homologado,"
                           " valor_unitario_estimado)",
               "fornecedor": "fornecedor_nome", "data": "data_resultado",
+              # a tabela guarda o código IBGE; ordenar por ele daria uma
+              # ordem sem sentido para quem lê, então o nome é resolvido
+              # aqui — o do próprio município vem da config
+              "municipio": "COALESCE((SELECT m.nome FROM municipios_referencia m"
+                           " WHERE m.ibge = itens.municipio_ibge),"
+                           " (SELECT valor FROM config"
+                           "  WHERE chave='municipio_nome'))",
               "origem": "(ano*100000+COALESCE(sequencial,0))"},
 }
 PADRAO_ORDEM = {"contratacoes": "data_publicacao DESC",

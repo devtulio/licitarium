@@ -344,7 +344,7 @@ const COLUNAS = {
                  ["Valor","valor"]],
   itens:        [["Descrição","descricao"], ["Unid.","unidade"],
                  ["Qtde",null], ["Valor unitário","unitario"],
-                 ["Fornecedor","fornecedor"], ["Município",null],
+                 ["Fornecedor","fornecedor"], ["Município","municipio"],
                  ["Processo","origem"]],
 };
 

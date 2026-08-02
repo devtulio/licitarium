@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2 — 2026-08-01
+
+- **A coluna Município passa a ordenar**, como as demais da aba Preços. A
+  ordem é alfabética pelo nome do município, e não pelo código interno.
+
 ## 1.3.1 — 2026-08-01
 
 - **Coluna Município na aba Preços.** A origem de cada preço passa a ter
