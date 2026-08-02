@@ -120,10 +120,6 @@ label { font-size:12px; color:var(--muted); display:block; margin:12px 0 5px; }
   background:var(--surface); color:var(--text); padding:8px 10px;
   font-size:13px; cursor:pointer; }
 .sugestoes button:hover, .sugestoes button:focus { background:var(--surface2); }
-.ref-linha { display:flex; align-items:center; gap:10px; padding:7px 0;
-  border-bottom:1px solid var(--border); font-size:13px; }
-.ref-linha:last-child { border-bottom:none; }
-.ref-linha .cresce { flex:1; }
 .wnota { margin:16px 0 18px; font-size:12px; color:var(--muted); text-align:left; }
 
 /* ══ APP ══ */
@@ -188,7 +184,7 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 .g-contratos    { grid-template-columns:var(--cols, 110px 1fr 160px 110px); }
 .g-atas         { grid-template-columns:var(--cols, 90px 210px 1fr 170px); }
 .g-pca          { grid-template-columns:var(--cols, 60px 1fr 150px 80px 110px); }
-.g-itens        { grid-template-columns:var(--cols, minmax(0,1fr) 52px 74px 124px 320px 78px); }
+.g-itens        { grid-template-columns:var(--cols, minmax(0,1fr) 52px 64px 124px 210px 100px 72px); }
 /* na aba Preços só a descrição quebra; o resto fica em uma linha.
    O cabeçalho fica de fora do overflow para não recortar a alça. */
 .g-itens > :nth-child(n+2) { white-space:nowrap; }
@@ -240,7 +236,8 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(4),
 .g-pca > :nth-child(1), .g-pca > :nth-child(3),
 .g-itens > :nth-child(2), .g-itens > :nth-child(3),
-.g-itens > :nth-child(5), .g-itens > :nth-child(6) { text-align:center; }
+.g-itens > :nth-child(5), .g-itens > :nth-child(6),
+.g-itens > :nth-child(7) { text-align:center; }
 .linha .obj { display:block; text-align:justify; hyphens:auto; }
 /* datas e selo centralizados na célula, com respiro entre eles: o selo em
    bloco próprio garante a linha separada mesmo quando a coluna é alargada */

@@ -344,7 +344,8 @@ const COLUNAS = {
                  ["Valor","valor"]],
   itens:        [["Descrição","descricao"], ["Unid.","unidade"],
                  ["Qtde",null], ["Valor unitário","unitario"],
-                 ["Fornecedor","fornecedor"], ["Processo","origem"]],
+                 ["Fornecedor","fornecedor"], ["Município",null],
+                 ["Processo","origem"]],
 };
 
 // Sufixo societário não identifica ninguém e come metade da coluna:
@@ -448,14 +449,11 @@ function renderLinha(tipo, d) {
       <span class="num">${unit}</span>
       <span class="dim" title="${esc(d.fornecedor_nome ?? "")}"
         >${esc(fornecedorCurto(d.fornecedor_nome))}</span>
-      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}${
-        // o município só aparece quando o preço vem de fora: no acervo
-        // próprio seria a mesma etiqueta em toda linha
-        d.referencia
-          ? `<br><small class="de-fora"
-               title="Preço de município de referência">${
-               esc(d.municipio_nome ?? "outro município")}</small>`
-          : ""}</span>`;
+      <span class="dim${d.referencia ? " de-fora" : ""}"
+        title="${d.referencia ? "Preço de município de referência"
+                              : "Preço do seu município"}"
+        >${esc(d.municipio_nome ?? "–")}</span>
+      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>`;
   }
   if (tipo === "pca")
     return `<span class="dim">${esc(d.numero_item)}</span>
@@ -523,6 +521,14 @@ function aplicarLarguras(tipo) {
   if (!mapa) { lista.style.removeProperty("--cols"); return; }
   const flex = COL_FLEX[tipo];
   const n = COLUNAS[tipo].length;
+  // larguras guardadas antes de a aba ganhar (ou perder) uma coluna não
+  // servem: faltando uma, o grid receberia "NaNpx" e quebraria a lista
+  for (let i = 0; i < n; i++)
+    if (i !== flex && !(mapa[i] > 0)) {
+      delete larguras[tipo];
+      lista.style.removeProperty("--cols");
+      return;
+    }
   const cols = [];
   for (let i = 0; i < n; i++)
     cols.push(i === flex ? "minmax(0,1fr)" : `${Math.round(mapa[i])}px`);
@@ -994,15 +1000,19 @@ $("rel-gerar").addEventListener("click", async () => {
 // ── municípios de referência (banco de preços) ────────────────────────────
 async function renderReferencia() {
   const lista = await api.listar_municipios_referencia();
+  // mesmo formato dos órgãos monitorados logo acima: nome, identificação
+  // embaixo e o controle à direita
   $("cfg-referencia").innerHTML = lista.map(m =>
-    `<div class="ref-linha"><span class="cresce">${esc(m.nome)} — ${esc(m.uf)}
-       <small class="dim">${m.itens} ${m.itens === 1 ? "preço" : "preços"}</small></span>
+    `<div class="orgrow"><span>${esc(m.nome)} — ${esc(m.uf)}
+       <small>IBGE ${esc(m.ibge)} · ${m.itens
+         ? `${m.itens.toLocaleString("pt-BR")} ${m.itens === 1 ? "preço" : "preços"} no banco`
+         : "ainda sem preços — serão baixados na próxima sincronização"}</small></span>
      <button class="btn ghost" data-remover="${esc(m.ibge)}">Remover</button></div>`)
     .join("") || `<div class="dim">Nenhum — o banco de preços usa só o seu
       município.</div>`;
   $("cfg-referencia").querySelectorAll("button[data-remover]").forEach(b =>
     b.addEventListener("click", async () => {
-      const nome = b.closest(".ref-linha").querySelector(".cresce")
+      const nome = b.closest(".orgrow").querySelector("span")
         .firstChild.textContent.trim();
       if (!confirm(`Remover ${nome}?\n\n`
                    + "Os preços que ele trouxe saem do banco.")) return;

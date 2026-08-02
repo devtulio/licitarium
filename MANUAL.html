@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.3.0</title>
+<title>Manual Operacional — Licitarium v1.3.1</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.3.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.3.1 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.3.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.3.1</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.3.0.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.3.1.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -266,11 +266,10 @@ identificado.</p>
       <td>Indicadores da tela inicial, abas Contratações, Contratos, Atas e
       PCA, Montar PCA e todos os demais relatórios</td></tr>
 </table>
-<p>Na lista, o preço vindo de fora traz o nome do município logo abaixo do
-processo; o que não tem essa marca é do seu município. O resumo informa a
-composição (por exemplo, <i>12 do seu município e 47 de referência</i>) e a
-caixa <b>Só do meu município</b> isola a sua própria série a qualquer
-momento.</p>
+<p>A lista tem uma coluna <b>Município</b>, que mostra a origem de cada preço
+— os de fora aparecem destacados. O resumo informa a composição (por exemplo,
+<i>12 do seu município e 47 de referência</i>) e a caixa <b>Só do meu
+município</b> isola a sua própria série a qualquer momento.</p>
 <div class="caixa alerta"><b>Nem todo vizinho publica.</b> Alguns municípios
 não têm registro algum no PNCP. Depois de adicionar e sincronizar, confira em
 Configurações quantos preços cada um trouxe — se ficou em zero, ele não
@@ -357,9 +356,10 @@ se preferir abrir em janela.</p>
 <p>Serve para dar base de comparação ao banco de preços (seção 4). Digite o
 nome do município — a lista é a mesma do assistente inicial — e ele entra na
 relação. <b>Os preços chegam na próxima sincronização</b>, não na hora.</p>
-<p>Cada município da lista mostra quantos preços já trouxe. <b>Remover</b>
-tira o município e apaga os preços que vieram dele; o seu acervo não é
-tocado.</p>
+<p>Os municípios adicionados ficam listados na tela, como os órgãos
+monitorados, com o código IBGE e quantos preços cada um já trouxe. Enquanto a
+sincronização não roda, aparece <i>ainda sem preços</i>. <b>Remover</b> tira o
+município e apaga os preços que vieram dele; o seu acervo não é tocado.</p>
 <div class="caixa"><b>O que a referência não faz.</b> Ela alimenta apenas o
 banco de preços. Contratos, atas e o PCA desses municípios não são baixados, e
 os órgãos deles não entram na lista de órgãos monitorados. Seus relatórios

@@ -191,7 +191,7 @@ test("duplo clique na alça ajusta a coluna ao conteúdo (autofit)",
   }, txt);
   // encolhe a coluna a ponto de cortar até um nome curto
   await page.evaluate(() => {
-    larguras.itens = { 1:52, 2:74, 3:124, 4:90, 5:78 };
+    larguras.itens = { 1:52, 2:64, 3:124, 4:90, 5:100, 6:72 };
     aplicarLarguras("itens");
   });
   expect(await cortado("ZILDA")).toBe(true);
@@ -576,6 +576,10 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
 test("aba Preços mostra a origem e permite ficar só com o município",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="itens"]').click();
+  // a coluna Município existe sempre e vale para as duas origens
+  await expect(page.locator(".cab")).toContainText("Município");
+  const municipios = page.locator(".linha:not(.cab) > span:nth-child(6)");
+  await expect(municipios.first()).toHaveText("Orindiúva");
   const deFora = page.locator(".linha:not(.cab) .de-fora");
   await expect(deFora).toHaveCount(1);
   await expect(deFora).toHaveText("Palestina");
@@ -595,4 +599,21 @@ test("aba Preços mostra a origem e permite ficar só com o município",
   const enviado = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "listar" && c.tipo === "itens").pop());
   expect(enviado.filtros.origem).toBe("proprio");
+});
+
+test("largura de coluna guardada antes de a aba mudar não quebra a lista",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  // formato antigo: 6 colunas, sem a de Município
+  await page.evaluate(() => {
+    larguras.itens = { 1: 52, 2: 74, 3: 124, 4: 320, 5: 78 };
+    aplicarLarguras("itens");
+  });
+  const cols = await page.evaluate(() => getComputedStyle(
+    document.querySelector(".lista .cab")).gridTemplateColumns);
+  // sem a guarda, a coluna que falta viraria "NaNpx" e o grid desabaria
+  expect(cols).not.toContain("NaN");
+  expect(cols.split(" ").length).toBe(7);
+  // o mapa incompatível é descartado, e não reaplicado na próxima troca
+  expect(await page.evaluate(() => larguras.itens)).toBeUndefined();
 });

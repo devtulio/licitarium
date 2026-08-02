@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1 — 2026-08-01
+
+- **Coluna Município na aba Preços.** A origem de cada preço passa a ter
+  coluna própria, sempre visível, em vez de aparecer apenas nos itens vindos
+  de fora. Os preços de municípios de referência continuam destacados.
+- **Municípios de referência listados como os órgãos monitorados**, com o
+  código IBGE e a contagem de preços de cada um. Enquanto a sincronização não
+  roda, a lista mostra *ainda sem preços — serão baixados na próxima
+  sincronização*.
+- As larguras de coluna salvas antes desta versão são descartadas na aba
+  Preços, que ganhou uma coluna; as demais abas não mudam.
+
 ## 1.3.0 — 2026-08-01
 
 **Municípios de referência no banco de preços**
