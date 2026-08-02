@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.0 — 2026-08-02
+
+**Escolher quais preços entram na pesquisa**
+
+- Cada linha da aba Preços passa a ter uma **caixa de seleção**, marcada por
+  padrão. Desmarque o que não for comparável e o resumo se refaz na hora: o
+  item sai do cálculo e do **relatório de pesquisa de preços**, mas continua
+  na tela, para dar para voltar atrás.
+- Resolve a distorção mais comum: buscar *papel higiênico* traz também
+  *suporte de papel higiênico* e *locação de banheiro químico*. No acervo do
+  piloto, descartar esses dois derruba a média de R$ 53,63 para R$ 30,74 e o
+  maior preço de R$ 249,80 para R$ 33,90.
+- Um aviso mostra quantos itens foram descartados, com **Restaurar todos**. A
+  escolha vale para a pesquisa em curso; trocar o termo recomeça.
+
 ## 1.3.2 — 2026-08-01
 
 - **A coluna Município passa a ordenar**, como as demais da aba Preços. A

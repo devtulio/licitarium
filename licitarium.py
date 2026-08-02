@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.3.2"
+VERSAO = "1.4.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -236,6 +236,16 @@ def abrir_db():
         db.execute("INSERT INTO itens_fts(itens_fts) VALUES('rebuild')")
         db.commit()
     return db
+
+
+def _blocos(ids, tamanho=400):
+    """Fatia a lista de ids em blocos para o SQLite.
+
+    Uma cláusula IN com milhares de parâmetros esbarra no limite de
+    variáveis por consulta; vários NOT IN encadeados dão o mesmo resultado.
+    """
+    ids = [str(i) for i in (ids or []) if i]
+    return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
 
 
 def _termo_fts(busca):
@@ -577,7 +587,8 @@ class Api:
         finally:
             db.close()
 
-    def estatisticas_preco(self, busca, ano=None, origem=None):
+    def estatisticas_preco(self, busca, ano=None, origem=None,
+                           excluidos=None):
         """Resumo do valor unitário homologado para um termo — a resposta de
         'quanto pagamos por isso?' que instrui a pesquisa de preços."""
         if not (busca or "").strip():
@@ -597,6 +608,11 @@ class Api:
             args.append(ano)
         if origem == "proprio":
             where.append("referencia=0")
+        # itens que o usuário desmarcou na lista: a pesquisa de preços do
+        # art. 23 só vale sobre itens comparáveis, e é ele quem julga isso
+        for grupo in _blocos(excluidos):
+            where.append("id NOT IN (%s)" % ",".join("?" * len(grupo)))
+            args += grupo
         db = abrir_db()
         try:
             valores = [r[0] for r in db.execute(

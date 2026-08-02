@@ -149,10 +149,13 @@ function scriptPonte(temaBanco = "portal") {
           itens = itens.filter(i => i.valor_unitario_homologado != null);
         if (tipo === "itens" && filtros && filtros.origem === "proprio")
           itens = itens.filter(i => !i.referencia);
+        if (tipo === "itens" && filtros && filtros.excluidos)
+          itens = itens.filter(i => !filtros.excluidos.includes(String(i.id)));
         return { itens, total: itens.length };
       },
-      estatisticas_preco: async (busca, ano) => {
-        window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano });
+      estatisticas_preco: async (busca, ano, origem, excluidos) => {
+        window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano,
+                                 origem, excluidos });
         if (!/papel/i.test(busca || "")) return null;
         return { n: 3, minimo: 15.4, maximo: 24.9, media: 19.68,
                  mediana: 18.75, fornecedores: 2,

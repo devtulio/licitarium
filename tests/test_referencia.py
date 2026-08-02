@@ -258,3 +258,38 @@ def test_ordenacao_por_municipio_usa_o_nome_e_nao_o_codigo(api):
     desc = api.listar("itens", {"so_homologados": True,
                                 "ord": "municipio", "dir": "desc"})["itens"]
     assert [i["municipio_nome"] for i in desc] == ["Orindiúva", "Barretos"]
+
+
+def test_descarte_de_item_nao_entra_no_resumo_nem_no_relatorio(api, tmp_path):
+    """A pesquisa do art. 23 só vale sobre itens comparáveis.
+
+    Buscar "papel higiênico" traz suporte de papel e locação de banheiro
+    químico; quem julga a aderência é o usuário, e o que ele descarta não
+    pode continuar puxando a média do documento.
+    """
+    s = api.estatisticas_preco("papel sulfite")
+    assert (s["n"], s["maximo"]) == (2, 9999.0)
+
+    s = api.estatisticas_preco("papel sulfite", excluidos=["REF-1#1"])
+    assert (s["n"], s["maximo"]) == (1, 1000.0)
+
+    db = _db()
+    try:
+        d = relatorios.dados_precos(db, "papel sulfite",
+                                    excluidos=["REF-1#1"])
+        assert len(d["linhas"]) == 1
+        r = relatorios.gerar(db, "precos",
+                             {"termo": "papel sulfite",
+                              "excluidos": ["REF-1#1"]},
+                             "Orindiúva", "SP", tmp_path / "rel")
+        html = Path(r["html"]).read_text(encoding="utf-8")
+        assert "9.999,00" not in html
+    finally:
+        db.close()
+
+
+def test_descarte_vazio_nao_muda_nada(api):
+    """Lista vazia ou nula não pode virar um NOT IN () inválido."""
+    base = api.estatisticas_preco("papel sulfite")
+    for vazio in (None, [], ["", None]):
+        assert api.estatisticas_preco("papel sulfite", excluidos=vazio) == base

@@ -42,6 +42,10 @@ const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
                  ord:null, dir:"desc" };
 // há município de referência? decide se a aba Preços mostra a origem
 let temReferencia = false;
+// itens que o usuário tirou da pesquisa de preços. Guarda os DESCARTADOS
+// (e não os escolhidos) para que item novo, vindo de uma sincronização ou
+// de outra página, entre marcado por padrão.
+let precosDescartados = new Set();
 let api = null;
 
 // ── splash ────────────────────────────────────────────────────────────────
@@ -342,7 +346,7 @@ const COLUNAS = {
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
-  itens:        [["Descrição","descricao"], ["Unid.","unidade"],
+  itens:        [["",null], ["Descrição","descricao"], ["Unid.","unidade"],
                  ["Qtde",null], ["Valor unitário","unitario"],
                  ["Fornecedor","fornecedor"], ["Município","municipio"],
                  ["Processo","origem"]],
@@ -443,7 +447,10 @@ function renderLinha(tipo, d) {
       ? dinheiro(d.valor_unitario_homologado)
       : `<span class="est" title="Sem resultado homologado: valor de referência
           do edital">${dinheiro(d.valor_unitario_estimado)} <small>est.</small></span>`;
-    return `<span class="obj">${esc(d.descricao ?? "–")}</span>
+    return `<span class="sel"><input type="checkbox" data-item="${esc(d.id)}"
+        ${precosDescartados.has(String(d.id)) ? "" : "checked"}
+        aria-label="Usar este preço na pesquisa"></span>
+      <span class="obj">${esc(d.descricao ?? "–")}</span>
       <span class="dim">${esc(d.unidade ?? "–")}</span>
       <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
       <span class="num">${unit}</span>
@@ -467,16 +474,27 @@ function renderLinha(tipo, d) {
     <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
 }
 
+let ultimoTermoPrecos = null;
+
 async function mostrarResumoPrecos() {
   const caixa = $("precos-resumo");
   const termo = $("f-busca").value.trim();
+  // o descarte vale para a pesquisa em curso; trocar o termo recomeça
+  if (termo !== ultimoTermoPrecos) {
+    ultimoTermoPrecos = termo;
+    if (precosDescartados.size) {
+      precosDescartados.clear();
+      atualizarSelecaoPrecos();
+    }
+  }
   if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
     caixa.classList.add("oculto");
     return;
   }
   const s = await api.estatisticas_preco(termo,
     $("f-ano").value ? +$("f-ano").value : null,
-    $("f-so-meu").checked ? "proprio" : null);
+    $("f-so-meu").checked ? "proprio" : null,
+    [...precosDescartados]);
   if (!s) { caixa.classList.add("oculto"); return; }
   const cel = (v, r, destaque) =>
     `<div class="cel${destaque ? " destaque" : ""}">
@@ -504,7 +522,7 @@ async function mostrarResumoPrecos() {
 // A coluna elástica de cada aba (objeto/descrição) absorve a sobra e por
 // isso não tem alça: alargar qualquer outra encolhe ela, que é o que se
 // espera ao puxar "fornecedor" para ver o nome inteiro.
-const COL_FLEX = { contratacoes:2, contratos:1, atas:2, pca:1, itens:0 };
+const COL_FLEX = { contratacoes:2, contratos:1, atas:2, pca:1, itens:1 };
 const LARGURA_MIN = 44;
 const FLEX_MIN = 170;       // espaço que a coluna elástica nunca cede
 let larguras = {};
@@ -622,9 +640,15 @@ async function carregarLista() {
         aria-sort="${ativa ? (estado.dir === "asc" ? "ascending" : "descending") : "none"}"` : "";
       return `<span${sort}>${rotulo} ${seta}</span>`;
     }).join("") + `</div>`;
-  const linhas = r.itens.map(d =>
-    `<button class="linha ${g}" data-nc="${esc(d.numero_controle ?? d.id)}">` +
-    renderLinha(estado.tipo, d) + `</button>`).join("");
+  const selecionavel = estado.tipo === "itens";
+  const linhas = r.itens.map(d => {
+    const nc = esc(d.numero_controle ?? d.id);
+    return selecionavel
+      ? `<div class="linha ${g}" data-nc="${nc}" role="button" tabindex="0">`
+        + renderLinha(estado.tipo, d) + `</div>`
+      : `<button class="linha ${g}" data-nc="${nc}">`
+        + renderLinha(estado.tipo, d) + `</button>`;
+  }).join("");
   const comFiltro = temFiltroAtivo();
   $("btn-limpar").classList.toggle("oculto", !comFiltro);
   const vazio = comFiltro
@@ -640,8 +664,28 @@ async function carregarLista() {
   ligarAlcas();
   $("vazio-limpar")?.addEventListener("click", limparFiltros);
   $("vazio-sync")?.addEventListener("click", () => api.sincronizar());
-  $("lista").querySelectorAll("button.linha[data-nc]").forEach(b =>
-    b.addEventListener("click", () => abrirDetalhe(b.dataset.nc)));
+  $("lista").querySelectorAll(".linha[data-nc]").forEach(b => {
+    b.addEventListener("click", e => {
+      // clicar na caixa de seleção não pode abrir o detalhe
+      if (e.target.closest(".sel")) return;
+      abrirDetalhe(b.dataset.nc);
+    });
+    if (b.tagName === "DIV")
+      b.addEventListener("keydown", e => {
+        if (e.target.closest(".sel")) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault(); abrirDetalhe(b.dataset.nc);
+        }
+      });
+  });
+  $("lista").querySelectorAll('.sel input[data-item]').forEach(c =>
+    c.addEventListener("change", () => {
+      const id = String(c.dataset.item);
+      if (c.checked) precosDescartados.delete(id);
+      else precosDescartados.add(id);
+      mostrarResumoPrecos();          // o resumo reflete só o que ficou
+      atualizarSelecaoPrecos();
+    }));
   $("lista").querySelectorAll(".cab span[data-ord]").forEach(s => {
     const ordenar = () => {
       const chave = s.dataset.ord;
@@ -983,6 +1027,11 @@ $("rel-gerar").addEventListener("click", async () => {
     orgao: $("rel-orgao").value || null,
     termo: $("rel-termo").value || null,
   };
+  // o que o usuário descartou na tela não entra no documento — mas só
+  // quando o relatório é o da própria pesquisa em curso
+  if ($("rel-tipo").value === "precos" && precosDescartados.size
+      && params.termo === ultimoTermoPrecos)
+    params.excluidos = [...precosDescartados];
   if ($("rel-tipo").value === "precos" && !params.termo) {
     $("rel-status").textContent = "Informe o que pesquisar";
     $("rel-termo").focus();
@@ -1056,6 +1105,22 @@ async function confirmarVolume(codigo, nome) {
     + `${e.itens.toLocaleString("pt-BR")} preços, ocupar `
     + `${String(e.mb).replace(".", ",")} MB e levar aproximadamente `
     + `${tempo}.${pesado}${nl}${nl}Adicionar mesmo assim?`);
+}
+
+function atualizarSelecaoPrecos() {
+  const caixa = $("precos-selecao");
+  if (!caixa) return;
+  const n = precosDescartados.size;
+  caixa.classList.toggle("oculto", n === 0);
+  if (n) caixa.innerHTML =
+    `${n} ${n === 1 ? "item descartado" : "itens descartados"} desta pesquisa —
+     não entram no resumo nem no relatório.
+     <button class="btn ghost" id="precos-restaurar">Restaurar todos</button>`;
+  $("precos-restaurar")?.addEventListener("click", () => {
+    precosDescartados.clear();
+    carregarLista();
+    atualizarSelecaoPrecos();
+  });
 }
 
 function ligarBuscaReferencia() {

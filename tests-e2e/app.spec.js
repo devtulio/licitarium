@@ -130,7 +130,7 @@ test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
     const quebrou = [], truncou = [];
     document.querySelectorAll(".linha:not(.cab)").forEach(linha => {
       [...linha.children].forEach((cel, i) => {
-        if (i === 0) return;                     // descrição pode quebrar
+        if (i <= 1) return;      // 0 = seleção; 1 = descrição, pode quebrar
         // preço de município de referência leva a origem numa 2ª linha,
         // de propósito: é o que distingue a série própria da de fora
         if (cel.querySelector(".de-fora")) return;
@@ -147,7 +147,7 @@ test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
   expect(m.truncou.length).toBe(1);
   expect(m.truncou[0]).toContain("COOPERATIVA");
   // sufixo societário sai do nome exibido, íntegro no title
-  const forn = page.locator(".linha:not(.cab)").nth(2).locator("span").nth(4);
+  const forn = page.locator(".linha:not(.cab)").nth(2).locator("span").nth(5);
   await expect(forn).toHaveText("CENTRAL HOLDING LOGISTICA");
   await expect(forn).toHaveAttribute("title", "CENTRAL HOLDING LOGISTICA LTDA");
 });
@@ -158,22 +158,22 @@ test("arrastar a alça redimensiona a coluna e persiste", async ({ page }) => {
   const larguraDe = i => page.evaluate(n => parseFloat(
     getComputedStyle(document.querySelector(".lista .cab"))
       .gridTemplateColumns.split(" ")[n]), i);
-  const antes = await larguraDe(4);                 // coluna Fornecedor
-  const alca = page.locator(".cab > span").nth(4).locator(".alca");
+  const antes = await larguraDe(5);                 // coluna Fornecedor
+  const alca = page.locator(".cab > span").nth(5).locator(".alca");
   const cx = await alca.boundingBox();
   await page.mouse.move(cx.x + cx.width / 2, cx.y + cx.height / 2);
   await page.mouse.down();
   await page.mouse.move(cx.x + cx.width / 2 + 40, cx.y + cx.height / 2,
                         { steps: 5 });
   await page.mouse.up();
-  const depois = await larguraDe(4);
+  const depois = await larguraDe(5);
   expect(depois).toBeGreaterThan(antes + 30);
   // a coluna elástica cedeu espaço, mas não abaixo do mínimo
-  expect(await larguraDe(0)).toBeGreaterThanOrEqual(160);
+  expect(await larguraDe(1)).toBeGreaterThanOrEqual(160);
   // largura salva para voltar na próxima abertura
   const salvo = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "set_config" && c.k === "colunas").pop());
-  expect(JSON.parse(salvo.v).itens[4]).toBeGreaterThan(antes + 30);
+  expect(JSON.parse(salvo.v).itens[5]).toBeGreaterThan(antes + 30);
   // ordenação não dispara ao arrastar sobre o cabeçalho
   const chamadas = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "listar" && c.filtros && c.filtros.ord));
@@ -186,21 +186,22 @@ test("duplo clique na alça ajusta a coluna ao conteúdo (autofit)",
   await page.locator('nav.abas button[data-tipo="itens"]').click();
   const cortado = txt => page.evaluate(t => {
     const c = [...document.querySelectorAll(".lista .linha:not(.cab)")]
-      .map(l => l.children[4]).find(e => e.textContent.includes(t));
+      .map(l => l.children[5]).find(e => e.textContent.includes(t));
     return c.scrollWidth > c.clientWidth + 1;
   }, txt);
   // encolhe a coluna a ponto de cortar até um nome curto
   await page.evaluate(() => {
-    larguras.itens = { 1:52, 2:64, 3:124, 4:90, 5:100, 6:72 };
+    larguras.itens = { 0:30, 2:52, 3:64, 4:124, 5:90, 6:100, 7:72 };
     aplicarLarguras("itens");
   });
   expect(await cortado("ZILDA")).toBe(true);
-  await page.locator(".cab > span").nth(4).locator(".alca").dblclick();
+  await page.locator(".cab > span").nth(5).locator(".alca").dblclick();
   expect(await cortado("ZILDA")).toBe(false);        // autofit recuperou
   // e a coluna elástica não foi engolida pelo nome gigante
+  // (índice 1: a 0 é a caixa de seleção da pesquisa)
   const flex = await page.evaluate(() => parseFloat(
     getComputedStyle(document.querySelector(".lista .cab"))
-      .gridTemplateColumns.split(" ")[0]));
+      .gridTemplateColumns.split(" ")[1]));
   expect(flex).toBeGreaterThanOrEqual(160);
   // ordenação não foi disparada pelos cliques do duplo clique
   const ord = await page.evaluate(() => window.__chamadas.filter(
@@ -584,7 +585,7 @@ test("aba Preços mostra a origem e permite ficar só com o município",
   await expect(cabMunicipio).toHaveAttribute("aria-sort", "ascending");
   expect((await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "listar").pop())).filtros.ord).toBe("municipio");
-  const municipios = page.locator(".linha:not(.cab) > span:nth-child(6)");
+  const municipios = page.locator(".linha:not(.cab) > span:nth-child(7)");
   await expect(municipios.first()).toHaveText("Orindiúva");
   const deFora = page.locator(".linha:not(.cab) .de-fora");
   await expect(deFora).toHaveCount(1);
@@ -619,7 +620,7 @@ test("largura de coluna guardada antes de a aba mudar não quebra a lista",
     document.querySelector(".lista .cab")).gridTemplateColumns);
   // sem a guarda, a coluna que falta viraria "NaNpx" e o grid desabaria
   expect(cols).not.toContain("NaN");
-  expect(cols.split(" ").length).toBe(7);
+  expect(cols.split(" ").length).toBe(8);
   // o mapa incompatível é descartado, e não reaplicado na próxima troca
   expect(await page.evaluate(() => larguras.itens)).toBeUndefined();
 });

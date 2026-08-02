@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.3.2</title>
+<title>Manual Operacional — Licitarium v1.4.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.3.2 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.4.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.3.2</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.4.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.3.2.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.4.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -280,6 +280,20 @@ com esse levantamento, do menor para o maior preço unitário — subsídio para
 pesquisa de preços do art. 23 da Lei 14.133/2021. A caixa <b>Só com preço
 fechado</b> (ligada por padrão) esconde itens que ainda não têm resultado
 homologado.</p>
+<h3>Escolher quais preços entram</h3>
+<p>Cada linha da lista tem uma <b>caixa de seleção</b>, marcada por padrão.
+Desmarque o que não for comparável e o resumo se refaz na hora — o item some
+do cálculo e do <b>relatório de pesquisa de preços</b>, mas continua na tela,
+para você poder voltar atrás.</p>
+<p>Serve para o caso mais comum de distorção: buscar <i>papel higiênico</i>
+traz também <i>suporte de papel higiênico</i> e <i>locação de banheiro
+químico com porta papel higiênico</i>. No acervo do piloto, descartar esses
+dois derruba a média de R$ 53,63 para R$ 30,74 e o maior preço de R$ 249,80
+para R$ 33,90.</p>
+<p>Um aviso mostra quantos itens foram descartados, com o botão
+<b>Restaurar todos</b>. A escolha vale para a pesquisa em curso: ao trocar o
+termo, tudo volta a ficar marcado.</p>
+
 <div class="caixa"><b>Confira a aderência.</b> Preço só é comparável entre
 itens equivalentes: verifique especificação, unidade de medida e quantidade
 antes de usar um valor do histórico como referência.</div>

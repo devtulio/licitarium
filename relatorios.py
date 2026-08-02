@@ -249,7 +249,13 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
             "n": len(dispensas)}
 
 
-def dados_precos(db, termo, ano=None, orgao=None):
+def _blocos(ids, tamanho=400):
+    """Fatia ids para caber no limite de parâmetros do SQLite."""
+    ids = [str(i) for i in (ids or []) if i]
+    return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
+
+
+def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
     """Histórico de preços unitários homologados para um termo de busca."""
     where = ["valor_unitario_homologado IS NOT NULL"]
     args = []
@@ -267,6 +273,10 @@ def dados_precos(db, termo, ano=None, orgao=None):
     if orgao:
         where.append("orgao_cnpj=?")
         args.append(orgao)
+    # itens que o usuário descartou na tela não entram no documento
+    for grupo in _blocos(excluidos):
+        where.append("id NOT IN (%s)" % ",".join("?" * len(grupo)))
+        args += grupo
     sql_where = " WHERE " + " AND ".join(where)
     linhas = [dict(r) for r in db.execute(
         f"""SELECT descricao, unidade, quantidade_homologada, unidade,
@@ -717,7 +727,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         termo = (params.get("termo") or "").strip()
         if not termo:
             raise ValueError("informe o que pesquisar")
-        d = dados_precos(db, termo, ano, orgao)
+        d = dados_precos(db, termo, ano, orgao, params.get("excluidos"))
         conteudo = render_precos(d, municipio, uf, tema)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"
