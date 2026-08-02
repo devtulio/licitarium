@@ -211,3 +211,32 @@ def test_relatorios_imprimem_documento_com_mascara(db):
     assert "13.286.494/0001-64" in html
     assert "014.721.886-16" in html
     assert "13286494000164" not in html      # nada de número cru
+
+
+def test_url_pncp_do_processo():
+    assert relatorios.url_pncp("96291141000180", 2024, 4344) == \
+        "https://pncp.gov.br/app/editais/96291141000180/2024/4344"
+    # sem os três dados não há link: melhor nenhum do que quebrado
+    for faltando in (("", 2024, 1), ("111", None, 1), ("111", 2024, None)):
+        assert relatorios.url_pncp(*faltando) is None
+
+
+def test_relatorio_de_precos_liga_o_processo_ao_pncp(db):
+    """Transparência: quem recebe o documento confere na fonte oficial."""
+    db.execute(
+        "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+        " sequencial, numero_item, descricao, unidade, quantidade_homologada,"
+        " valor_unitario_homologado, valor_total_homologado, fornecedor_nome,"
+        " data_resultado, municipio_ibge)"
+        " VALUES ('P#1','C-1','96291141000180',2024,4344,1,'PAPEL HIGIENICO',"
+        " 'Fardo 64,00 RO',200,28.8,5760.0,'QUALITY PAPER LTDA',"
+        " '2024-09-26','3536604')")
+    db.commit()
+    html = relatorios.render_precos(
+        relatorios.dados_precos(db, "papel"), "Orindiúva", "SP")
+    assert ('href="https://pncp.gov.br/app/editais/96291141000180/2024/4344"'
+            in html)
+    assert ">4344/2024</a>" in html
+    # município e unidade em coluna que não quebra
+    assert '<td class="muni">' in html and '<td class="unid">' in html
+    assert "white-space:nowrap" in html

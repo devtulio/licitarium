@@ -66,6 +66,17 @@ def moeda(v):
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
 
 
+def url_pncp(cnpj, ano, sequencial):
+    """Página do processo no portal — a mesma que o programa abre na tela.
+
+    No relatório serve à transparência: quem recebe o documento confere cada
+    preço na fonte oficial, em vez de confiar na nossa tabela.
+    """
+    if not (cnpj and ano and sequencial):
+        return None
+    return f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{sequencial}"
+
+
 def num_contrato(numero, ano):
     """PNCP grava '0033/26'; padrão de exibição é numero/ano: 33/2026."""
     if not numero:
@@ -282,7 +293,7 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
         f"""SELECT descricao, unidade, quantidade_homologada, unidade,
                    valor_unitario_homologado, valor_total_homologado,
                    fornecedor_nome, fornecedor_ni, data_resultado,
-                   sequencial, ano, contratacao_controle,
+                   sequencial, ano, contratacao_controle, orgao_cnpj,
                    referencia, municipio_ibge
             FROM itens{sql_where}
             ORDER BY valor_unitario_homologado""", args)]
@@ -382,6 +393,13 @@ def _css(paisagem, tema="pergaminho"):
   .obj {{ text-transform:uppercase; text-align:justify; hyphens:auto; }}
   /* nome de fornecedor quebra feio; a coluna cede espaço da descrição */
   td.forn, th.forn {{ text-align:center; min-width:170px; }}
+  /* município e unidade em uma linha só: "Paulo de Faria" e "Fardo 64,00 RO"
+     quebravam no meio, e a descrição tem folga para ceder */
+  td.muni, th.muni {{ text-align:center; white-space:nowrap; }}
+  td.unid, th.unid {{ text-align:center; white-space:nowrap; }}
+  /* link para a página oficial: discreto no papel, clicável no PDF */
+  td.proc a {{ color:var(--acento); text-decoration:none;
+               border-bottom:1px dotted var(--acento); }}
   .cards {{ display:flex; gap:10px; margin-bottom:6px; }}
   .card {{ background:var(--superficie); border:1px solid var(--borda);
            border-radius:3px;
@@ -600,15 +618,21 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
 <div class="card"><div class="n">{r['n']}</div><div class="l">itens</div></div>
 <div class="card"><div class="n">{r['fornecedores']}</div><div class="l">fornecedores</div></div>
 </div>"""
+    def _processo(l):
+        texto = f"{_e(l['sequencial'])}/{_e(l['ano'])}"
+        url = url_pncp(l.get("orgao_cnpj"), l.get("ano"), l.get("sequencial"))
+        return (f'<a href="{_e(url)}" title="Abrir no PNCP">{texto}</a>'
+                if url else texto)
+
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
-      <td class="ctr">{_e(l['unidade'])}</td>
+      <td class="unid">{_e(l['unidade'])}</td>
       <td class="num">{l['quantidade_homologada'] or '–'}</td>
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
       <td class="num">{moeda(l['valor_total_homologado'])}</td>
       <td class="forn">{_e(l['fornecedor_nome'])}</td>
-      <td class="ctr">{_e(l['municipio_nome'])}</td>
-      <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
+      <td class="muni">{_e(l['municipio_nome'])}</td>
+      <td class="ctr proc">{_processo(l)}</td>
       <td class="num">{data_br(l['data_resultado'])}</td></tr>"""
       for l in d["linhas"])
     corpo = f"""<div class="caixa-aviso">Levantamento de <b>preços efetivamente
@@ -616,13 +640,14 @@ homologados</b> pelo município, extraído do PNCP — subsídio à pesquisa de
 preços do art. 23 da Lei 14.133/2021 (que admite contratações similares de
 outros entes como parâmetro). Confira a aderência de especificação, unidade e
 quantidade de cada item antes de usar como referência.
-Termo pesquisado: <b>{_e(d['termo'])}</b>.</div>
+Termo pesquisado: <b>{_e(d['termo'])}</b>.
+O número do processo leva à página oficial no PNCP, para conferência.</div>
 {cards}
 <h2>Itens homologados, do menor para o maior preço unitário</h2>
-<table><thead><tr><th>Descrição</th><th class="ctr">Unid.</th>
+<table><thead><tr><th>Descrição</th><th class="unid">Unid.</th>
 <th class="num">Qtde</th><th class="num">Unitário</th>
 <th class="num">Total</th><th class="forn">Fornecedor</th>
-<th class="ctr">Município</th>
+<th class="muni">Município</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
 <tbody>{linhas}</tbody></table>"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"

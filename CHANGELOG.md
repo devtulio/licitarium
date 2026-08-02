@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.1 — 2026-08-02
+
+- **Link para o PNCP no relatório de pesquisa de preços.** O número do
+  processo passa a levar à página oficial daquela contratação no portal.
+  Em PDF fica clicável; no papel, o número continua legível. Quem recebe o
+  levantamento confere cada preço na fonte, em vez de confiar só na tabela.
+- **Colunas Município e Unid. deixam de quebrar** no relatório: "Paulo de
+  Faria" e "Fardo 64,00 RO" ocupavam duas linhas cada. A coluna de descrição
+  cede o espaço.
+
 ## 1.4.0 — 2026-08-02
 
 **Escolher quais preços entram na pesquisa**
