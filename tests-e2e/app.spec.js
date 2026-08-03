@@ -549,6 +549,8 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
   const secao = page.locator("#cfg-referencia");
   await expect(secao).toContainText("Palestina");
   await expect(secao).toContainText("812 preços");
+  // quanto o município pesa no arquivo: quem decide remover precisa saber
+  await expect(secao).toContainText("ocupa ~4,6 MB");
 
   // adicionar pelo autocomplete (o volume da coleta é confirmado antes —
   // ver tests-e2e/volume.spec.js)

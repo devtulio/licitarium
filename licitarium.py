@@ -22,7 +22,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.4.1"
+VERSAO = "1.4.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -238,6 +238,15 @@ def abrir_db():
     return db
 
 
+# Quanto um município de referência realmente ocupa em disco, medido em
+# 2026-08-02 removendo cada um de uma cópia do acervo e comparando o arquivo
+# depois de VACUUM: 14,57 / 11,60 / 11,33 / 6,62 / 1,28 MB reais contra
+# 8,16 / 6,46 / 6,46 / 3,69 / 0,72 MB de JSON bruto. A razão fica entre 1,75 e
+# 1,80 nos cinco, do maior ao menor — o resto são as colunas projetadas, os
+# índices e o índice de busca.
+FATOR_DISCO = 1.78
+
+
 def _blocos(ids, tamanho=400):
     """Fatia a lista de ids em blocos para o SQLite.
 
@@ -357,13 +366,21 @@ class Api:
     def listar_municipios_referencia(self):
         db = abrir_db()
         try:
-            return [{"ibge": r["ibge"], "nome": r["nome"], "uf": r["uf"],
-                     "itens": r["itens"]} for r in db.execute(
+            linhas = db.execute(
                 """SELECT m.ibge, m.nome, m.uf,
                           (SELECT COUNT(*) FROM itens i
                            WHERE i.municipio_ibge = m.ibge
-                             AND i.valor_unitario_homologado IS NOT NULL) itens
-                   FROM municipios_referencia m ORDER BY m.nome""")]
+                             AND i.valor_unitario_homologado IS NOT NULL) itens,
+                          (SELECT COALESCE(SUM(LENGTH(i.raw)),0) FROM itens i
+                           WHERE i.municipio_ibge = m.ibge)
+                          + (SELECT COALESCE(SUM(LENGTH(c.raw)),0)
+                             FROM contratacoes c
+                             WHERE c.municipio_ibge = m.ibge) bytes_raw
+                   FROM municipios_referencia m ORDER BY m.nome""").fetchall()
+            return [{"ibge": r["ibge"], "nome": r["nome"], "uf": r["uf"],
+                     "itens": r["itens"],
+                     "mb": round(r["bytes_raw"] * FATOR_DISCO / 1e6, 1)}
+                    for r in linhas]
         finally:
             db.close()
 

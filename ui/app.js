@@ -1055,6 +1055,7 @@ async function renderReferencia() {
     `<div class="orgrow"><span>${esc(m.nome)} — ${esc(m.uf)}
        <small>IBGE ${esc(m.ibge)} · ${m.itens
          ? `${m.itens.toLocaleString("pt-BR")} ${m.itens === 1 ? "preço" : "preços"} no banco`
+           + ` · ocupa ~${(m.mb || 0).toLocaleString("pt-BR")} MB`
          : "ainda sem preços — serão baixados na próxima sincronização"}</small></span>
      <button class="btn ghost" data-remover="${esc(m.ibge)}">Remover</button></div>`)
     .join("") || `<div class="dim">Nenhum — o banco de preços usa só o seu

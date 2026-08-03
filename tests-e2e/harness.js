@@ -123,7 +123,7 @@ function scriptPonte(temaBanco = "portal") {
                    parcial: false },
       "9999999": { erro: "sem conexão com o PNCP" },
     };
-    window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812 }];
+    window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812, mb: 4.6 }];
     window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
     window.pywebview = { api: {
@@ -182,7 +182,7 @@ function scriptPonte(temaBanco = "portal") {
       adicionar_municipio_referencia: async (c, n, uf) => {
         window.__chamadas.push({ metodo: "adicionar_municipio_referencia", c, n, uf });
         window.__referencia = [...window.__referencia,
-                               { ibge: String(c), nome: n, uf, itens: 0 }];
+                               { ibge: String(c), nome: n, uf, itens: 0, mb: 0 }];
         return { ok: true };
       },
       remover_municipio_referencia: async (c) => {

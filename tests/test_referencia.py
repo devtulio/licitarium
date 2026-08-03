@@ -293,3 +293,35 @@ def test_descarte_vazio_nao_muda_nada(api):
     base = api.estatisticas_preco("papel sulfite")
     for vazio in (None, [], ["", None]):
         assert api.estatisticas_preco("papel sulfite", excluidos=vazio) == base
+
+
+def test_tamanho_em_disco_do_municipio_de_referencia(api):
+    """O MB mostrado sai do JSON bruto vezes o fator medido, e só do município.
+
+    O peso real do município no arquivo é maior que o JSON que ele trouxe —
+    há as colunas projetadas, os índices e o FTS. FATOR_DISCO traduz um no
+    outro; ver a medição documentada na constante.
+    """
+    api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
+    db = _db()
+    try:
+        # 1 MB de JSON em cada tabela, marcado como do município
+        db.execute("UPDATE contratacoes SET municipio_ibge='3536604',"
+                   " raw=? WHERE referencia=1", ("x" * 1_000_000,))
+        db.execute("UPDATE itens SET municipio_ibge='3536604',"
+                   " raw=? WHERE referencia=1", ("x" * 1_000_000,))
+        # o do próprio município é volumoso e não pode entrar na conta
+        db.execute("UPDATE itens SET raw=? WHERE referencia=0",
+                   ("x" * 5_000_000,))
+        db.commit()
+    finally:
+        db.close()
+
+    m, = api.listar_municipios_referencia()
+    assert m["mb"] == round(2 * licitarium.FATOR_DISCO, 1)
+
+
+def test_municipio_de_referencia_sem_dados_nao_ocupa_nada(api):
+    api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
+    m, = api.listar_municipios_referencia()
+    assert m["itens"] == 0 and m["mb"] == 0

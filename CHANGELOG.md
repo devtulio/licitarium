@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.2 — 2026-08-02
+
+- **Tamanho de cada município de referência.** A lista em Configurações passa
+  a mostrar quanto cada município ocupa no banco, ao lado da contagem de
+  preços. Um vizinho custa de 1 a 15 MB, conforme o quanto publica; agora dá
+  para ver qual deles está pesando antes de decidir remover.
+
 ## 1.4.1 — 2026-08-02
 
 - **Link para o PNCP no relatório de pesquisa de preços.** O número do
