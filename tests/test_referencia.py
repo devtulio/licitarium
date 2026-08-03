@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import licitarium
 import pca_builder
+import pncp
 import relatorios
 
 ANO = 2026
@@ -318,10 +319,41 @@ def test_tamanho_em_disco_do_municipio_de_referencia(api):
         db.close()
 
     m, = api.listar_municipios_referencia()
-    assert m["mb"] == round(2 * licitarium.FATOR_DISCO, 1)
+    assert m["mb"] == round(2 * pncp.FATOR_DISCO, 1)
 
 
 def test_municipio_de_referencia_sem_dados_nao_ocupa_nada(api):
     api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
     m, = api.listar_municipios_referencia()
     assert m["itens"] == 0 and m["mb"] == 0
+
+
+# Medição de 2026-08-02: contratações e MB de arquivo de cada município de
+# referência já coletado. O MB veio de remover o município de uma cópia do
+# acervo e comparar o arquivo depois de VACUUM.
+COLETADOS = [("Guaraci", 166, 14.57), ("Paulo de Faria", 223, 11.60),
+             ("Riolândia", 207, 11.33), ("Icém", 94, 6.62),
+             ("Palestina", 24, 1.28)]
+
+
+def test_estimativa_de_volume_bate_com_o_que_foi_coletado():
+    """As constantes do aviso de volume valem contra a coleta real.
+
+    O aviso decide se o usuário aceita uma coleta de minutos ou de horas —
+    e até a 1.4.2 ele previa os MB de JSON, não o crescimento do arquivo,
+    anunciando 34 MB para uma coleta que ocupou 45,4. Este teste quebra se
+    alguém mexer nas constantes sem refazer a medição.
+    """
+    def previsto(contratacoes):
+        return (contratacoes * pncp.ITENS_POR_CONTRATACAO
+                * pncp.KB_POR_ITEM * pncp.FATOR_DISCO / 1024)
+
+    total_prev = sum(previsto(c) for _, c, _ in COLETADOS)
+    total_real = sum(mb for _, _, mb in COLETADOS)
+    assert abs(total_prev - total_real) / total_real < 0.10, (
+        f"previsto {total_prev:.1f} MB para {total_real:.1f} MB reais")
+
+    # município a município a dispersão é grande (13,3 a 23,7 itens por
+    # contratação): aqui basta a ordem de grandeza
+    for nome, contratacoes, real in COLETADOS:
+        assert 0.6 < previsto(contratacoes) / real < 1.6, nome

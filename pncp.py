@@ -168,13 +168,21 @@ def _baixar(caminho, consultas, tamanho_pagina):
             yield futuros[f], f.result()
 
 
-# medidos no acervo real de Orindiúva (131 contratações, 2.674 itens,
-# 12,8 MB) — servem para dizer ao usuário o tamanho da encrenca antes de
-# ele mandar baixar o município. Conferidos: para as 131 contratações a
-# estimativa dá 2.672 itens contra 2.674 reais.
-ITENS_POR_CONTRATACAO = 20.4
-KB_POR_ITEM = 2.4
+# servem para dizer ao usuário o tamanho da encrenca antes de ele mandar
+# baixar o município. Recalibrados em 2026-08-02 sobre os cinco municípios de
+# referência já coletados — 714 contratações, 12.587 itens, 25,5 MB de JSON e
+# 45,4 MB de arquivo —, amostra bem maior que as 131 contratações de
+# Orindiúva de onde saíram os primeiros números (20,4 itens e 2,4 KB).
+ITENS_POR_CONTRATACAO = 17.6
+KB_POR_ITEM = 2.1             # de JSON bruto; o disco cobra FATOR_DISCO a mais
 FRACAO_COM_RESULTADO = 0.84   # 2.257 dos 2.674 itens têm preço homologado
+# Razão entre o JSON que vem do portal e o espaço que ele ocupa depois de
+# gravado: as colunas projetadas, os índices e o FTS custam quase o mesmo que
+# o próprio JSON. Medida em 2026-08-02 removendo cada município de referência
+# de uma cópia do acervo e comparando o arquivo depois de VACUUM — 14,57 /
+# 11,60 / 11,33 / 6,62 / 1,28 MB reais contra 8,16 / 6,46 / 6,46 / 3,69 /
+# 0,72 MB de JSON: a razão fica entre 1,75 e 1,80 nos cinco.
+FATOR_DISCO = 1.78
 
 
 def estimar_volume(codigo_ibge, inicio=DATA_INICIO_PNCP, fim=None):
@@ -220,7 +228,9 @@ def estimar_volume(codigo_ibge, inicio=DATA_INICIO_PNCP, fim=None):
     requisicoes = total + itens * FRACAO_COM_RESULTADO
     minutos = round(requisicoes * 0.9 / max(CONEXOES_PARALELAS, 1) / 60)
     return {"contratacoes": total, "itens": itens,
-            "mb": round(itens * KB_POR_ITEM / 1024, 1),
+            # o que o usuário quer saber é quanto o disco vai crescer, não
+            # quanto JSON vem do portal
+            "mb": round(itens * KB_POR_ITEM * FATOR_DISCO / 1024, 1),
             "minutos": minutos, "parcial": falhas > 0}
 
 

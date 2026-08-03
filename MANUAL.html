@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.4.2</title>
+<title>Manual Operacional — Licitarium v1.4.3</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.4.2 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.4.3 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.4.2</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.4.3</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.4.2.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.4.3.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -376,6 +376,12 @@ se preferir abrir em janela.</p>
 <p>Serve para dar base de comparação ao banco de preços (seção 4). Digite o
 nome do município — a lista é a mesma do assistente inicial — e ele entra na
 relação. <b>Os preços chegam na próxima sincronização</b>, não na hora.</p>
+<p>Antes de aceitar, o programa consulta o PNCP e informa <b>quantas
+contratações o município tem, quantos preços deve trazer, quanto vai ocupar e
+quanto tempo a coleta leva</b>. Vizinho pequeno custa minutos e poucos MB;
+cidade média custa horas e centenas de MB — nesse caso o aviso é destacado. A
+coleta roda em segundo plano e não impede o uso do programa. Município sem
+nada publicado no PNCP é recusado, porque não traria preço algum.</p>
 <p>Os municípios adicionados ficam listados na tela, como os órgãos
 monitorados, com o código IBGE, quantos preços cada um já trouxe e
 <b>quanto ele ocupa no seu banco</b> — assim dá para ver quem está pesando no

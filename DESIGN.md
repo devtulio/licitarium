@@ -71,9 +71,12 @@ Fase 2 — CONTRATOS / ATAS / PCA (chave: CNPJ do órgão)
   só o banco de preços e o relatório de Pesquisa de Preços enxergam os dois.
   A blindagem é testada em `tests/test_referencia.py`, que inclusive lê o HTML
   gerado. Motivação e medições: `design/BRIEFING-precos-referencia.md`.
-  O `raw` do item de referência é mantido (medido: ~25 MB para quatro
+  O `raw` do item de referência é mantido (medido: 25,5 MB de JSON para cinco
   vizinhos) — descartá-lo economizaria pouco e quebraria o princípio de que
-  o JSON bruto é a fonte da verdade.
+  o JSON bruto é a fonte da verdade. O que o município ocupa de fato em disco
+  é esse JSON vezes `pncp.FATOR_DISCO` (1,78, medido): é assim que a lista de
+  municípios de referência e o aviso de volume dizem o tamanho, já que
+  `dbstat` não existe na build do SQLite que acompanha o Python.
 - **Revisita de itens**: `data_atualizacao` da contratação muda por motivo
   cosmético e não implica item alterado — `_itens_pendentes` compara a data de
   cada item antes de pedir o resultado. Item inalterado é pulado inteiro, e

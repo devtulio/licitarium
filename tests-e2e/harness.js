@@ -117,8 +117,8 @@ function scriptPonte(temaBanco = "portal") {
     // 3533908 = cidade média (coleta de horas); 3533007 não
     // publica no PNCP; 9999999 simula falha de consulta
     window.__estimativas = {
-      "3533908": { contratacoes: 5982, itens: 122033, mb: 286,
-                   minutos: 407, parcial: false },
+      "3533908": { contratacoes: 5982, itens: 105283, mb: 384,
+                   minutos: 353, parcial: false },
       "3533007": { contratacoes: 0, itens: 0, mb: 0, minutos: 0,
                    parcial: false },
       "9999999": { erro: "sem conexão com o PNCP" },

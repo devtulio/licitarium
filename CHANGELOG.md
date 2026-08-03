@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.3 — 2026-08-03
+
+- **O aviso de volume dizia um tamanho menor que o real.** Ele previa os MB
+  de JSON que viriam do portal, não o quanto o arquivo ia crescer — e o banco
+  cobra quase o dobro, entre colunas, índices e busca. Com os cinco
+  municípios de referência já coletados (714 contratações, 12.587 itens,
+  45,4 MB), as estimativas foram refeitas: agora o aviso fala de espaço em
+  disco e a previsão para esses cinco erra 0,5 MB, contra 11 MB antes.
+
 ## 1.4.2 — 2026-08-02
 
 - **Tamanho de cada município de referência.** A lista em Configurações passa

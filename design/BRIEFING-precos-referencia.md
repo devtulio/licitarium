@@ -136,6 +136,40 @@ torna a escolha explícita.
   uma cidade de 53 mil habitantes. Foi o que motivou o aviso de volume,
   implementado antes da entrega.
 
+### 6.1 Aferição depois da coleta (2026-08-02)
+
+Com os cinco coletados, dá para comparar a previsão com o que de fato entrou.
+O tamanho real de cada um foi medido removendo o município de uma cópia do
+acervo e comparando o arquivo depois de `VACUUM`:
+
+| município | contratações | itens | JSON | disco real | previsto (antes) |
+|---|---:|---:|---:|---:|---:|
+| Guaraci | 166 | 3.930 | 8,16 MB | 14,57 MB | 7,9 MB |
+| Paulo de Faria | 223 | 3.475 | 6,46 MB | 11,60 MB | 10,7 MB |
+| Riolândia | 207 | 2.760 | 6,46 MB | 11,33 MB | 9,9 MB |
+| Icém | 94 | 2.009 | 3,69 MB | 6,62 MB | 4,2 MB |
+| Palestina | 24 | 413 | 0,72 MB | 1,28 MB | 1,1 MB |
+| **total** | **714** | **12.587** | **25,5 MB** | **45,4 MB** | **34 MB** |
+
+Três correções saíram daí:
+
+- **A previsão media JSON, não disco.** Os 34 MB anunciados eram do JSON que
+  viria do portal; o arquivo cresceu 45,4 MB. As colunas projetadas, os índices
+  e o FTS custam quase tanto quanto o próprio JSON — razão medida entre 1,75 e
+  1,80 nos cinco, agora aplicada na estimativa (`FATOR_DISCO`).
+- **20,4 itens por contratação era otimista para fora de casa.** Os vizinhos
+  dão 17,6 na média (de 13,3 em Riolândia a 23,7 em Guaraci). A constante
+  passou a sair das 714 contratações de cinco municípios, não das 131 de um.
+- **2,4 KB por item virou 2,1**, medido sobre 12.587 itens.
+
+Recalibrada, a previsão para os cinco daria 45,9 MB contra os 45,4 reais.
+O aviso de volume de Olímpia sobe de 286 MB para cerca de 384 MB — a decisão
+de deixá-la de fora fica mais fundamentada, não menos.
+
+Uma lição a mais: **estimativa medida num acervo só não vale para os outros.**
+A dispersão entre vizinhos de porte parecido (13,3 a 23,7 itens por
+contratação) é maior que a diferença entre a média deles e a de casa.
+
 ## 7. Interface
 
 - **Configurações → Municípios de referência**: lista com adicionar e remover,

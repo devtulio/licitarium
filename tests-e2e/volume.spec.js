@@ -21,9 +21,9 @@ test("cidade média avisa o tamanho da coleta e respeita o cancelamento",
   await escolher(page, "Olímpia", "3533908");
 
   expect(msg).toContain("5.982 contratações");
-  expect(msg).toContain("122.033");        // preços estimados
-  expect(msg).toContain("286 MB");
-  expect(msg).toContain("6,8 horas");      // minutos viram horas
+  expect(msg).toContain("105.283");        // preços estimados
+  expect(msg).toContain("384 MB");
+  expect(msg).toContain("5,9 horas");      // minutos viram horas
   expect(msg).toContain("ATENÇÃO");        // destaque para coleta longa
 
   // cancelou: não entra na lista

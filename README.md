@@ -74,6 +74,11 @@ amparo no art. 23, §1º, I (contratações similares de outros entes). A origem
 de cada valor fica visível na tela e no relatório; o acervo, os indicadores,
 o PCA e os demais relatórios continuam exclusivamente do seu município.
 
+Antes de aceitar, o programa consulta quanto o município vai custar em tempo e
+em espaço — um vizinho pequeno cabe em minutos e poucos MB, uma cidade média
+leva horas e centenas de MB. Depois de coletado, cada um mostra na lista
+quanto ocupa no banco.
+
 ### Montar PCA
 
 Usa o histórico de itens já contratados para sugerir o **Plano de Contratações
