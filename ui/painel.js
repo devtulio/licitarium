@@ -45,7 +45,7 @@ function svg(largura, altura, dentro) {
 }
 
 // ── colunas pareadas: estimado (claro) × homologado (cheio) ────────────────
-function grafMeses(meses) {
+function grafMeses(meses, larg = 660) {
   // Mês sem contratação é informação: filtrá-lo comprimia o eixo e escondia
   // o buraco — no acervo do piloto, março sumia entre fevereiro e abril.
   if (!meses.some(m => m.valor || m.estimado))
@@ -53,7 +53,7 @@ function grafMeses(meses) {
   const ultimo = meses.reduce(
     (u, m, i) => (m.valor || m.estimado) ? i : u, 0);
   const dados = meses.slice(0, Math.max(ultimo + 1, new Date().getMonth() + 1));
-  const alto = 170, base = 170, larg = 660;
+  const alto = 170, base = 170;
   const e = escala(Math.max(...dados.map(m => Math.max(m.valor, m.estimado))));
   const passo = (larg - 60) / dados.length;
   const y = (v) => base - (v / e.topo) * (base - 30);
@@ -65,7 +65,7 @@ function grafMeses(meses) {
         >${v ? compacto(v).replace("R$ ", "") : "0"}</text>`;
   }
   dados.forEach((m, i) => {
-    const x = 56 + i * passo, w = Math.min(22, passo / 2.6);
+    const x = 56 + i * passo, w = Math.min(34, passo / 2.6);
     const he = Math.max(2, base - y(m.estimado)), hh = Math.max(2, base - y(m.valor));
     g += `<rect x="${x}" y="${y(m.estimado)}" width="${w}" height="${he}" rx="4"
             fill="var(--s1)" opacity=".32"><title>${MES[m.mes - 1]} · estimado ${
@@ -83,10 +83,10 @@ function grafMeses(meses) {
 }
 
 // ── barras horizontais, uma série, rótulo direto ──────────────────────────
-function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}) {
+function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 360) {
   if (!itens.length) return `<div class="vazio">Sem dados no exercício.</div>`;
   const max = Math.max(...itens.map(valor)) || 1;
-  const linha = 40, larg = 360;
+  const linha = 40;
   let g = "";
   itens.forEach((it, i) => {
     const y = i * linha + 18, w = Math.max(3, (valor(it) / max) * (larg - 110));
@@ -100,13 +100,13 @@ function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}) {
 }
 
 // ── linhas do acumulado: ano corrente em destaque, anteriores em contexto ──
-function grafSeries(series, anoAtual) {
+function grafSeries(series, anoAtual, larg = 1000) {
   const anos = Object.keys(series).sort();
   const todos = anos.flatMap(a => series[a]);
   if (!todos.some(v => v)) return `<div class="vazio">Sem histórico para comparar.</div>`;
   // 90px à direita ficam para os rótulos dos anos: fora da área do plot,
   // dentro do viewBox — senão o texto sai cortado na borda
-  const larg = 1000, base = 170, e = escala(Math.max(...todos));
+  const base = 170, e = escala(Math.max(...todos));
   const x = (i) => 56 + i * ((larg - 150) / 11);
   const y = (v) => base - (v / e.topo) * (base - 26);
   let g = "";
@@ -145,11 +145,11 @@ function grafSeries(series, anoAtual) {
 }
 
 // ── deságio: economia à direita, estouro à esquerda do zero ───────────────
-function grafDesagio(desagios) {
+function grafDesagio(desagios, larg = 500) {
   if (!desagios.length)
     return `<div class="vazio">Nenhuma contratação com valor estimado e
             homologado no exercício.</div>`;
-  const larg = 500, linha = 37, meio = 250;
+  const linha = 37, meio = Math.round(larg * 0.42);
   const max = Math.max(20, ...desagios.map(d => Math.abs(d.pct)));
   let g = `<line x1="${meio}" y1="10" x2="${meio}" y2="${desagios.length * linha + 6}"
              class="eixo"/>`;
@@ -168,25 +168,29 @@ function grafDesagio(desagios) {
           <text class="rot" x="${economia ? meio - 8 : meio - w - 52}" y="${y + 14}"
             text-anchor="end">${esc(d.modalidade)}</text>`;
   });
+  const meia = (larg - meio) / 2;
   g += `<text class="rot" x="${meio}" y="${desagios.length * linha + 22}"
           text-anchor="middle">0%</text>
-        <text class="rot" x="${meio - 110}" y="${desagios.length * linha + 22}"
-          text-anchor="middle">acima do estimado</text>
-        <text class="rot" x="${meio + 110}" y="${desagios.length * linha + 22}"
+        <text class="rot" x="${Math.max(70, meio - meia)}"
+          y="${desagios.length * linha + 22}" text-anchor="middle"
+          >acima do estimado</text>
+        <text class="rot" x="${meio + meia}" y="${desagios.length * linha + 22}"
           text-anchor="middle">economia</text>`;
   return svg(larg, desagios.length * linha + 30, g);
 }
 
 // ── concentração: curva do valor acumulado por fornecedor ─────────────────
-function grafConcentracao(curva, total) {
+function grafConcentracao(curva, total, larg = 500) {
   if (curva.length < 3)
     return `<div class="vazio">Poucos fornecedores para medir concentração.</div>`;
-  const larg = 500, alto = 190, x0 = 40, y0 = 160;
+  const alto = 190, x0 = 40, y0 = 160;
   const px = (i) => x0 + (i / (curva.length - 1)) * (larg - 60);
   const py = (v) => y0 - (v / 100) * (y0 - 20);
   const pontos = curva.map((v, i) => `${px(i)},${py(v)}`).join(" ");
-  const dez = Math.min(9, curva.length - 1);
-  const aDireita = px(dez) < larg - 220;
+  // destacar o último ponto seria dizer "todos os fornecedores = 100%", que
+  // não informa nada — e o rótulo cairia em cima do fim da curva
+  const dez = Math.min(9, Math.max(0, curva.length - 2));
+  const aDireita = px(dez) < larg - 260;
   return svg(larg, alto, `
     <line class="eixo" x1="${x0}" y1="${y0}" x2="${larg - 20}" y2="${y0}"/>
     <line class="eixo" x1="${x0}" y1="20" x2="${x0}" y2="${y0}"/>
@@ -197,7 +201,7 @@ function grafConcentracao(curva, total) {
     <circle cx="${px(dez)}" cy="${py(curva[dez])}" r="4" fill="var(--s1)"
       stroke="var(--surface)" stroke-width="2"/>
     <text class="val" x="${px(dez) + (aDireita ? 10 : -10)}"
-      y="${py(curva[dez]) + (aDireita ? -2 : 16)}"
+      y="${py(curva[dez]) + 20}"
       text-anchor="${aDireita ? "start" : "end"}"
       >${dez + 1} ${dez ? "fornecedores" : "fornecedor"} = ${
         pct(curva[dez], 0)} do valor</text>
@@ -208,12 +212,12 @@ function grafConcentracao(curva, total) {
 }
 
 // ── calor: processos por mês e modalidade, rampa de uma cor só ────────────
-function grafCalor(calor, meses) {
+function grafCalor(calor, meses, larg = 1000) {
   const linhas = Object.entries(calor);
   const todos = linhas.flatMap(([, v]) => v);
   if (!todos.some(v => v)) return `<div class="vazio">Sem processos no exercício.</div>`;
   const max = Math.max(...todos);
-  const larg = 1000, cel = 70, alt = 24;
+  const cel = 96, alt = 24;
   const passo = Math.min(cel, (larg - 180) / meses.length - 4);
   let g = "";
   linhas.forEach(([nome, valores], i) => {
@@ -242,10 +246,10 @@ function grafCalor(calor, meses) {
 }
 
 // ── medidores do limite anual de dispensa ─────────────────────────────────
-function grafLimites(objetos, limite) {
+function grafLimites(objetos, limite, larg = 500) {
   if (!objetos.length)
     return `<div class="vazio">Nenhuma dispensa registrada no exercício.</div>`;
-  const larg = 500, bloco = 66;
+  const bloco = 66;
   let g = "";
   objetos.forEach((o, i) => {
     const y = i * bloco + 16;
@@ -274,11 +278,10 @@ function grafLimites(objetos, limite) {
 }
 
 // ── funil: onde os processos do exercício pararam ─────────────────────────
-function grafFunil(f) {
+function grafFunil(f, larg = 500) {
   const etapas = [["Publicadas", f.publicadas], ["Com resultado", f.com_resultado],
                   ["Com contrato", f.com_contrato], ["Vigentes hoje", f.vigentes]];
   const max = etapas[0][1] || 1;
-  const larg = 500;
   let g = "";
   etapas.forEach(([nome, v], i) => {
     const y = i * 40 + 14, w = Math.max(6, (v / max) * (larg - 70));
@@ -295,7 +298,7 @@ function grafFunil(f) {
 // Vencimentos se amontoam: numa prefeitura pequena, meia dúzia de contratos
 // termina no mesmo dia. Por isso a marca é o DIA, não o contrato — o tamanho
 // dela conta quantos, e o rótulo nomeia o primeiro.
-function grafAgenda(itens) {
+function grafAgenda(itens, larg = 1000) {
   if (!itens.length)
     return `<div class="vazio">Nada vence nos próximos 90 dias.</div>`;
   const porDia = new Map();
@@ -304,7 +307,7 @@ function grafAgenda(itens) {
     (porDia.get(d) ?? porDia.set(d, []).get(d)).push(it);
   });
   const dias = [...porDia.keys()].sort((a, b) => a - b);
-  const larg = 1000, y = 74;
+  const y = 74;
   const x = (d) => 40 + d / 90 * (larg - 80);
   let g = `<line x1="40" y1="${y}" x2="${larg - 40}" y2="${y}" class="eixo"
              stroke-width="2"/>`;
@@ -341,6 +344,43 @@ function grafAgenda(itens) {
 function cartao(titulo, corpo, nota) {
   return `<div class="card"><h3>${titulo}</h3>${corpo}${
     nota ? `<div class="nota">${nota}</div>` : ""}</div>`;
+}
+
+// Cartão cujo gráfico só é desenhado depois de saber a largura do espaço.
+// Com viewBox fixo o SVG escalava mantendo proporção e sobrava faixa vazia
+// dos dois lados — em tela larga, metade do cartão era espaço morto.
+function cartaoGraf(titulo, chave, nota) {
+  return cartao(titulo, `<div class="graf" data-graf="${chave}"></div>`, nota);
+}
+
+// Cada chave sabe se desenhar em qualquer largura. O redesenho acontece
+// depois da montagem e a cada mudança de tamanho da janela.
+const DESENHO = {
+  meses: (l) => grafMeses(P.dados.execucao.meses, l),
+  modalidades: (l) => grafBarras(P.dados.execucao.modalidades.slice(0, 6), {
+    valor: m => m.homologado || m.estimado || 0,
+    rotulo: m => m.modalidade_nome ?? "–",
+    sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}`}, l),
+  series: (l) => grafSeries(P.dados.analise.series, P.dados.ano, l),
+  desagio: (l) => grafDesagio(P.dados.analise.desagios, l),
+  concentracao: (l) => grafConcentracao(P.dados.analise.curva,
+                                        P.dados.analise.fornecedores_total, l),
+  calor: (l) => grafCalor(P.dados.analise.calor, P.dados.analise.meses_calor, l),
+  limites: (l) => grafLimites(P.dados.vigilancia.limites,
+                              P.dados.vigilancia.limite_compras, l),
+  funil: (l) => grafFunil(P.dados.vigilancia.funil, l),
+  agenda: (l) => grafAgenda(P.dados.vigilancia.agenda, l),
+};
+
+function desenharGraficos(raiz) {
+  if (!P.dados) return;
+  (raiz ?? $("painel")).querySelectorAll(".graf[data-graf]").forEach(el => {
+    const largura = Math.round(el.clientWidth);
+    if (!largura) return;               // vista oculta: desenha ao aparecer
+    if (el.dataset.largura === String(largura)) return;
+    el.dataset.largura = String(largura);
+    el.innerHTML = DESENHO[el.dataset.graf](largura);
+  });
 }
 
 function vistaExecucao(d) {
@@ -382,13 +422,8 @@ function vistaExecucao(d) {
     </div>
   </div>
   <div class="faixa f-21">
-    ${cartao(`Contratações por mês — estimado × homologado`,
-             grafMeses(d.execucao.meses))}
-    ${cartao("Por modalidade — valor homologado",
-             grafBarras(d.execucao.modalidades.slice(0, 6), {
-               valor: m => m.homologado || m.estimado || 0,
-               rotulo: m => m.modalidade_nome ?? "–",
-               sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}`}))}
+    ${cartaoGraf(`Contratações por mês — estimado × homologado`, "meses")}
+    ${cartaoGraf("Por modalidade — valor homologado", "modalidades")}
   </div>
   <div class="faixa f-11">
     ${cartao("Vence nos próximos 90 dias", tabelaVencendo(d.execucao.vencendo),
@@ -425,39 +460,35 @@ function tabelaFornecedores(itens) {
 function vistaAnalise(d) {
   const a = d.analise;
   return `
-  ${cartao(`Valor homologado acumulado — ${d.ano - 2} a ${d.ano}`,
-           grafSeries(a.series, d.ano),
+  ${cartaoGraf(`Valor homologado acumulado — ${d.ano - 2} a ${d.ano}`, "series",
            `O ano corrente em destaque; os anteriores ficam como contexto — a
             comparação é com o mesmo mês, não com o total do ano.`)}
   <div class="faixa f-11">
-    ${cartao("Deságio por modalidade — quanto o certame economizou",
-             grafDesagio(a.desagios))}
-    ${cartao(`Concentração de fornecedores — ${d.ano}`,
-             grafConcentracao(a.curva, a.fornecedores_total),
+    ${cartaoGraf("Deságio por modalidade — quanto o certame economizou",
+                 "desagio")}
+    ${cartaoGraf(`Concentração de fornecedores — ${d.ano}`, "concentracao",
              `A linha tracejada é a distribuição perfeitamente igual — quanto
               mais a curva se afasta dela, mais concentrado é o mercado.`)}
   </div>
-  ${cartao("Quando o município compra — processos por mês e modalidade",
-           grafCalor(a.calor, a.meses_calor))}`;
+  ${cartaoGraf("Quando o município compra — processos por mês e modalidade",
+               "calor")}`;
 }
 
 function vistaVigilancia(d) {
   const v = d.vigilancia;
   return `
   <div class="faixa f-11">
-    ${cartao(`Limite anual de dispensa — art. 75, II (${
-               dinheiro(v.limite_compras)})`,
-             grafLimites(v.limites, v.limite_compras),
+    ${cartaoGraf(`Limite anual de dispensa — art. 75, II (${
+               dinheiro(v.limite_compras)})`, "limites",
              `A soma é por <b>objeto</b>, agrupado pelas duas primeiras
               palavras significativas da descrição — o critério do art. 75 é
               objeto de mesma natureza, e o enquadramento final é juízo do
               gestor. Este medidor é termômetro, não veredito.`)}
-    ${cartao("Do edital ao contrato — onde os processos estão",
-             grafFunil(v.funil),
+    ${cartaoGraf("Do edital ao contrato — onde os processos estão", "funil",
              `${v.funil.publicadas - v.funil.com_resultado} publicadas ainda sem
               resultado registrado no PNCP.`)}
   </div>
-  ${cartao("Agenda dos próximos 90 dias", grafAgenda(v.agenda),
+  ${cartaoGraf("Agenda dos próximos 90 dias", "agenda",
            `Vermelho vence em menos de 15 dias; âmbar, em 60; verde, além
             disso.`)}`;
 }
@@ -469,6 +500,8 @@ async function carregarPainel() {
                  vigilancia: "p-vigilancia" };
   for (const id of Object.values(alvo))
     $(id).classList.toggle("oculto", alvo[P.vista] !== id);
+  // vista oculta tem largura zero: ao aparecer, os gráficos são desenhados
+  desenharGraficos($(alvo[P.vista]));
   if (!api.painel) return;
   const dados = await api.painel($("p-ano").value || null,
                                  $("p-orgao").value || null);
@@ -477,7 +510,17 @@ async function carregarPainel() {
   $("p-execucao").innerHTML = vistaExecucao(dados);
   $("p-analise").innerHTML = vistaAnalise(dados);
   $("p-vigilancia").innerHTML = vistaVigilancia(dados);
+  desenharGraficos();
 }
+
+// Redesenhar em vez de esticar: o SVG é gerado na medida do espaço, então
+// mudar a largura da janela (ou o modo compacta/expandida) refaz as marcas
+// no tamanho certo, sem faixa morta nem texto deformado.
+let redesenhoPendente;
+new ResizeObserver(() => {
+  clearTimeout(redesenhoPendente);
+  redesenhoPendente = setTimeout(() => desenharGraficos(), 120);
+}).observe($("painel"));
 
 // Os alertas ficam acima das subabas de propósito: alerta que só aparece
 // depois de escolher a subaba certa não alerta ninguém.
@@ -488,13 +531,16 @@ function mostrarChips(a) {
       ? "acima do" : "perto do"} limite anual de dispensa`,
     () => irPara("contratacoes", {modalidade: "8"})]);
   if (a.vencendo) chips.push(["aviso", "⏱", a.vencendo,
-    "contratos/atas vencem em 60 dias",
+    a.vencendo === 1 ? "contrato ou ata vence em 60 dias"
+                     : "contratos/atas vencem em 60 dias",
     () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"})]);
   if (a.propostas) chips.push(["", "📄", a.propostas,
-    "processos com proposta aberta",
+    a.propostas === 1 ? "processo com proposta aberta"
+                      : "processos com proposta aberta",
     () => irPara("contratacoes", {propostas: true})]);
   if (a.paradas) chips.push(["", "⏳", a.paradas,
-    "sem resultado há mais de 90 dias",
+    a.paradas === 1 ? "processo sem resultado há mais de 90 dias"
+                    : "processos sem resultado há mais de 90 dias",
     () => irPara("contratacoes", {})]);
   const caixa = $("painel-chips");
   caixa.classList.toggle("oculto", !chips.length);

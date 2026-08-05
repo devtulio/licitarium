@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.10.2 — 2026-08-05
+
+**O Painel passa a usar a tela**
+
+- Os gráficos eram desenhados numa largura fixa e escalados para caber: em
+  monitor largo, cada um ficava ilhado no meio do cartão, com faixas vazias dos
+  dois lados. Agora **cada gráfico é desenhado na medida do espaço** e
+  redesenhado quando a janela muda de tamanho — as barras crescem, os rótulos
+  se espalham e o cartão fica cheio.
+- **Os estilos do painel não estavam sendo aplicados.** A seção tinha só o
+  identificador, e as regras usavam a classe: títulos, tabelas e notas ficavam
+  com a formatação genérica. Corrigido — tabelas ganham colunas de largura
+  previsível e texto longo é cortado com reticências, em vez de encostar na
+  coluna vizinha.
+- **Rótulos que se sobrepunham**: na curva de concentração o texto caía sobre a
+  linha (e destacava "todos os fornecedores = 100%", que não informa nada);
+  na agenda, nomes de vencimentos próximos se encavalavam; no deságio, a escala
+  não acompanhava o eixo ao mudar a largura.
+- Os avisos concordam em número: *1 processo com proposta aberta*, não
+  *1 processos*.
+
 ## 1.10.1 — 2026-08-05
 
 **Correções no Painel — três números que induziam a erro**

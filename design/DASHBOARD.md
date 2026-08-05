@@ -71,6 +71,14 @@ manda no papel de parede, não no significado do dado.
 - **Concentração** usa contratos do exercício, por fornecedor. A linha
   tracejada é a distribuição perfeitamente igual.
 
+## Largura
+
+Cada gráfico é desenhado **na largura medida do seu cartão** e redesenhado num
+`ResizeObserver`. Com `viewBox` fixo e `preserveAspectRatio`, o SVG escalava
+mantendo proporção e sobrava faixa morta dos dois lados — em monitor largo,
+metade do cartão era vazio. Vista oculta tem largura zero: por isso o desenho
+também acontece ao trocar de subaba.
+
 ## Impressão
 
 `🖨 Imprimir` gera **A3 paisagem**, uma vista por página. O SVG enviado ao

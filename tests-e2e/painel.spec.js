@@ -91,3 +91,49 @@ test("imprimir manda as três vistas ao documento", async ({ page }) => {
   // as três vão com conteúdo, mesmo as que não estavam à vista
   expect(chamada.tamanhos.every(([, tamanho]) => tamanho > 500)).toBe(true);
 });
+
+test("os gráficos são desenhados na largura do espaço, não esticados",
+    async ({ page }) => {
+  // na largura "compacta" o conteúdo tem teto fixo: quem varia é o modo
+  // expandido, que é onde a faixa morta aparecia
+  await page.evaluate(() =>
+    document.documentElement.dataset.largura = "expandida");
+  const svg = page.locator('#p-execucao [data-graf="meses"] svg');
+  await expect(svg).toBeVisible();
+  await page.waitForTimeout(300);
+  const antes = await svg.getAttribute("viewBox");
+
+  // tela mais larga: o viewBox acompanha, em vez de escalar com faixa morta
+  await page.setViewportSize({ width: 1800, height: 1000 });
+  await page.waitForTimeout(300);
+  const depois = await svg.getAttribute("viewBox");
+  expect(depois).not.toBe(antes);
+  const larguraSvg = Number(depois.split(" ")[2]);
+  const caixa = await page.locator('#p-execucao [data-graf="meses"]')
+    .boundingBox();
+  expect(Math.abs(larguraSvg - caixa.width)).toBeLessThan(3);
+});
+
+test("vista oculta desenha ao aparecer", async ({ page }) => {
+  // com display:none o contêiner tem largura zero; sem redesenhar, a vista
+  // abriria vazia
+  await page.locator('.subabas button[data-vista="vigilancia"]').click();
+  const svg = page.locator('#p-vigilancia [data-graf="funil"] svg');
+  await expect(svg).toBeVisible();
+  const larg = Number((await svg.getAttribute("viewBox")).split(" ")[2]);
+  expect(larg).toBeGreaterThan(200);
+});
+
+test("chips concordam em número", async ({ page }) => {
+  await page.evaluate(() => {
+    window.__painel = { ...window.PAINEL_DADOS,
+      alertas: { perto_do_limite: 1, acima_do_limite: 0, vencendo: 1,
+                 propostas: 1, paradas: 1 } };
+  });
+  await page.locator("#p-ano").selectOption({ index: 0 });
+  const chips = page.locator("#painel-chips .chip");
+  await expect(chips.nth(0)).toContainText("objeto perto do limite");
+  await expect(chips.nth(1)).toContainText("contrato ou ata vence");
+  await expect(chips.nth(2)).toContainText("processo com proposta aberta");
+  await expect(chips.nth(3)).toContainText("processo sem resultado");
+});

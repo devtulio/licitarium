@@ -421,7 +421,14 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .leg i { width:9px; height:9px; border-radius:2px; display:inline-block;
          margin-right:5px; }
 .nota { font-size:11.5px; color:var(--muted); margin-top:9px; line-height:1.5; }
-.painel table { border-collapse:collapse; width:100%; font-size:12.5px; }
+/* largura fixa + reticências: sem isso o nome do fornecedor encostava no
+   objeto e o objeto era cortado no meio da palavra, sem sinal nenhum */
+.painel table { border-collapse:collapse; width:100%; font-size:12.5px;
+                table-layout:fixed; }
+.painel td, .painel th { overflow:hidden; text-overflow:ellipsis;
+                         white-space:nowrap; }
+.painel td:first-child, .painel th:first-child { width:34%; padding-right:14px; }
+.painel td.num, .painel th.num { width:84px; }
 .painel td, .painel th { padding:5px 6px; text-align:left;
                          border-bottom:1px solid var(--border); }
 .painel th { font-size:10.5px; color:var(--muted); text-transform:uppercase;
