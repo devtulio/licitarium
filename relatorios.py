@@ -1312,9 +1312,11 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
 # validadas para daltonismo e contraste —, e `print-color-adjust: exact` é o
 # que impede o navegador de "economizar tinta" e devolver barras cinzentas.
 CSS_PAINEL = """
-  :root { --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
-          --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#5598e7; --seq4:#2a78d6;
-          --seq5:#1c5cab; --surface:#fbf7ee; --surface2:#efe6d2;
+  /* o documento imprime no pergaminho (papel é papel), então as séries são
+     as daquele tema — validadas contra a superfície #fbf7ee */
+  :root { --s1:#a03521; --s2:#c98a00; --s3:#1f8a52; --s4:#3f5fa8;
+          --seq1:#f0e2c6; --seq2:#ddc294; --seq3:#c19d5c; --seq4:#96702c;
+          --seq5:#5d4415; --surface:#fbf7ee; --surface2:#efe6d2;
           --muted:var(--suave); --text:var(--texto); --border:var(--borda);
           --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);
           --warn:var(--atencao); --ok:#2f7d32; --pill:99px;

@@ -42,10 +42,27 @@ piso de visão normal e contraste contra a superfície.
 
 ### Paleta
 
-As cores de série vivem em `ui/estilo.css` (`--s1…--s4`, `--seq1…--seq5`) e
-**não mudam com o tema**: foram validadas contra a superfície clara e a escura,
-e trocá-las por tema exigiria validar uma paleta nova para cada pele. O tema
-manda no papel de parede, não no significado do dado.
+As cores de série vivem em `ui/estilo.css` (`--s1…--s4`, `--seq1…--seq5`), com
+**uma paleta por tema** — cada uma validada contra a própria superfície pelo
+script dos seis checks:
+
+| Tema | Séries | Rampa |
+|---|---|---|
+| Portal | azul, laranja, aqua, amarelo | azul, claro → escuro |
+| Pergaminho | terracota, ocre, verde, ardósia | sépia, claro → escuro |
+| Observatório | azul, laranja, verde, ocre (tons escuros) | azul, escuro → claro |
+
+O Pergaminho não podia herdar o azul do Portal: sobre papel sépia ele lê como
+corpo estranho. Mas quatro tons quentes não se separam sob daltonismo — daí a
+ardósia fria na quarta posição, que é o que faz a paleta passar nos checks.
+
+A rampa do Observatório tem degraus mais espaçados que a do tema claro: sobre
+fundo escuro, dois azuis próximos viram a mesma cor e o mapa de calor deixa de
+informar. Passo mínimo de luminosidade entre vizinhos: 0,066.
+
+**O que não muda com o tema é o significado**: dentro de um gráfico, a mesma
+posição de série é sempre a mesma cor, e nenhuma paleta usa cor sozinha para
+identificar.
 
 ## O que cada número é (e não é)
 

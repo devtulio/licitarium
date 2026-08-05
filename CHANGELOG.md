@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.10.3 — 2026-08-05
+
+**Cada tema com a sua paleta de gráficos**
+
+- No **Pergaminho**, as barras azuis liam como corpo estranho sobre o papel
+  sépia. As séries passam a ser **terracota, ocre, verde e ardósia**, validadas
+  contra a superfície do tema — a ardósia fria fica na quarta posição porque
+  quatro tons quentes não se separam sob daltonismo.
+- No **Observatório**, o mapa de calor quase não diferenciava os níveis: os
+  degraus da rampa eram próximos demais para fundo escuro. Refeitos com mais
+  separação de luminosidade.
+- O **relatório impresso** acompanha o Pergaminho, que é o tema do papel.
+
 ## 1.10.2 — 2026-08-05
 
 **O Painel passa a usar a tela**
