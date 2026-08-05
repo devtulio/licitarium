@@ -9,7 +9,10 @@ test.describe("splash", () => {
   test("aparece no tema da URL e some quando o acervo abre",
       async ({ page }) => {
     // já montada pelo beforeEach: some sozinha ao fim do carregamento
-    await expect(page.locator("#splash")).toHaveCount(0, { timeout: 5000 });
+    // sem timeout próprio: o global (10s) existe justamente porque o
+    // primeiro teste do CI paga o aquecimento da máquina — com 5s aqui,
+    // este assert já falhou em run frio enquanto passava em 1,8s local
+    await expect(page.locator("#splash")).toHaveCount(0);
   });
 
   test("sem tema.js (reserva): assume o do banco e remonta a splash",
