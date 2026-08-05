@@ -1,5 +1,6 @@
 // Ponte pywebview mockada + dados de exemplo para os testes E2E e screenshots.
 const path = require("path");
+const PAINEL = require("./painel-dados");
 
 const URL_UI = "file://" +
   path.resolve(__dirname, "..", "ui", "index.html").replace(/\\/g, "/");
@@ -126,6 +127,7 @@ function scriptPonte(temaBanco = "portal") {
                    parcial: false },
       "9999999": { erro: "sem conexão com o PNCP" },
     };
+    window.PAINEL_DADOS = ${JSON.stringify(PAINEL)};
     window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812, mb: 4.6 }];
     window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
@@ -139,6 +141,15 @@ function scriptPonte(temaBanco = "portal") {
         last_sync: "2026-07-29", sincronizado_em: "2026-07-29T14:32:00",
         kpis: { contratacoes: 131, homologado_ano: 10828702.73, vigentes: 47,
                 vencendo_60: 9, propostas_abertas: 2 } }),
+      painel: async (ano, orgao) => {
+        window.__chamadas.push({ metodo: "painel", ano, orgao });
+        return window.__painel ?? PAINEL_DADOS;
+      },
+      imprimir_painel: async (vistas, ano) => {
+        window.__chamadas.push({ metodo: "imprimir_painel", ano,
+          tamanhos: (vistas || []).map(([nome, html]) => [nome, html.length]) });
+        return { ok: true, arquivo: "C:/tmp/painel.html" };
+      },
       filtros_disponiveis: async () => ({ anos: [2026, 2025, 2024],
         situacoes: ["Homologada", "Divulgada no PNCP"],
         modalidades: [{ id: 8, nome: "Dispensa" },

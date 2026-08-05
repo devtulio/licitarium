@@ -244,6 +244,18 @@ públicos; o Peculium guarda dados pessoais num cofre cifrado.
 
 ---
 
+## Painel
+
+A tela inicial resume o exercício em gráficos, em três visões — **Execução**
+(como está o ano), **Análise** (o que mudou e onde concentra) e **Vigilância**
+(o que precisa de ação). Os alertas ficam acima das três e levam à lista já
+filtrada.
+
+Os gráficos são SVG desenhado pelo próprio programa — sem biblioteca e sem
+rede —, seguem um método com paleta validada para daltonismo e contraste, e
+saem em **A3 paisagem** pelo botão de impressão. As decisões estão em
+[design/DASHBOARD.md](design/DASHBOARD.md).
+
 ## Cópia do acervo
 
 O banco é um espelho reconstruível do PNCP, mas recoletar **municípios de

@@ -26,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.9.0"
+VERSAO = "1.10.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -528,6 +528,10 @@ class Api:
                     "fonte": cfg.get("fonte", "normal"),
                     "densidade": cfg.get("densidade", "confortavel"),
                     "colunas": cfg.get("colunas", "{}"),
+                    # onde o usuário estava: o Painel é a tela inicial, mas
+                    # quem trabalha numa aba volta para ela
+                    "aba": cfg.get("aba", "painel"),
+                    "painel_vista": cfg.get("painel_vista", "execucao"),
                     "maximizar": cfg.get("maximizar", "1"),
                     "limite_dispensa_compras":
                         cfg.get("limite_dispensa_compras",
@@ -1025,6 +1029,46 @@ class Api:
             return resumo
         finally:
             db.close()
+
+    def painel(self, ano=None, orgao=None):
+        """Dados das três subabas do Painel, numa chamada só."""
+        db = abrir_db()
+        try:
+            if not ano:
+                ano = db.execute(
+                    "SELECT MAX(ano) FROM contratacoes WHERE referencia=0"
+                ).fetchone()[0] or date.today().year
+            cfg = {r["chave"]: r["valor"] for r in
+                   db.execute("SELECT chave, valor FROM config")}
+            return relatorios.dados_painel(
+                db, ano, orgao,
+                {"compras": cfg.get("limite_dispensa_compras"),
+                 "obras": cfg.get("limite_dispensa_obras")})
+        finally:
+            db.close()
+
+    def imprimir_painel(self, vistas, ano=None):
+        """Grava o painel em A3 paisagem e abre para impressão.
+
+        `vistas` é o que a tela desenhou — [[nome, html], …]. O SVG vem
+        pronto de lá justamente para o papel não divergir da tela.
+        """
+        db = abrir_db()
+        try:
+            municipio = pncp._config(db, "municipio_nome") or "Município"
+            uf = pncp._config(db, "municipio_uf") or ""
+            tema = pncp._config(db, "tema") or "portal"
+        finally:
+            db.close()
+        html = relatorios.render_painel(
+            [(str(n), str(h)) for n, h in (vistas or [])],
+            municipio, uf, ano or date.today().year, tema)
+        destino = DIR_DADOS / "relatorios"
+        destino.mkdir(parents=True, exist_ok=True)
+        arquivo = destino / f"painel_{ano or date.today().year}.html"
+        arquivo.write_text(html, encoding="utf-8")
+        webbrowser.open(arquivo.as_uri())
+        return {"ok": True, "arquivo": str(arquivo)}
 
     def filtros_disponiveis(self):
         db = abrir_db()

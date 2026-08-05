@@ -242,7 +242,10 @@ async function iniciarApp(e) {
   renderKpis(e.kpis);
   await carregarFiltros();
   progressoSplash(0.85);
-  await carregarLista();
+  await prepararPainel(e);
+  const aba = ["painel", "contratacoes", "contratos", "atas", "pca", "itens"]
+    .includes(e.aba) ? e.aba : "painel";
+  document.querySelector(`nav.abas button[data-tipo="${aba}"]`).click();
   esconderSplash();
   // o programa consertou algo no banco para conseguir abrir: dizer, senão o
   // usuário só descobre pelo dado que faltou
@@ -851,6 +854,16 @@ document.querySelectorAll("nav.abas button").forEach(b =>
       x.classList.toggle("on", x === b));
     estado.tipo = b.dataset.tipo;
     estado.pagina = 1;
+    // o Painel não é uma lista: troca a tela em vez de trocar as colunas
+    const ehPainel = estado.tipo === "painel";
+    $("painel").classList.toggle("oculto", !ehPainel);
+    for (const id of ["filtros-lista", "lista", "rodape-lista", "kpis-topo"])
+      $(id)?.classList.toggle("oculto", ehPainel);
+    // os alertas do topo pertencem às listas: no painel eles viram chips
+    if (ehPainel) $("alertas").classList.add("oculto");
+    else if ($("alertas").innerHTML.trim()) $("alertas").classList.remove("oculto");
+    if (api.set_config) api.set_config("aba", estado.tipo);
+    if (ehPainel) { carregarPainel(); return; }
     estado.ord = null; estado.dir = "desc";
     const soContratacoes = estado.tipo === "contratacoes";
     $("f-modalidade").classList.toggle("oculto", !soContratacoes);

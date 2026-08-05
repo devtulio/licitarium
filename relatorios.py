@@ -274,6 +274,145 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
             "n": len(dispensas)}
 
 
+def dados_painel(db, ano, orgao=None, limites=None):
+    """Tudo o que o Painel mostra, numa consulta só por assunto.
+
+    O painel tem três subabas — execução, análise e vigilância —, mas uma
+    ida ao banco: a ponte JS custa mais que a consulta, e trocar de subaba
+    não pode ir buscar dados de novo.
+    """
+    ano = int(ano)
+    og = " AND orgao_cnpj=?" if orgao else ""
+    og_args = [orgao] if orgao else []
+    executivo = dados_executivo(db, ano, orgao)
+    fracionamento = dados_fracionamento(db, ano, orgao, limites)
+
+    # ── execução: o ano corrente contra o anterior, no mesmo ponto do mês
+    anterior = dados_contratacoes(db, ano - 1, orgao=orgao)["totais"]
+    # homologado é homologado: o resumo executivo usa
+    # COALESCE(homologado, estimado) para não zerar processo em andamento,
+    # mas aqui as duas barras são comparadas lado a lado — misturar as duas
+    # coisas numa delas faria o gráfico mentir sobre o que foi pago.
+    mensal = {r[0]: r for r in db.execute(
+        f"""SELECT CAST(substr(data_publicacao,6,2) AS INTEGER) mes,
+                   COUNT(*) n, SUM(valor_estimado) est,
+                   SUM(valor_homologado) hom
+            FROM contratacoes
+            WHERE referencia=0 AND ano=? AND data_publicacao IS NOT NULL{og}
+            GROUP BY 1""", [ano] + og_args)}
+    meses = [{"mes": m,
+              "n": mensal[m][1] if m in mensal else 0,
+              "estimado": (mensal[m][2] or 0) if m in mensal else 0,
+              "valor": (mensal[m][3] or 0) if m in mensal else 0}
+             for m in range(1, 13)]
+
+    # ── análise: acumulado do ano e dos dois anteriores, mês a mês
+    series = {}
+    for a in (ano - 2, ano - 1, ano):
+        # mesma regra do gráfico mensal: acumulado de homologado é só do
+        # que foi efetivamente homologado
+        por_mes = {r[0]: r[1] or 0 for r in db.execute(
+            f"""SELECT CAST(substr(data_publicacao,6,2) AS INTEGER),
+                       SUM(valor_homologado)
+                FROM contratacoes
+                WHERE referencia=0 AND ano=? AND data_publicacao IS NOT NULL{og}
+                GROUP BY 1""", [a] + og_args)}
+        acumulado, total = [], 0
+        for m in range(1, 13):
+            total += por_mes.get(m, 0)
+            acumulado.append(total)
+        series[a] = acumulado
+
+    # deságio por modalidade: quanto o certame economizou sobre o estimado
+    desagios = []
+    for r in db.execute(
+            f"""SELECT modalidade_nome, COUNT(*) n,
+                       SUM(valor_estimado) est, SUM(valor_homologado) hom
+                FROM contratacoes
+                WHERE referencia=0 AND ano=? AND valor_estimado > 0
+                  AND valor_homologado IS NOT NULL{og}
+                GROUP BY 1 ORDER BY 3 DESC""", [ano] + og_args):
+        desagios.append({"modalidade": r[0], "n": r[1],
+                         "pct": (1 - (r[3] or 0) / r[2]) * 100 if r[2] else 0})
+
+    # concentração: quanto do valor está nos maiores fornecedores
+    valores = [r[0] or 0 for r in db.execute(
+        f"""SELECT SUM(COALESCE(valor_global,0)) t FROM contratos
+            WHERE substr(data_publicacao,1,4)=?{og}
+            GROUP BY fornecedor_ni ORDER BY t DESC""",
+        [str(ano)] + og_args)]
+    total_contratado = sum(valores)
+    curva, acumulado = [], 0
+    for v in valores:
+        acumulado += v
+        curva.append(acumulado / total_contratado * 100 if total_contratado else 0)
+
+    # calor: processos por mês e modalidade, com a cauda somada em "Outras"
+    principais = [m["modalidade_nome"] for m in executivo["modalidades"][:3]]
+    calor = {nome: [0] * 12 for nome in principais + ["Outras"]}
+    for r in db.execute(
+            f"""SELECT modalidade_nome, CAST(substr(data_publicacao,6,2) AS INTEGER),
+                       COUNT(*)
+                FROM contratacoes
+                WHERE referencia=0 AND ano=? AND data_publicacao IS NOT NULL{og}
+                GROUP BY 1,2""", [ano] + og_args):
+        linha = calor[r[0]] if r[0] in calor else calor["Outras"]
+        if r[1] and 1 <= r[1] <= 12:
+            linha[r[1] - 1] += r[2]
+
+    # ── vigilância: o que exige ação
+    funil = {
+        "publicadas": executivo["cards"]["n"],
+        "com_resultado": db.execute(
+            f"""SELECT COUNT(DISTINCT c.numero_controle) FROM contratacoes c
+                 JOIN itens i ON i.contratacao_controle = c.numero_controle
+                WHERE c.referencia=0 AND c.ano=?
+                  AND i.valor_unitario_homologado IS NOT NULL{og}""",
+            [ano] + og_args).fetchone()[0],
+        "com_contrato": db.execute(
+            f"""SELECT COUNT(DISTINCT contratacao_controle) FROM contratos
+                WHERE contratacao_controle IN (
+                  SELECT numero_controle FROM contratacoes
+                   WHERE referencia=0 AND ano=?){og}""",
+            [ano] + og_args).fetchone()[0],
+        "vigentes": executivo["cards"]["contratos_vigentes"],
+    }
+    # processo publicado há muito tempo e sem resultado é pendência, não
+    # estatística: costuma ser homologação que o órgão esqueceu de publicar
+    paradas = db.execute(
+        f"""SELECT COUNT(*) FROM contratacoes c
+             WHERE c.referencia=0 AND c.valor_homologado IS NULL
+               AND date(c.data_publicacao) < date('now','-90 day')
+               AND c.ano=?{og}""", [ano] + og_args).fetchone()[0]
+    propostas = db.execute(
+        f"""SELECT COUNT(*) FROM contratacoes
+             WHERE referencia=0
+               AND datetime(data_encerramento_proposta) >= datetime('now'){og}""",
+        og_args).fetchone()[0]
+    perto_do_limite = [u for u in fracionamento["unidades"] if u["pct"] >= 75]
+
+    return {
+        "ano": ano,
+        "alertas": {"perto_do_limite": len(perto_do_limite),
+                    "vencendo": len([v for v in executivo["vencendo"]
+                                     if (v["dias"] or 0) <= 60]),
+                    "propostas": propostas, "paradas": paradas},
+        "execucao": {"cards": executivo["cards"], "meses": meses,
+                     "modalidades": executivo["modalidades"],
+                     "fornecedores": executivo["fornecedores"],
+                     "vencendo": executivo["vencendo"],
+                     "homologado_anterior": anterior["homologado"],
+                     "n_anterior": anterior["n"]},
+        "analise": {"series": {str(a): v for a, v in series.items()},
+                    "desagios": desagios, "curva": curva,
+                    "fornecedores_total": len(valores),
+                    "calor": calor, "meses_calor": list(range(1, 13))},
+        "vigilancia": {"funil": funil, "limites": fracionamento["unidades"][:6],
+                       "limite_compras": fracionamento["limite_compras"],
+                       "agenda": executivo["vencendo"][:40]},
+    }
+
+
 def _blocos(ids, tamanho=400):
     """Fatia ids para caber no limite de parâmetros do SQLite."""
     ids = [str(i) for i in (ids or []) if i]
@@ -674,13 +813,13 @@ def _vars(p):
             f" --atencao:{p['atencao']};")
 
 
-def _css(paisagem, tema="pergaminho"):
+def _css(paisagem, tema="pergaminho", papel="A4"):
     p = PALETAS.get(tema) or PALETAS["pergaminho"]
     return f"""
   :root {{ {_vars(p)} }}
   @media print {{ :root {{ {_vars(PALETAS["pergaminho"])} }} }}
   @page {{
-    size: A4 {"landscape" if paisagem else "portrait"}; margin: 1.6cm 1.4cm;
+    size: {papel} {"landscape" if paisagem else "portrait"}; margin: 1.6cm 1.4cm;
     @top-center {{ content: string(titulo); font-size: 8pt; color: #6f5b3e; }}
     @bottom-right {{ content: "Página " counter(page) " de " counter(pages);
                      font-size: 8pt; color: #6f5b3e; }}
@@ -688,7 +827,8 @@ def _css(paisagem, tema="pergaminho"):
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{ font-family:'Segoe UI',system-ui,sans-serif; color:var(--texto);
           background:var(--bg); font-size:13px; line-height:1.45; }}
-  .pagina {{ max-width:{1080 if paisagem else 820}px; margin:0 auto;
+  .pagina {{ max-width:{(1480 if papel == "A3" else 1080) if paisagem else 820}px;
+             margin:0 auto;
              padding:26px 30px 50px; }}
   header {{ display:flex; align-items:center; gap:18px; padding-bottom:14px;
             border-bottom:3px double var(--detalhe); margin-bottom:16px; }}
@@ -756,11 +896,12 @@ def _css(paisagem, tema="pergaminho"):
 
 
 def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
-            tema="pergaminho"):
+            tema="pergaminho", papel="A4", estilo_extra=""):
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
-<title>{_e(titulo_doc)}</title><style>{_css(paisagem, tema)}</style></head><body>
+<title>{_e(titulo_doc)}</title>
+<style>{_css(paisagem, tema, papel)}{estilo_extra}</style></head><body>
 <div class="no-print"><button onclick="print()">🖨 Imprimir</button></div>
 <div class="pagina">
 <header>{ESTANDARTE}
@@ -1118,6 +1259,77 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
+
+# Estilo do painel impresso. As cores de série são as mesmas da tela — foram
+# validadas para daltonismo e contraste —, e `print-color-adjust: exact` é o
+# que impede o navegador de "economizar tinta" e devolver barras cinzentas.
+CSS_PAINEL = """
+  :root { --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+          --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#5598e7; --seq4:#2a78d6;
+          --seq5:#1c5cab; --surface:#fbf7ee; --surface2:#efe6d2;
+          --muted:var(--suave); --text:var(--texto); --border:var(--borda);
+          --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);
+          --warn:var(--atencao); --ok:#2f7d32; --pill:99px;
+          --font-ui:'Segoe UI',system-ui,sans-serif; }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .vista { display:grid; gap:12px; }
+  .faixa { display:grid; gap:12px; }
+  .f-4 { grid-template-columns:1.15fr 1fr 1fr 1fr; }
+  .f-21 { grid-template-columns:1.6fr 1fr; }
+  .f-11 { grid-template-columns:1fr 1fr; }
+  .card { background:var(--superficie); border:1px solid var(--borda);
+          border-radius:3px; padding:12px 14px; break-inside:avoid; }
+  .card h3 { font-size:9.5pt; color:var(--suave); font-weight:600;
+             letter-spacing:.05em; text-transform:uppercase; margin-bottom:8px; }
+  .hero .n { font-size:26pt; font-weight:700; line-height:1.05; }
+  .hero .r, .kpiv .r { font-size:9pt; color:var(--suave); margin-top:2px; }
+  .kpiv .v { font-size:16pt; font-weight:700; }
+  .kpiv .r { text-transform:uppercase; letter-spacing:.05em; font-size:8pt; }
+  .up { color:#2f7d32; font-weight:600; } .down { color:var(--alerta); font-weight:600; }
+  .leg { display:flex; gap:14px; font-size:8.5pt; color:var(--suave);
+         margin-top:6px; }
+  .leg i { width:9px; height:9px; border-radius:2px; display:inline-block;
+           margin-right:5px; }
+  .nota { font-size:8.5pt; color:var(--suave); margin-top:7px; line-height:1.45; }
+  .vazio { color:var(--suave); font-size:9pt; padding:18px 0; text-align:center; }
+  .rot { font-size:8pt; fill:var(--suave); }
+  .val { font-size:8.5pt; fill:var(--texto); }
+  .eixo { stroke:var(--borda); stroke-width:1; }
+  .badge { font-size:8pt; padding:2px 8px; border-radius:99px; }
+  .badge.ok { background:#e6f4ea; color:#2f7d32; }
+  .badge.warn { background:#fdf1dc; color:var(--atencao); }
+  .badge.err { background:#fbe9e7; color:var(--alerta); }
+  /* instrução de clique não faz sentido no papel */
+  .so-tela { display:none; }
+  .secao-painel { break-after:page; }
+  .secao-painel:last-child { break-after:auto; }
+  .secao-painel > h2 { font-family:Georgia,serif; font-size:15pt;
+                       font-weight:400; color:var(--acento); margin:0 0 10px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .chip { font-size:9pt; padding:5px 12px; border-radius:99px;
+          border:1px solid var(--borda); background:var(--superficie); }
+"""
+
+TITULOS_PAINEL = {"execucao": "Execução do exercício",
+                  "analise": "Análise comparativa",
+                  "vigilancia": "Vigilância e prazos"}
+
+
+def render_painel(vistas, municipio, uf, ano, tema="pergaminho"):
+    """Monta o painel impresso a partir do que a tela desenhou.
+
+    Os gráficos não são redesenhados aqui: o SVG que vai ao papel é o mesmo
+    que está na tela, enviado pela interface. Redesenhar no Python seria uma
+    segunda implementação para divergir da primeira.
+    """
+    corpo = "".join(
+        f'<section class="secao-painel"><h2>{_e(TITULOS_PAINEL.get(nome, nome))}'
+        f'</h2>{html}</section>'
+        for nome, html in vistas if html)
+    return _pagina(f"Painel — {municipio} — {ano}", corpo, municipio, uf,
+                   f"Exercício {ano}", paisagem=True, tema=tema, papel="A3",
+                   estilo_extra=CSS_PAINEL)
+
 
 def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
     """Gera o relatório e retorna {"html": caminho, "csv": caminho|None}."""

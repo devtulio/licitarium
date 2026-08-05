@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.10.0 — 2026-08-05
+
+**Painel — a nova tela inicial**
+
+- O programa passa a abrir num **Painel** com gráficos do exercício, em três
+  visões: **Execução** (como está o ano), **Análise** (o que mudou e onde
+  concentra) e **Vigilância** (o que precisa de ação). A visão escolhida fica
+  guardada, e os seletores de exercício e órgão valem para as três.
+- **Execução**: valor homologado com comparação ao ano anterior, contratações,
+  deságio médio, contratos vigentes, valores mês a mês (estimado × homologado),
+  modalidades, vencimentos de 90 dias e principais fornecedores.
+- **Análise**: acumulado do ano contra os dois anteriores, deságio por
+  modalidade, concentração de fornecedores e mapa de calor de processos por mês
+  e modalidade.
+- **Vigilância**: medidores do limite anual de dispensa por unidade, funil do
+  edital ao contrato e agenda dos próximos 90 dias.
+- Os **alertas** — limite de dispensa, vencimentos, propostas abertas e
+  processos sem resultado há mais de 90 dias — ficam acima das três visões e
+  levam à lista já filtrada.
+- **Impressão em A3 paisagem**, uma visão por página, com o mesmo desenho da
+  tela. Os gráficos são vetoriais, então saem na resolução da impressora, e as
+  cores são preservadas no papel.
+
+**Correção**
+
+- O gráfico de valores mensais usava, na barra de *homologado*, o valor
+  estimado quando o processo ainda não tinha homologação — mostrava como pago o
+  que era estimativa. Agora homologado é homologado; processo sem resultado não
+  entra nessa barra nem no acumulado.
+
 ## 1.9.0 — 2026-08-05
 
 **Corrigir pelo IPCA**

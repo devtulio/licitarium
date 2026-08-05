@@ -56,7 +56,7 @@
     </div>
   </header>
   <main>
-    <div class="kpis">
+    <div class="kpis" id="kpis-topo">
       <button class="card kpi" id="kpi-card-contratacoes"
         title="Ver todas as contratações">
         <div class="n" id="kpi-contratacoes">–</div>
@@ -72,15 +72,35 @@
     </div>
     <div class="alertas oculto" id="alertas"></div>
     <nav class="abas" role="tablist">
-      <button data-tipo="contratacoes" class="on" role="tab">Contratações</button>
+      <button data-tipo="painel" class="on" role="tab">Painel</button>
+      <button data-tipo="contratacoes" role="tab">Contratações</button>
       <button data-tipo="contratos" role="tab">Contratos</button>
       <button data-tipo="atas" role="tab">Atas</button>
       <button data-tipo="pca" role="tab">PCA</button>
       <button data-tipo="itens" role="tab">Preços</button>
     </nav>
+    <section id="painel" aria-label="Painel">
+      <div class="chips oculto" id="painel-chips"></div>
+      <div class="painel-topo">
+        <div class="subabas" role="tablist" aria-label="Visões do painel">
+          <button data-vista="execucao" class="on" role="tab">Execução</button>
+          <button data-vista="analise" role="tab">Análise</button>
+          <button data-vista="vigilancia" role="tab">Vigilância</button>
+        </div>
+        <span class="cresce"></span>
+        <select id="p-ano" aria-label="Exercício do painel"></select>
+        <select id="p-orgao" aria-label="Órgão do painel">
+          <option value="">Todos os órgãos</option></select>
+        <button class="btn ghost" id="btn-imprimir-painel"
+          title="Gera o painel em A3 paisagem para impressão">🖨 Imprimir</button>
+      </div>
+      <div id="p-execucao" class="vista"></div>
+      <div id="p-analise" class="vista oculto"></div>
+      <div id="p-vigilancia" class="vista oculto"></div>
+    </section>
     <div class="card precos oculto" id="precos-resumo"></div>
     <div class="aviso-selecao oculto" id="precos-selecao"></div>
-    <div class="filtros">
+    <div class="filtros" id="filtros-lista">
       <select id="f-ano" aria-label="Ano"><option value="">Todos os anos</option></select>
       <select id="f-modalidade" aria-label="Modalidade">
         <option value="">Todas as modalidades</option></select>
@@ -112,7 +132,7 @@
       <button class="btn ghost" id="btn-csv">Exportar CSV</button>
     </div>
     <div class="card lista" id="lista"></div>
-    <div class="rodape">
+    <div class="rodape" id="rodape-lista">
       <div class="paginacao">
         <button class="btn ghost" id="pag-ant" aria-label="Página anterior">‹</button>
         <span id="pag-info" class="dim"></span>
@@ -356,5 +376,6 @@
 </div>
 
 <script src="app.js"></script>
+<script src="painel.js"></script>
 </body>
 </html>
