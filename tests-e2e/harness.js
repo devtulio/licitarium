@@ -171,6 +171,24 @@ function scriptPonte(temaBanco = "portal") {
       detalhe: async (tipo, nc) =>
         ({ ...(DADOS[tipo] || []).find(d => d.numero_controle === nc),
            raw: { exemplo: true } }),
+      descartes: async (busca) => {
+        window.__chamadas.push({ metodo: "descartes", busca });
+        return window.__descartes?.[String(busca).toLowerCase().trim()] ?? [];
+      },
+      descartar_preco: async (busca, item_id, motivo) => {
+        window.__chamadas.push({ metodo: "descartar_preco", busca, item_id,
+                                 motivo });
+        return { ok: true };
+      },
+      restaurar_preco: async (busca, item_id) => {
+        window.__chamadas.push({ metodo: "restaurar_preco", busca, item_id });
+        return { ok: true };
+      },
+      motivos_descarte: async () => ([
+        { id: "nao_comparavel", texto: "Item não comparável ao objeto pesquisado" },
+        { id: "embalagem", texto: "Embalagem ou unidade de medida diferente" },
+        { id: "inexequivel", texto: "Preço manifestamente inexequível" },
+      ]),
       exportar_acervo: async () => {
         window.__chamadas.push({ metodo: "exportar_acervo" });
         return window.__respostaExportar ?? { ok: true, arquivo: "C:/tmp/c.zip",

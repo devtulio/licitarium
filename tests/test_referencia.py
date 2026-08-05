@@ -284,7 +284,13 @@ def test_descarte_de_item_nao_entra_no_resumo_nem_no_relatorio(api, tmp_path):
                               "excluidos": ["REF-1#1"]},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")
-        assert "9.999,00" not in html
+        # o preço descartado não entra no cálculo nem na tabela principal,
+        # mas o documento precisa dizer que ele existiu e ficou de fora
+        principal, _, desconsiderados = html.partition(
+            "Itens desconsiderados nesta pesquisa")
+        assert "9.999,00" not in principal
+        assert "9.999,00" in desconsiderados
+        assert "Sem justificativa registrada" in desconsiderados
     finally:
         db.close()
 

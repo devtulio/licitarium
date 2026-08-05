@@ -45,7 +45,9 @@ let temReferencia = false;
 // itens que o usuário tirou da pesquisa de preços. Guarda os DESCARTADOS
 // (e não os escolhidos) para que item novo, vindo de uma sincronização ou
 // de outra página, entre marcado por padrão.
-let precosDescartados = new Set();
+// id do item -> { motivo, descricao, valor }. Gravado no banco por termo:
+// a pesquisa é peça de processo e precisa poder ser refeita amanhã.
+let precosDescartados = new Map();
 let api = null;
 
 // ── splash ────────────────────────────────────────────────────────────────
@@ -529,13 +531,16 @@ let ultimoTermoPrecos = null;
 async function mostrarResumoPrecos() {
   const caixa = $("precos-resumo");
   const termo = $("f-busca").value.trim();
-  // o descarte vale para a pesquisa em curso; trocar o termo recomeça
+  // cada pesquisa tem os seus descartes, gravados: voltar a "papel a4"
+  // amanhã traz de volta o que foi desconsiderado e por quê
   if (termo !== ultimoTermoPrecos) {
     ultimoTermoPrecos = termo;
-    if (precosDescartados.size) {
-      precosDescartados.clear();
-      atualizarSelecaoPrecos();
-    }
+    precosDescartados = new Map();
+    if (api.descartes && termo)
+      for (const d of await api.descartes(termo))
+        precosDescartados.set(String(d.item_id),
+          {motivo: d.motivo, descricao: d.descricao, valor: d.valor});
+    atualizarSelecaoPrecos();
   }
   if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
     caixa.classList.add("oculto");
@@ -544,7 +549,7 @@ async function mostrarResumoPrecos() {
   const s = await api.estatisticas_preco(termo,
     $("f-ano").value ? +$("f-ano").value : null,
     $("f-so-meu").checked ? "proprio" : null,
-    [...precosDescartados]);
+    [...precosDescartados.keys()]);
   if (!s) { caixa.classList.add("oculto"); return; }
   const cel = (v, r, destaque) =>
     `<div class="cel${destaque ? " destaque" : ""}">
@@ -567,8 +572,8 @@ async function mostrarResumoPrecos() {
     ${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
-  $("btn-descartar-fora")?.addEventListener("click", () => {
-    (s.fora_da_curva ?? []).forEach(id => precosDescartados.add(String(id)));
+  $("btn-descartar-fora")?.addEventListener("click", async () => {
+    for (const id of s.fora_da_curva ?? []) await descartar(String(id));
     carregarLista();
     atualizarSelecaoPrecos();
   });
@@ -735,10 +740,14 @@ async function carregarLista() {
       });
   });
   $("lista").querySelectorAll('.sel input[data-item]').forEach(c =>
-    c.addEventListener("change", () => {
+    c.addEventListener("change", async () => {
       const id = String(c.dataset.item);
-      if (c.checked) precosDescartados.delete(id);
-      else precosDescartados.add(id);
+      if (c.checked) {
+        precosDescartados.delete(id);
+        await api.restaurar_preco?.(ultimoTermoPrecos ?? "", id);
+      } else {
+        await descartar(id, c.closest(".linha"));
+      }
       mostrarResumoPrecos();          // o resumo reflete só o que ficou
       atualizarSelecaoPrecos();
     }));
@@ -1089,7 +1098,7 @@ $("rel-gerar").addEventListener("click", async () => {
   // quando o relatório é o da própria pesquisa em curso
   if ($("rel-tipo").value === "precos" && precosDescartados.size
       && params.termo === ultimoTermoPrecos)
-    params.excluidos = [...precosDescartados];
+    params.excluidos = [...precosDescartados.keys()];
   if ($("rel-tipo").value === "precos" && !params.termo) {
     $("rel-status").textContent = "Informe o que pesquisar";
     $("rel-termo").focus();
@@ -1166,20 +1175,92 @@ async function confirmarVolume(codigo, nome) {
     + `${tempo}.${pesado}${nl}${nl}Adicionar mesmo assim?`);
 }
 
-function atualizarSelecaoPrecos() {
+// A razão pode vir depois: exigi-la no clique atrapalharia quem descarta
+// dez itens de uma vez. Quem cobra é o relatório.
+async function descartar(id, linha) {
+  const celulas = linha ? linha.querySelectorAll("span") : [];
+  precosDescartados.set(id, {
+    motivo: precosDescartados.get(id)?.motivo ?? null,
+    descricao: celulas[1]?.textContent.trim() ?? null,
+    valor: null,
+  });
+  await api.descartar_preco?.(ultimoTermoPrecos ?? "", id,
+                              precosDescartados.get(id).motivo);
+}
+
+// Motivos vêm do backend para tela e documento falarem igual; carregados
+// uma vez, porque a lista é fixa.
+let motivosDescarte = null;
+
+async function carregarMotivos() {
+  if (!motivosDescarte && api.motivos_descarte)
+    motivosDescarte = await api.motivos_descarte();
+  return motivosDescarte ?? [];
+}
+
+// O descarte é registrado por pesquisa: sai do cálculo, entra no relatório
+// numa seção própria e a razão fica gravada. Sem razão, o documento acusa.
+async function atualizarSelecaoPrecos() {
   const caixa = $("precos-selecao");
   if (!caixa) return;
   const n = precosDescartados.size;
   caixa.classList.toggle("oculto", n === 0);
-  if (n) caixa.innerHTML =
-    `${n} ${n === 1 ? "item descartado" : "itens descartados"} desta pesquisa —
-     não entram no resumo nem no relatório.
-     <button class="btn ghost" id="precos-restaurar">Restaurar todos</button>`;
-  $("precos-restaurar")?.addEventListener("click", () => {
+  if (!n) return;
+  const motivos = await carregarMotivos();
+  const opcoes = (atual) => motivos.map(m =>
+    `<option value="${esc(m.id)}"${m.id === atual ? " selected" : ""}
+      >${esc(m.texto)}</option>`).join("");
+  const linhas = [...precosDescartados.entries()].map(([id, d]) => {
+    const conhecido = motivos.some(m => m.id === d.motivo);
+    const livre = d.motivo && !conhecido;
+    return `<div class="descartado">
+      <span class="obj" title="${esc(d.descricao ?? "")}"
+        >${esc(d.descricao ?? id)}</span>
+      <span class="num dim">${d.valor != null ? dinheiro(d.valor) : ""}</span>
+      <select data-motivo="${esc(id)}" aria-label="Razão do descarte">
+        <option value="">Sem justificativa…</option>
+        ${opcoes(d.motivo)}
+        <option value="__outro"${livre ? " selected" : ""}>Outro…</option>
+      </select>
+      <input type="text" data-livre="${esc(id)}" maxlength="200"
+        class="${livre ? "" : "oculto"}" placeholder="Escreva a razão"
+        value="${esc(livre ? d.motivo : "")}">
+    </div>`;
+  }).join("");
+  const semRazao = [...precosDescartados.values()].filter(d => !d.motivo).length;
+  caixa.innerHTML =
+    `<div class="descarte-topo">
+       <span>${n} ${n === 1 ? "item descartado" : "itens descartados"} desta
+         pesquisa — ${n === 1 ? "não entra" : "não entram"} no resumo, mas
+         ${n === 1 ? "consta" : "constam"} no relatório com a razão.${
+           semRazao ? ` <b>${semRazao} sem justificativa.</b>` : ""}</span>
+       <button class="btn ghost" id="precos-restaurar">Restaurar todos</button>
+     </div>${linhas}`;
+  $("precos-restaurar").addEventListener("click", async () => {
+    await api.restaurar_preco?.(ultimoTermoPrecos ?? "");
     precosDescartados.clear();
     carregarLista();
     atualizarSelecaoPrecos();
   });
+  caixa.querySelectorAll("select[data-motivo]").forEach(sel =>
+    sel.addEventListener("change", async () => {
+      const id = sel.dataset.motivo;
+      const livre = caixa.querySelector(`input[data-livre="${CSS.escape(id)}"]`);
+      livre.classList.toggle("oculto", sel.value !== "__outro");
+      if (sel.value === "__outro") { livre.focus(); return; }
+      await registrarMotivo(id, sel.value || null);
+    }));
+  caixa.querySelectorAll("input[data-livre]").forEach(campo =>
+    campo.addEventListener("change", () =>
+      registrarMotivo(campo.dataset.livre, campo.value.trim() || null)));
+}
+
+async function registrarMotivo(id, motivo) {
+  const d = precosDescartados.get(id);
+  if (!d) return;
+  d.motivo = motivo;
+  await api.descartar_preco?.(ultimoTermoPrecos ?? "", id, motivo);
+  atualizarSelecaoPrecos();
 }
 
 // ── cópia do acervo ───────────────────────────────────────────────────────

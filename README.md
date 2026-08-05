@@ -74,6 +74,11 @@ oferece o descarte, mas desprezar preço coletado é decisão de quem assina.
 O filtro por **unidade de medida** agrupa as grafias do portal — *CX*, *Caixa*
 e *CAIXAS* são uma opção só.
 
+Preço descartado sai do cálculo **com a razão registrada**: o relatório traz a
+seção *Itens desconsiderados nesta pesquisa*, com o motivo de cada um, e marca
+o que ficou sem justificativa. Os descartes ficam gravados por termo, então a
+pesquisa pode ser refeita e conferida depois.
+
 **Municípios de referência.** Um município pequeno compra pouco e compra
 variado — no acervo do piloto, 98% das descrições aparecem uma única vez, e
 mediana sobre um preço só não sustenta pesquisa. Por isso é possível indicar

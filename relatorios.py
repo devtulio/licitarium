@@ -266,6 +266,30 @@ def _blocos(ids, tamanho=400):
     return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
 
 
+# Motivos típicos de desconsideração numa pesquisa de preços. A lista existe
+# para o documento sair com linguagem uniforme; "outro" abre texto livre.
+MOTIVOS_DESCARTE = {
+    "nao_comparavel": "Item não comparável ao objeto pesquisado",
+    "embalagem": "Embalagem ou unidade de medida diferente",
+    "inexequivel": "Preço manifestamente inexequível",
+    "excessivo": "Preço excessivamente elevado",
+    "antigo": "Contratação antiga demais para servir de parâmetro",
+    "lote": "Valor de lote lançado como item único",
+}
+
+
+def rotulo_motivo(motivo):
+    """Texto que vai ao documento: rótulo padrão ou o que o usuário escreveu."""
+    if not motivo:
+        return None
+    return MOTIVOS_DESCARTE.get(motivo, motivo)
+
+
+def chave_termo(busca):
+    """Identifica a pesquisa. "Papel  A4 " e "papel a4" são a mesma."""
+    return " ".join((busca or "").lower().split())
+
+
 def _quantil(ordenados, p):
     """Quantil por interpolação linear (o método de `numpy.percentile`)."""
     if not ordenados:
@@ -316,7 +340,13 @@ def resumo_estatistico(valores):
 
 
 def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
-    """Histórico de preços unitários homologados para um termo de busca."""
+    """Histórico de preços unitários homologados para um termo de busca.
+
+    Os itens desconsiderados saem do cálculo mas não do documento: eles
+    reaparecem numa seção própria, com a razão de cada um. A pesquisa de
+    preços é peça de processo, e desprezar um preço coletado sem dizer por
+    quê é o que o art. 23 e a IN SEGES 65/2021 não admitem.
+    """
     where = ["valor_unitario_homologado IS NOT NULL"]
     args = []
     palavras = re.findall(r"[0-9A-Za-zÀ-ÿ]+", termo or "")
@@ -333,8 +363,14 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
     if orgao:
         where.append("orgao_cnpj=?")
         args.append(orgao)
-    # itens que o usuário descartou na tela não entram no documento
-    for grupo in _blocos(excluidos):
+    # o que o usuário desconsiderou nesta pesquisa, com a razão registrada;
+    # a tela pode passar uma lista extra (descartes ainda não gravados)
+    motivos = {r[0]: r[1] for r in db.execute(
+        "SELECT item_id, motivo FROM precos_descartes WHERE termo=?",
+        (chave_termo(termo),))}
+    for extra in (excluidos or []):
+        motivos.setdefault(str(extra), None)
+    for grupo in _blocos(list(motivos)):
         where.append("id NOT IN (%s)" % ",".join("?" * len(grupo)))
         args += grupo
     sql_where = " WHERE " + " AND ".join(where)
@@ -362,8 +398,20 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
     resumo = resumo_estatistico(valores)
     if resumo:
         resumo["fornecedores"] = len({l["fornecedor_ni"] for l in linhas})
+    # os desconsiderados vão ao documento com a razão de cada um — sem isso,
+    # quem confere não tem como saber que a série foi filtrada
+    desconsiderados = []
+    for grupo in _blocos(list(motivos)):
+        desconsiderados += [dict(r) for r in db.execute(
+            "SELECT id, descricao, unidade, quantidade_homologada,"
+            " valor_unitario_homologado, fornecedor_nome, sequencial, ano,"
+            " orgao_cnpj FROM itens WHERE id IN (%s)"
+            % ",".join("?" * len(grupo)), grupo)]
+    for l in desconsiderados:
+        l["motivo"] = rotulo_motivo(motivos.get(l["id"]))
+    desconsiderados.sort(key=lambda l: l["valor_unitario_homologado"] or 0)
     return {"termo": (termo or "").strip(), "linhas": linhas, "resumo": resumo,
-            "ano": ano}
+            "desconsiderados": desconsiderados, "ano": ano}
 
 
 # ── render ──────────────────────────────────────────────────────────────────
@@ -446,6 +494,7 @@ def _css(paisagem, tema="pergaminho"):
   p.disp {{ margin:0 0 6px; font-size:10.5px; color:var(--suave);
             break-inside:avoid; }}
   p.disp b {{ color:var(--texto); }}
+  td.sem-motivo {{ color:var(--alerta); font-style:italic; }}
   .card {{ background:var(--superficie); border:1px solid var(--borda);
            border-radius:3px;
            padding:10px 12px; break-inside:avoid; flex:1 1 auto; }}
@@ -647,6 +696,50 @@ pela <b>{est}</b> dos valores homologados.</div>
                    paisagem=True, tema=tema)
 
 
+def _desconsiderados_html(d):
+    """Seção dos preços que ficaram de fora, com a razão de cada um.
+
+    O documento tem de bastar a si mesmo: quem confere precisa ver que a
+    série foi filtrada, o que saiu e por quê. Item sem razão registrada
+    aparece marcado — é pendência antes de assinar, não detalhe.
+    """
+    fora = d.get("desconsiderados") or []
+    if not fora:
+        return ""
+    sem_motivo = sum(1 for l in fora if not l.get("motivo"))
+    linhas = "".join(f"""<tr>
+      <td class="obj">{_e(l['descricao'])}</td>
+      <td class="unid">{_e(l['unidade'])}</td>
+      <td class="num">{l['quantidade_homologada'] or '–'}</td>
+      <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
+      <td class="forn">{_e(l['fornecedor_nome'])}</td>
+      <td class="ctr proc">{_processo(l)}</td>
+      <td class="{'sem-motivo' if not l.get('motivo') else ''}">{
+        _e(l['motivo']) if l.get('motivo')
+        else 'Sem justificativa registrada'}</td></tr>"""
+      for l in fora)
+    alerta = (f" <b>{sem_motivo} {'item' if sem_motivo == 1 else 'itens'} "
+              f"{'está' if sem_motivo == 1 else 'estão'} sem justificativa "
+              "registrada</b> — registre a razão antes de juntar este "
+              "documento ao processo." if sem_motivo else "")
+    return f"""<h2>Itens desconsiderados nesta pesquisa</h2>
+<div class="caixa-aviso">Os preços abaixo foram coletados, mas <b>não entraram
+no cálculo</b> por decisão do responsável pela pesquisa. Eles constam aqui para
+que a filtragem fique visível a quem confere.{alerta}</div>
+<table><thead><tr><th>Descrição</th><th class="unid">Unid.</th>
+<th class="num">Qtde</th><th class="num">Unitário</th>
+<th class="forn">Fornecedor</th><th class="ctr">Processo</th>
+<th>Razão</th></tr></thead><tbody>{linhas}</tbody></table>"""
+
+
+def _processo(l):
+    """Número do processo com link para o PNCP, quando dá para montar."""
+    texto = f"{_e(l['sequencial'])}/{_e(l['ano'])}"
+    url = url_pncp(l.get("orgao_cnpj"), l.get("ano"), l.get("sequencial"))
+    return (f'<a href="{_e(url)}" title="Abrir no PNCP">{texto}</a>'
+            if url else texto)
+
+
 def _LEITURA_CV(cv):
     """Mesma leitura da tela — o documento não pode discordar dela."""
     if cv < 0.15:
@@ -683,12 +776,6 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
             f'<p class="disp">{faixa}Desvio padrão <b>{moeda(r["desvio"])}</b>'
             f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
             f' ({_LEITURA_CV(r["cv"])}).</p>')
-    def _processo(l):
-        texto = f"{_e(l['sequencial'])}/{_e(l['ano'])}"
-        url = url_pncp(l.get("orgao_cnpj"), l.get("ano"), l.get("sequencial"))
-        return (f'<a href="{_e(url)}" title="Abrir no PNCP">{texto}</a>'
-                if url else texto)
-
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
@@ -714,7 +801,7 @@ O número do processo leva à página oficial no PNCP, para conferência.</div>
 <th class="num">Total</th><th class="forn">Fornecedor</th>
 <th class="muni">Município</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
-<tbody>{linhas}</tbody></table>"""
+<tbody>{linhas}</tbody></table>{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
                    tema=tema)

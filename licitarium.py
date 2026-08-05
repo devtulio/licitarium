@@ -26,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.6.0"
+VERSAO = "1.7.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS pca_minuta_itens (
   descricao TEXT, unidade TEXT, categoria TEXT, quantidade REAL,
   valor_unitario REAL, margem REAL, incluir INTEGER DEFAULT 1,
   editado INTEGER DEFAULT 0, origem TEXT, mesclado_de TEXT);
+-- Itens que o usuário tirou de uma pesquisa de preços e por quê. A IN
+-- SEGES 65/2021 exige motivar a desconsideração de preço coletado, e a
+-- justificativa tem de acompanhar o documento — por isso vive no banco, e
+-- não na tela.
+CREATE TABLE IF NOT EXISTS precos_descartes (
+  termo TEXT, item_id TEXT, motivo TEXT, criado_em TEXT,
+  PRIMARY KEY (termo, item_id));
 CREATE TABLE IF NOT EXISTS municipios_referencia (
   ibge TEXT PRIMARY KEY, nome TEXT, uf TEXT, adicionado_em TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
@@ -795,6 +802,71 @@ class Api:
             return d
         finally:
             db.close()
+
+    # ── descartes da pesquisa de preços ─────────────────────────────────
+
+    def descartes(self, busca):
+        """O que já foi desconsiderado nesta pesquisa, com o motivo."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return []
+        db = abrir_db()
+        try:
+            # a descrição vem junto: a lista de descartados precisa dizer
+            # qual item é, e o id sozinho não diz nada a quem lê
+            return [dict(r) for r in db.execute(
+                "SELECT d.item_id, d.motivo, i.descricao, i.unidade,"
+                "       i.valor_unitario_homologado valor"
+                "  FROM precos_descartes d"
+                "  LEFT JOIN itens i ON i.id = d.item_id"
+                " WHERE d.termo=? ORDER BY d.criado_em", (termo,))]
+        finally:
+            db.close()
+
+    def descartar_preco(self, busca, item_id, motivo=None):
+        """Tira o item da pesquisa; o motivo pode vir depois.
+
+        Exigir a justificativa no clique atrapalharia quem descarta dez
+        itens de uma vez — o relatório é que cobra, apontando o que ficou
+        sem razão registrada.
+        """
+        termo = relatorios.chave_termo(busca)
+        if not termo or not item_id:
+            return {"ok": False}
+        db = abrir_db()
+        try:
+            db.execute(
+                "INSERT INTO precos_descartes (termo, item_id, motivo,"
+                " criado_em) VALUES (?,?,?,?)"
+                " ON CONFLICT(termo, item_id) DO UPDATE SET motivo=excluded.motivo",
+                (termo, str(item_id), motivo or None,
+                 datetime.now().isoformat()))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def restaurar_preco(self, busca, item_id=None):
+        """Devolve um item à pesquisa — ou todos, se não vier item."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return {"ok": False}
+        db = abrir_db()
+        try:
+            if item_id:
+                db.execute("DELETE FROM precos_descartes"
+                           " WHERE termo=? AND item_id=?", (termo, str(item_id)))
+            else:
+                db.execute("DELETE FROM precos_descartes WHERE termo=?",
+                           (termo,))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def motivos_descarte(self):
+        """Lista para a tela montar o seletor, na ordem em que aparece."""
+        return [{"id": k, "texto": v} for k, v in relatorios.MOTIVOS_DESCARTE.items()]
 
     def estatisticas_preco(self, busca, ano=None, origem=None,
                            excluidos=None):

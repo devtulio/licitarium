@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.0 — 2026-08-05
+
+**A razão de cada preço descartado, gravada e impressa**
+
+- O aviso de itens descartados virou uma **lista**: cada item mostra o que é,
+  quanto custava e um seletor de **razão**. Seis motivos prontos — item não
+  comparável, embalagem ou unidade diferente, preço inexequível, preço
+  excessivamente elevado, contratação antiga demais, valor de lote lançado como
+  item único — e **Outro…** abre campo livre.
+- O relatório ganhou a seção **Itens desconsiderados nesta pesquisa**, com
+  preço, fornecedor, processo e motivo. Antes o item simplesmente sumia do
+  documento: quem conferia não tinha como saber que a série fora filtrada —
+  justamente o que o art. 23 e a IN SEGES 65/2021 não admitem.
+- **Descartar continua sendo um clique**; a razão pode vir depois. O que ficar
+  sem justificativa é contado no aviso da tela e **marcado no documento**, como
+  pendência a resolver antes de juntar o relatório ao processo.
+- Os descartes passam a ser **gravados por pesquisa**: voltar ao mesmo termo
+  amanhã traz de volta o que foi desconsiderado e por quê.
+- O documento passou a ler os descartes do banco, e não do estado da tela — o
+  relatório sai igual mesmo gerado depois, de outra tela.
+
 ## 1.6.0 — 2026-08-05
 
 **Cópia do acervo**
