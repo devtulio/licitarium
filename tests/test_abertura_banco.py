@@ -105,6 +105,7 @@ def test_banco_mesmo_corrompido_e_guardado_e_o_programa_recomeca(
     perícia, em vez de ser sobrescrito.
     """
     acervo.write_bytes(b"nao sou um banco de dados" * 500)
+    monkeypatch.setattr(licitarium, "_confirmar_recomeco", lambda: True)
 
     db = licitarium.abrir_db()
     try:
@@ -129,3 +130,19 @@ def test_erro_de_banco_que_nao_e_corrupcao_continua_estourando(
         licitarium.abrir_db()
     assert not list(acervo.parent.glob("*.orfao-*"))
     assert not list(acervo.parent.glob("*.corrompido-*"))
+
+
+def test_recomeco_recusado_nao_toca_no_arquivo(acervo, monkeypatch):
+    """Perder um acervo de horas não pode ser decisão automática.
+
+    O diagnóstico de corrupção pode estar errado — em 2026-08-05 um arquivo
+    truncado pela metade por outra causa passou por banco corrompido. Se o
+    usuário responde que não, o programa sai sem renomear nada.
+    """
+    acervo.write_bytes(b"nao sou um banco de dados" * 500)
+    monkeypatch.setattr(licitarium, "_confirmar_recomeco", lambda: False)
+
+    with pytest.raises(SystemExit):
+        licitarium.abrir_db()
+    assert not list(acervo.parent.glob("*.corrompido-*"))
+    assert acervo.read_bytes().startswith(b"nao sou um banco")

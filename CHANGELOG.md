@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2 — 2026-08-05
+
+- **O programa não aposenta mais um banco por conta própria.** A 1.5.1 passou
+  a guardar como `.corrompido-<data>` o banco que não conseguisse ler, criando
+  um novo em seguida. Só que um diagnóstico de corrupção pode estar errado — e
+  quando está, o que desaparece da tela é um acervo que custou horas de coleta.
+  Agora o programa **pergunta antes**, numa caixa do Windows: começar um banco
+  novo ou sair sem tocar em nada. Escolhendo sair, o arquivo continua
+  exatamente onde estava, para você cuidar dele.
+
 ## 1.5.1 — 2026-08-05
 
 - **Correção: o programa deixava de abrir por causa do diário de transações.**

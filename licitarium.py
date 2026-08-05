@@ -23,7 +23,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.5.1"
+VERSAO = "1.5.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -209,8 +209,13 @@ def _conectar():
             "posto de lado. O acervo está íntegro; o que faltar volta na "
             "próxima sincronização.")
         return sqlite3.connect(ARQUIVO_DB)
-    # o banco em si se perdeu: guarda o arquivo e recomeça, porque o acervo
-    # inteiro pode ser baixado de novo do PNCP
+    # O banco em si se perdeu. O acervo pode ser baixado de novo do PNCP,
+    # mas isso custa horas de coleta — e um diagnóstico errado aqui apaga da
+    # tela um acervo que talvez alguém consiga recuperar. Por isso a decisão
+    # é do usuário, e o arquivo só sai do lugar se ele mandar.
+    if not _confirmar_recomeco():
+        raise SystemExit(
+            "Abertura cancelada. O banco continua onde estava, intacto.")
     guardado = ARQUIVO_DB.with_name(f"{ARQUIVO_DB.name}.corrompido-{carimbo}")
     ARQUIVO_DB.rename(guardado)
     for sufixo in ("-wal", "-shm"):
@@ -221,6 +226,28 @@ def _conectar():
         f"O banco estava corrompido e foi guardado como {guardado.name}. "
         "Um banco novo foi criado — sincronize para baixar o acervo de novo.")
     return sqlite3.connect(ARQUIVO_DB)
+
+
+def _confirmar_recomeco():
+    """Pergunta antes de aposentar o banco, com a janela ainda inexistente.
+
+    A interface do programa é a própria página, que só nasce depois do
+    banco; quando isto roda, a única forma de falar com o usuário é uma
+    caixa do Windows.
+    """
+    aviso = (f"O banco do Licitarium não pôde ser lido:\n{ARQUIVO_DB}\n\n"
+             "Posso guardar o arquivo atual (renomeado) e começar um banco "
+             "novo — o acervo volta na sincronização, baixando do PNCP de "
+             "novo, o que pode levar bastante tempo.\n\n"
+             "Escolha Não para sair sem tocar em nada e cuidar do arquivo "
+             "você mesmo.\n\nComeçar um banco novo?")
+    try:
+        import ctypes
+        # MB_YESNO | MB_ICONWARNING; 6 = Sim
+        return ctypes.windll.user32.MessageBoxW(
+            None, aviso, "Licitarium", 0x04 | 0x30) == 6
+    except Exception:
+        return True    # sem interface gráfica (linha de comando, testes)
 
 
 def _banco_intacto():
