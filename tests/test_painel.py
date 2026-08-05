@@ -16,6 +16,10 @@ import relatorios
 ANO = 2026
 
 
+def _db():
+    return licitarium.abrir_db()
+
+
 @pytest.fixture
 def api(tmp_path, monkeypatch):
     """Dois exercícios, com dispensa, pregão, contrato e ata vencendo."""
@@ -139,21 +143,102 @@ def test_funil_do_edital_ao_contrato(api):
     assert f["vigentes"] == 1
 
 
-def test_medidor_de_limite_por_unidade(api):
+def test_medidor_de_limite_agrupa_por_objeto(api):
+    """Por unidade o medidor não separava nada.
+
+    O campo `unidade` do PNCP traz o nome do órgão: no acervo do piloto, as
+    16 dispensas caíam todas em "MUNICIPIO DE ORINDIUVA" e o termômetro
+    virava uma linha só. O art. 75 fala em objeto de mesma natureza, que é
+    também o agrupamento útil.
+    """
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET objeto='AQUISIÇÃO DE PAPEL A4'"
+                   " WHERE numero_controle='D1'")
+        db.execute("UPDATE contratacoes SET objeto='AQUISICAO DE PAPEL A4"
+                   " SULFITE' WHERE numero_controle='D2'")
+        # mesma unidade administrativa, objeto diferente
+        db.execute("INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+                   " orgao_cnpj, unidade, modalidade_id, modalidade_nome,"
+                   " objeto, valor_estimado, valor_homologado, data_publicacao,"
+                   " referencia, raw) VALUES ('D9',?,9,'111','Saúde',8,"
+                   " 'Dispensa','CONTRATAÇÃO DE MANUTENÇÃO PREDIAL',9000,9000,"
+                   " ?,0,'{}')", (ANO, f"{ANO}-05-05"))
+        db.commit()
+    finally:
+        db.close()
+
     v = api.painel(ANO)["vigilancia"]
-    saude = next(u for u in v["limites"] if u["unidade"] == "Saúde")
-    assert saude["n"] == 2 and saude["total"] == pytest.approx(52000.0)
-    # 52.000 sobre o limite do art. 75, II
-    assert saude["pct"] == pytest.approx(52000 / v["limite_compras"] * 100)
+    limites = {o["objeto"]: o for o in v["limites"]}
+    # os dois papéis caem na mesma chave; a manutenção fica separada
+    papel = limites["PAPEL A4"]
+    assert papel["n"] == 2 and papel["total"] == pytest.approx(52000.0)
+    assert papel["pct"] == pytest.approx(52000 / v["limite_compras"] * 100)
+    assert limites["MANUTENÇÃO PREDIAL"]["n"] == 1
 
 
 def test_alertas_contam_o_que_exige_acao(api):
     a = api.painel(ANO)["alertas"]
     assert a["vencendo"] == 2                  # contrato em 20 dias e ata em 45
     assert a["paradas"] == 1                   # P2, publicada em janeiro
-    # Saúde soma R$ 52.000 dos R$ 62.639,92 do art. 75, II — 83% do limite
-    assert a["perto_do_limite"] == 1
+    # o objeto das duas dispensas soma R$ 52.000 dos R$ 62.639,92 do
+    # art. 75, II — 83% do limite, sem estourar
+    assert a["perto_do_limite"] == 1 and a["acima_do_limite"] == 0
     assert isinstance(a["propostas"], int)
+
+
+def test_alerta_distingue_perto_de_acima_do_limite(api):
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET valor_homologado=90000"
+                   " WHERE numero_controle='D1'")
+        db.commit()
+    finally:
+        db.close()
+    a = api.painel(ANO)["alertas"]
+    assert a["acima_do_limite"] == 1
+
+
+def test_comparacao_com_o_ano_anterior_usa_o_mesmo_periodo(api):
+    """Comparar oito meses com doze é aritmética do calendário.
+
+    O acervo tem uma contratação de abril do exercício anterior. Pedindo o
+    exercício corrente, ela só entra na comparação se já tiver passado a
+    data de hoje — do contrário o painel diria "caiu" só porque o ano ainda
+    não terminou.
+    """
+    hoje = date.today()
+    d = api.painel(hoje.year)
+    assert d["comparacao_parcial"] is True
+
+    # exercício fechado compara ano inteiro com ano inteiro
+    assert api.painel(ANO - 1)["comparacao_parcial"] is (ANO - 1 == hoje.year)
+
+
+def test_funil_conta_o_mesmo_conjunto_nas_quatro_etapas(api):
+    """A última etapa não pode ser maior que a primeira.
+
+    "Vigentes hoje" contava contratos de qualquer exercício: no acervo real
+    isso dava 50 vigentes para 34 publicadas, e o funil alargava no fim.
+    """
+    db = _db()
+    try:
+        # contrato vigente de um exercício anterior: não é deste funil
+        db.execute("INSERT INTO contratos (numero_controle,"
+                   " contratacao_controle, orgao_cnpj, fornecedor_ni,"
+                   " fornecedor_nome, objeto, valor_global, vigencia_inicio,"
+                   " vigencia_fim, data_publicacao, raw)"
+                   " VALUES ('K9','D3','111','9','OUTRO','Obj',1000,?,?,?,'{}')",
+                   (f"{ANO - 1}-01-01",
+                    (date.today() + timedelta(days=300)).isoformat(),
+                    f"{ANO - 1}-02-01"))
+        db.commit()
+    finally:
+        db.close()
+
+    f = api.painel(ANO)["vigilancia"]["funil"]
+    assert f["vigentes"] == 1                       # só o contrato de D1
+    assert f["publicadas"] >= f["com_resultado"] >= f["vigentes"]
 
 
 def test_ano_ausente_usa_o_mais_recente_do_acervo(api):

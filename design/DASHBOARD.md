@@ -54,11 +54,20 @@ manda no papel de parede, não no significado do dado.
   painel isso faria a barra "homologado" mostrar como pago o que ainda é
   estimativa. Foi um defeito real, pego por teste.
 - **Deságio** só considera contratações com estimado > 0 **e** homologado.
-- **Funil**: "com resultado" é contratação com ao menos um item homologado —
-  não é o mesmo que ter valor homologado no processo.
-- **Medidor de limite** soma dispensas **por unidade administrativa**. O
-  agrupamento legal correto é por objeto de mesma natureza, que é juízo do
-  gestor: o medidor é termômetro de autocontrole, não veredito.
+- **Funil**: as quatro etapas contam o mesmo conjunto — contratações do
+  exercício escolhido. "Com resultado" é contratação com ao menos um item
+  homologado; "vigentes" são os contratos **dessas** contratações, não todos os
+  vigentes do acervo (o que fazia a última barra superar a primeira).
+- **Medidor de limite** soma dispensas **por objeto**, agrupado pelas duas
+  primeiras palavras significativas da descrição (`pca_builder.chave_agrupamento`
+  com `palavras=2`). Agrupar por `unidade` não servia: o campo do PNCP traz o
+  nome do órgão, e no acervo do piloto todas as dispensas caíam numa linha só.
+  Com três palavras, "PAPEL A4" e "PAPEL A4 SULFITE" viram objetos distintos e
+  o limite deixa de somar o que a lei manda somar; com uma, "MATERIAL" engole
+  meio acervo. O enquadramento final é juízo do gestor — termômetro, não
+  veredito.
+- **Comparação com o ano anterior** usa o mesmo período quando o exercício está
+  em curso. Comparar acumulado parcial com ano fechado mede o calendário.
 - **Concentração** usa contratos do exercício, por fornecedor. A linha
   tracejada é a distribuição perfeitamente igual.
 

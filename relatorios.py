@@ -10,6 +10,8 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+import pca_builder
+
 # fonte da verdade da arte: design/estandarte-t3.svg
 ESTANDARTE = """<svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
   <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
@@ -288,7 +290,19 @@ def dados_painel(db, ano, orgao=None, limites=None):
     fracionamento = dados_fracionamento(db, ano, orgao, limites)
 
     # ── execução: o ano corrente contra o anterior, no mesmo ponto do mês
-    anterior = dados_contratacoes(db, ano - 1, orgao=orgao)["totais"]
+    # Comparar o ano em curso com o ano anterior INTEIRO é aritmética do
+    # calendário, não desempenho: em agosto, "caiu 67%" só diz que faltam
+    # quatro meses. Quando o exercício pedido é o corrente, o anterior é
+    # cortado no mesmo dia.
+    hoje = date.today()
+    parcial = ano == hoje.year
+    corte = f"{ano - 1}-{hoje:%m-%d}" if parcial else f"{ano - 1}-12-31"
+    ant = db.execute(
+        f"""SELECT COUNT(*), SUM(valor_homologado) FROM contratacoes
+             WHERE referencia=0 AND ano=?
+               AND (data_publicacao IS NULL OR substr(data_publicacao,1,10) <= ?)
+               {og}""", [ano - 1, corte] + og_args).fetchone()
+    anterior = {"n": ant[0], "homologado": ant[1] or 0}
     # homologado é homologado: o resumo executivo usa
     # COALESCE(homologado, estimado) para não zerar processo em andamento,
     # mas aqui as duas barras são comparadas lado a lado — misturar as duas
@@ -375,7 +389,16 @@ def dados_painel(db, ano, orgao=None, limites=None):
                   SELECT numero_controle FROM contratacoes
                    WHERE referencia=0 AND ano=?){og}""",
             [ano] + og_args).fetchone()[0],
-        "vigentes": executivo["cards"]["contratos_vigentes"],
+        # vigentes DO EXERCÍCIO: contar todos os contratos vigentes, de
+        # qualquer ano, fazia a última etapa do funil ficar maior que a
+        # primeira — as quatro barras precisam falar do mesmo conjunto
+        "vigentes": db.execute(
+            f"""SELECT COUNT(*) FROM contratos k
+                 WHERE date(k.vigencia_fim) >= date('now')
+                   AND k.contratacao_controle IN (
+                     SELECT numero_controle FROM contratacoes
+                      WHERE referencia=0 AND ano=?){og}""",
+            [ano] + og_args).fetchone()[0],
     }
     # processo publicado há muito tempo e sem resultado é pendência, não
     # estatística: costuma ser homologação que o órgão esqueceu de publicar
@@ -389,11 +412,36 @@ def dados_painel(db, ano, orgao=None, limites=None):
              WHERE referencia=0
                AND datetime(data_encerramento_proposta) >= datetime('now'){og}""",
         og_args).fetchone()[0]
-    perto_do_limite = [u for u in fracionamento["unidades"] if u["pct"] >= 75]
+    # O campo "unidade" do PNCP costuma trazer o nome do órgão — no acervo
+    # do piloto, todas as dispensas caem em "MUNICIPIO DE ORINDIUVA" e o
+    # medidor vira uma linha só. Agrupar por objeto é também o critério
+    # legal: o art. 75 fala em objeto de mesma natureza.
+    por_objeto = {}
+    for r in db.execute(
+            f"""SELECT objeto, COALESCE(valor_homologado, valor_estimado, 0)
+                  FROM contratacoes
+                 WHERE referencia=0 AND ano=? AND modalidade_id=8{og}""",
+            [ano] + og_args):
+        # duas palavras significativas: com três, "PAPEL A4" e "PAPEL A4
+        # SULFITE" viram objetos distintos e o limite deixa de somar o que
+        # a lei manda somar; com uma, "MATERIAL" engoliria meio acervo
+        chave = pca_builder.chave_agrupamento(r[0], palavras=2)             or "(sem descrição)"
+        alvo = por_objeto.setdefault(chave, {"objeto": chave, "n": 0,
+                                             "total": 0.0})
+        alvo["n"] += 1
+        alvo["total"] += r[1] or 0
+    limite = fracionamento["limite_compras"]
+    objetos = sorted(por_objeto.values(), key=lambda o: -o["total"])
+    for o in objetos:
+        o["pct"] = o["total"] / limite * 100 if limite else 0
+    perto_do_limite = [o for o in objetos if o["pct"] >= 75]
 
     return {
         "ano": ano,
+        "comparacao_parcial": parcial,
         "alertas": {"perto_do_limite": len(perto_do_limite),
+                    "acima_do_limite": sum(1 for o in objetos
+                                           if o["pct"] > 100),
                     "vencendo": len([v for v in executivo["vencendo"]
                                      if (v["dias"] or 0) <= 60]),
                     "propostas": propostas, "paradas": paradas},
@@ -407,7 +455,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
                     "desagios": desagios, "curva": curva,
                     "fornecedores_total": len(valores),
                     "calor": calor, "meses_calor": list(range(1, 13))},
-        "vigilancia": {"funil": funil, "limites": fracionamento["unidades"][:6],
+        "vigilancia": {"funil": funil, "limites": objetos[:6],
                        "limite_compras": fracionamento["limite_compras"],
                        "agenda": executivo["vencendo"][:40]},
     }

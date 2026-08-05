@@ -46,8 +46,13 @@ function svg(largura, altura, dentro) {
 
 // ── colunas pareadas: estimado (claro) × homologado (cheio) ────────────────
 function grafMeses(meses) {
-  const dados = meses.filter(m => m.valor || m.estimado);
-  if (!dados.length) return `<div class="vazio">Sem contratações no exercício.</div>`;
+  // Mês sem contratação é informação: filtrá-lo comprimia o eixo e escondia
+  // o buraco — no acervo do piloto, março sumia entre fevereiro e abril.
+  if (!meses.some(m => m.valor || m.estimado))
+    return `<div class="vazio">Sem contratações no exercício.</div>`;
+  const ultimo = meses.reduce(
+    (u, m, i) => (m.valor || m.estimado) ? i : u, 0);
+  const dados = meses.slice(0, Math.max(ultimo + 1, new Date().getMonth() + 1));
   const alto = 170, base = 170, larg = 660;
   const e = escala(Math.max(...dados.map(m => Math.max(m.valor, m.estimado))));
   const passo = (larg - 60) / dados.length;
@@ -237,27 +242,35 @@ function grafCalor(calor, meses) {
 }
 
 // ── medidores do limite anual de dispensa ─────────────────────────────────
-function grafLimites(unidades, limite) {
-  if (!unidades.length)
+function grafLimites(objetos, limite) {
+  if (!objetos.length)
     return `<div class="vazio">Nenhuma dispensa registrada no exercício.</div>`;
   const larg = 500, bloco = 66;
   let g = "";
-  unidades.forEach((u, i) => {
+  objetos.forEach((o, i) => {
     const y = i * bloco + 16;
-    const w = Math.min(1, (u.pct || 0) / 100) * (larg - 60);
-    const cor = u.pct >= 90 ? "var(--erro)" : u.pct >= 75 ? "var(--warn)"
+    const cheio = larg - 60;
+    const w = Math.min(1, (o.pct || 0) / 100) * cheio;
+    const estourou = o.pct > 100;
+    const cor = o.pct >= 90 ? "var(--erro)" : o.pct >= 75 ? "var(--warn)"
                                                           : "var(--s3)";
-    g += `<text class="rot" x="0" y="${y - 4}">${esc(u.unidade)} · ${u.n} ${
-            u.n === 1 ? "dispensa" : "dispensas"}</text>
-          <rect x="0" y="${y}" width="${larg - 60}" height="14" rx="4"
+    // barra cheia diz "chegou ao limite"; passar dele é outra informação, e
+    // "874%" numa barra igual à de 100% esconde justamente a gravidade
+    const vezes = (o.pct / 100).toFixed(1).replace(".", ",");
+    g += `<text class="rot" x="0" y="${y - 4}">${esc(o.objeto)} · ${o.n} ${
+            o.n === 1 ? "dispensa" : "dispensas"}</text>
+          <rect x="0" y="${y}" width="${cheio}" height="14" rx="4"
             fill="var(--surface2)"/>
           <rect x="0" y="${y}" width="${Math.max(3, w)}" height="14" rx="4"
-            fill="${cor}"><title>${esc(u.unidade)} · ${dinheiro(u.total)} de ${
-              dinheiro(limite)}</title></rect>
-          <text class="val" x="0" y="${y + 30}">${dinheiro(u.total)} · <tspan
-            fill="${cor}" font-weight="600">${pct(u.pct, 0)} do limite</tspan></text>`;
+            fill="${cor}"><title>${esc(o.objeto)} · ${dinheiro(o.total)} de ${
+              dinheiro(limite)}</title></rect>${estourou ? `
+          <path d="M${cheio - 1},${y - 3} l10,10 l-10,10 z" fill="var(--erro)"
+            ><title>acima do limite</title></path>` : ""}
+          <text class="val" x="0" y="${y + 30}">${dinheiro(o.total)} · <tspan
+            fill="${cor}" font-weight="600">${estourou
+              ? `${vezes}× o limite` : `${pct(o.pct, 0)} do limite`}</tspan></text>`;
   });
-  return svg(larg, unidades.length * bloco + 6, g);
+  return svg(larg, objetos.length * bloco + 6, g);
 }
 
 // ── funil: onde os processos do exercício pararam ─────────────────────────
@@ -348,14 +361,15 @@ function vistaExecucao(d) {
       <div class="r">${varValor == null ? `sem ${ano - 1} para comparar`
         : `<span class="${varValor >= 0 ? "up" : "down"}">${
             varValor >= 0 ? "▲" : "▼"} ${pct(Math.abs(varValor), 0)}</span>
-           sobre ${ano - 1}`}</div>
+           sobre ${ano - 1}${d.comparacao_parcial ? " no mesmo período" : ""}`}</div>
       ${spark.length > 1 ? svg(240, 44, `<polyline fill="none" stroke="var(--s1)"
         stroke-width="2" stroke-linejoin="round" points="${linha}"/>`) : ""}
     </div>
     <div class="card kpiv"><div class="v">${c.n}</div>
       <div class="r">contratações</div>
       <div class="r" style="margin-top:8px">${varN >= 0 ? "▲" : "▼"} ${
-        Math.abs(varN)} vs. ${ano - 1}</div></div>
+        Math.abs(varN)} vs. ${ano - 1}${
+        d.comparacao_parcial ? " até hoje" : ""}</div></div>
     <div class="card kpiv"><div class="v">${
         c.desagio == null ? "–" : pct(c.desagio)}</div>
       <div class="r">deságio médio</div>
@@ -434,9 +448,10 @@ function vistaVigilancia(d) {
     ${cartao(`Limite anual de dispensa — art. 75, II (${
                dinheiro(v.limite_compras)})`,
              grafLimites(v.limites, v.limite_compras),
-             `A soma é por unidade administrativa. O agrupamento legal é por
-              objeto de mesma natureza — este medidor é termômetro, não
-              veredito.`)}
+             `A soma é por <b>objeto</b>, agrupado pelas duas primeiras
+              palavras significativas da descrição — o critério do art. 75 é
+              objeto de mesma natureza, e o enquadramento final é juízo do
+              gestor. Este medidor é termômetro, não veredito.`)}
     ${cartao("Do edital ao contrato — onde os processos estão",
              grafFunil(v.funil),
              `${v.funil.publicadas - v.funil.com_resultado} publicadas ainda sem
@@ -469,7 +484,8 @@ async function carregarPainel() {
 function mostrarChips(a) {
   const chips = [];
   if (a.perto_do_limite) chips.push(["grave", "⚠", a.perto_do_limite,
-    `unidade${a.perto_do_limite > 1 ? "s" : ""} perto do limite anual de dispensa`,
+    `objeto${a.perto_do_limite > 1 ? "s" : ""} ${a.acima_do_limite
+      ? "acima do" : "perto do"} limite anual de dispensa`,
     () => irPara("contratacoes", {modalidade: "8"})]);
   if (a.vencendo) chips.push(["aviso", "⏱", a.vencendo,
     "contratos/atas vencem em 60 dias",

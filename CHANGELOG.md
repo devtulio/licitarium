@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.10.1 — 2026-08-05
+
+**Correções no Painel — três números que induziam a erro**
+
+- **A comparação com o ano anterior media períodos diferentes.** O painel
+  confrontava o acumulado do exercício em curso com o **ano inteiro**
+  anterior: em agosto, "caiu 67%" dizia apenas que faltavam quatro meses.
+  Agora compara com o **mesmo período** do ano anterior, e o rótulo diz isso.
+- **O funil misturava escopos.** "Vigentes hoje" contava contratos de qualquer
+  exercício, enquanto as demais etapas eram só do ano escolhido — a última
+  barra chegava a ser maior que a primeira. As quatro etapas passam a falar do
+  mesmo conjunto.
+- **O medidor de limite não separava nada.** Ele agrupava por unidade
+  administrativa, e o campo do PNCP traz o nome do órgão: no acervo do piloto,
+  as 16 dispensas caíam todas numa linha só, com 874%. Agora o agrupamento é
+  por **objeto**, que é também o critério do art. 75 — e passando de 100% o
+  medidor mostra quantas vezes o limite foi excedido, em vez de uma barra cheia
+  idêntica à de quem está em 100%.
+- **Mês sem contratação voltou ao eixo.** Meses vazios eram omitidos, e o
+  gráfico emendava fevereiro com abril sem avisar que março existia.
+
 ## 1.10.0 — 2026-08-05
 
 **Painel — a nova tela inicial**
