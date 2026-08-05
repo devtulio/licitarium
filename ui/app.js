@@ -232,6 +232,9 @@ async function iniciarApp(e) {
   progressoSplash(0.85);
   await carregarLista();
   esconderSplash();
+  // o programa consertou algo no banco para conseguir abrir: dizer, senão o
+  // usuário só descobre pelo dado que faltou
+  if (e.aviso_abertura) alert(`Licitarium\n\n${e.aviso_abertura}`);
   api.sincronizar();  // sync ao abrir (catch-up incremental)
   api.checar_atualizacao().then(at => {
     if (!at) return;

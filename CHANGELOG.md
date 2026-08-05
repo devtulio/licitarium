@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.1 — 2026-08-05
+
+- **Correção: o programa deixava de abrir por causa do diário de transações.**
+  O SQLite mantém um arquivo `-wal` com o que ainda não foi gravado no banco.
+  Se sobrar um `-wal` de outro momento do arquivo — cópia da pasta, restauração
+  de backup, sincronizador de nuvem, encerramento à força —, ele é aplicado
+  sobre o banco atual e produz `database disk image is malformed` antes mesmo
+  de a janela aparecer, com um traceback no lugar de qualquer explicação.
+  Foi o que aconteceu aqui: o banco estava íntegro (29.489 itens,
+  verificação sem erro) e só o diário de três dias antes derrubava tudo.
+- Agora o Licitarium **confere o banco ao abrir**. Diário incompatível é posto
+  de lado como `.orfao-<data>` e o programa segue, avisando na tela. Banco
+  realmente corrompido é guardado como `.corrompido-<data>` e um novo é criado
+  — o acervo volta na sincronização, porque a fonte é o PNCP.
+- E ao fechar, o diário é **consolidado no banco**, para não sobrar nada capaz
+  de voltar órfão na abertura seguinte.
+
 ## 1.5.0 — 2026-08-05
 
 **Análise estatística da pesquisa de preços**

@@ -23,7 +23,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.5.0"
+VERSAO = "1.5.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -161,11 +161,107 @@ PADRAO_ORDEM = {"contratacoes": "data_publicacao DESC",
                 "itens": "data_resultado DESC, id"}
 
 
+# O que o programa encontrou de errado ao abrir o banco, para a tela contar
+# ao usuário. Fica em memória: quando o aviso nasce, gravar no banco ainda
+# não é possível.
+AVISO_ABERTURA = None
+
+
+def _conectar():
+    """Abre o banco e tira da frente um arquivo de transações órfão.
+
+    O `-wal` guarda o que ainda não foi gravado no `.db`. Se sobrar um `-wal`
+    escrito para outro momento do arquivo — cópia da pasta, restauração de
+    backup, sincronizador de nuvem, encerramento à força —, o SQLite aplica
+    aquelas páginas velhas sobre o banco atual e o resultado é
+    `database disk image is malformed`, antes mesmo de a janela abrir.
+    Aconteceu em 2026-08-05: o `.db` estava íntegro (29.489 itens,
+    `integrity_check` ok) e só o `-wal` de três dias antes derrubava tudo.
+
+    Aqui o `-wal` é posto de lado e o banco reabre. O que ele continha se
+    perde — mas é o que ainda não tinha sido gravado, e o acervo se
+    completa na sincronização seguinte.
+    """
+    global AVISO_ABERTURA
+    db = None
+    try:
+        db = sqlite3.connect(ARQUIVO_DB)
+        # conectar não lê nada: a corrupção só aparece na primeira consulta
+        db.execute("PRAGMA table_info(atas)").fetchall()
+        return db
+    except sqlite3.DatabaseError as e:
+        # no Windows o arquivo fica travado enquanto a conexão viver, e
+        # renomear é justamente o que vem a seguir
+        if db is not None:
+            db.close()
+        if "malformed" not in str(e) and "not a database" not in str(e):
+            raise
+    carimbo = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if _banco_intacto():
+        movidos = []
+        for sufixo in ("-wal", "-shm"):
+            f = Path(str(ARQUIVO_DB) + sufixo)
+            if f.exists():
+                f.rename(f.with_name(f"{f.name}.orfao-{carimbo}"))
+                movidos.append(f.name)
+        AVISO_ABERTURA = (
+            "O arquivo de transações do banco estava inconsistente e foi "
+            "posto de lado. O acervo está íntegro; o que faltar volta na "
+            "próxima sincronização.")
+        return sqlite3.connect(ARQUIVO_DB)
+    # o banco em si se perdeu: guarda o arquivo e recomeça, porque o acervo
+    # inteiro pode ser baixado de novo do PNCP
+    guardado = ARQUIVO_DB.with_name(f"{ARQUIVO_DB.name}.corrompido-{carimbo}")
+    ARQUIVO_DB.rename(guardado)
+    for sufixo in ("-wal", "-shm"):
+        f = Path(str(ARQUIVO_DB) + sufixo)
+        if f.exists():
+            f.unlink()
+    AVISO_ABERTURA = (
+        f"O banco estava corrompido e foi guardado como {guardado.name}. "
+        "Um banco novo foi criado — sincronize para baixar o acervo de novo.")
+    return sqlite3.connect(ARQUIVO_DB)
+
+
+def _banco_intacto():
+    """O arquivo principal responde sozinho, sem o `-wal`?
+
+    `immutable=1` faz o SQLite ignorar `-wal` e `-shm` e ler só o `.db` —
+    é o que separa "o banco quebrou" de "o arquivo de transações não é
+    deste banco".
+    """
+    try:
+        db = sqlite3.connect(f"file:{ARQUIVO_DB}?mode=ro&immutable=1", uri=True)
+        try:
+            return db.execute("PRAGMA quick_check(1)").fetchone()[0] == "ok"
+        finally:
+            db.close()
+    except (sqlite3.DatabaseError, OSError):
+        return False
+
+
+def fechar_limpo():
+    """Grava o `-wal` no banco e o zera antes de sair.
+
+    Um `-wal` que não sobrevive ao encerramento não tem como voltar órfão
+    na abertura seguinte — é a metade preventiva do problema tratado em
+    `_conectar`.
+    """
+    try:
+        db = sqlite3.connect(ARQUIVO_DB)
+        try:
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            db.close()
+    except sqlite3.DatabaseError:
+        pass   # sair é mais importante que encerrar bonito
+
+
 def abrir_db():
     # ponytail: conexão nova por operação — chamadas vêm de threads distintas
     # (js bridge + thread de sync) e o volume municipal não justifica pool
     DIR_DADOS.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(ARQUIVO_DB)
+    db = _conectar()
     db.row_factory = sqlite3.Row
     # migrações: atas e contratos ganharam o número humano como colunas
     # (0.2.x); bancos antigos são reprojetados do raw (fonte da verdade)
@@ -337,6 +433,9 @@ class Api:
             cfg = {r["chave"]: r["valor"] for r in
                    db.execute("SELECT chave, valor FROM config")}
             return {"versao": VERSAO,
+                    # o que o programa consertou sozinho ao abrir o banco;
+                    # None no caso normal
+                    "aviso_abertura": AVISO_ABERTURA,
                     "municipio": cfg.get("municipio_nome"),
                     "uf": cfg.get("municipio_uf"),
                     "ibge": cfg.get("municipio_ibge"),
@@ -1182,6 +1281,9 @@ def main():
     # armazenamento persistente: sem isso o WebView2 abre um perfil novo a
     # cada execução e o localStorage (usado como reserva pela splash) some
     webview.start(private_mode=False, storage_path=str(DIR_DADOS / "webview"))
+    # a janela fechou: consolida o -wal para a próxima abertura não achar
+    # arquivo de transação nenhum pela frente
+    fechar_limpo()
 
 
 def _escrever_tema_da_splash(tema):
