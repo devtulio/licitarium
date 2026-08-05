@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.8.0</title>
+<title>Manual Operacional — Licitarium v1.9.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.8.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.9.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.8.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.9.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.8.0.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.9.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -343,6 +343,24 @@ relatório ao processo.</p>
 <p>A escolha <b>fica gravada por pesquisa</b>: voltar a buscar o mesmo termo
 amanhã traz de volta os descartes e as justificativas, e o relatório gerado
 depois sai igual ao que você viu na tela.</p>
+
+<h3>Corrigir pelo IPCA</h3>
+<p>Preço de 2022 não se compara com preço de 2026. A caixa <b>Corrigir pelo
+IPCA</b>, na aba Preços, traz cada valor a preços de hoje antes de qualquer
+conta — no acervo do piloto, R$ 208,04 pagos em março de 2022 equivalem a
+<b>R$ 252,06</b> em junho de 2026.</p>
+<p>O índice é o <b>IPCA</b> (série 433 do Banco Central), baixado junto com a
+sincronização e guardado no banco. A data-base de cada preço é a <b>data do
+resultado</b> da contratação; quando ela não existe, a da publicação do
+processo.</p>
+<div class="caixa"><b>O programa não projeta índice.</b> O IBGE publica o IPCA
+com semanas de atraso. A correção vai até o <b>último mês publicado</b>, e
+tanto a tela quanto o relatório dizem qual é — <i>"valores corrigidos pelo
+IPCA até jun/2026"</i>. Preço mais recente que o índice, ou sem data
+utilizável, fica de fora do levantamento e é contado no aviso.</div>
+<p>As duas caixas podem ficar ligadas ao mesmo tempo: nesse caso o preço por
+conteúdo já sai corrigido, e a coluna <b>Corrigido</b> aparece entre o valor
+pago e a de conteúdo.</p>
 
 <h3>Comparar por conteúdo</h3>
 <p>Preço de embalagem não se compara. Uma caixa de papel A4 com 5.000 folhas a

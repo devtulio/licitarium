@@ -26,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.8.0"
+VERSAO = "1.9.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -92,6 +92,10 @@ CREATE TABLE IF NOT EXISTS pca_minuta_itens (
 CREATE TABLE IF NOT EXISTS precos_descartes (
   termo TEXT, item_id TEXT, motivo TEXT, criado_em TEXT,
   PRIMARY KEY (termo, item_id));
+-- IPCA mensal do Banco Central (série 433), para trazer preço antigo a
+-- valor de hoje. Competência no formato AAAA-MM; variação em % do mês.
+CREATE TABLE IF NOT EXISTS ipca (
+  competencia TEXT PRIMARY KEY, variacao REAL);
 CREATE TABLE IF NOT EXISTS municipios_referencia (
   ibge TEXT PRIMARY KEY, nome TEXT, uf TEXT, adicionado_em TEXT);
 CREATE TABLE IF NOT EXISTS sync_log (
@@ -438,6 +442,21 @@ def _unidade_canonica(texto):
     sem_acento = (unicodedata.normalize("NFD", chave)
                   .encode("ascii", "ignore").decode())
     return _CANONICA.get(sem_acento.upper().rstrip("."), limpo.capitalize())
+
+
+def _corrigir_pelo_ipca(linhas, ipca):
+    """Troca cada preço pelo valor corrigido, guardando o resto da linha.
+
+    Item sem data utilizável, ou mais recente que o último índice, fica de
+    fora: corrigir sem saber de quando é o preço seria inventar.
+    """
+    corrigidas = []
+    for r in linhas:
+        valor = relatorios.corrigir(r[1], r[4], ipca)
+        if valor is not None:
+            corrigidas.append((r[0], valor, r[2], r[3], r[4]))
+    corrigidas.sort(key=lambda x: x[1])
+    return corrigidas, len(linhas) - len(corrigidas)
 
 
 def _normalizar_por_conteudo(linhas):
@@ -789,16 +808,33 @@ class Api:
                 f"SELECT * FROM {tabela}{sql_where} ORDER BY {ordem} "
                 f"LIMIT 50 OFFSET ?", args + [(max(1, pagina) - 1) * 50])
             nomes = self._nomes_de_municipio(db) if tipo == "itens" else {}
+            # correção monetária só quando pedida: a série é lida uma vez
+            # para a página inteira, não por item
+            ipca = (relatorios.fatores_ipca(db)
+                    if tipo == "itens" and f.get("corrigir") else None)
+            publicacao = {}
+            if ipca:
+                publicacao = {r[0]: r[1] for r in db.execute(
+                    "SELECT numero_controle, data_publicacao"
+                    " FROM contratacoes")}
             itens = []
             for r in linhas:
                 d = dict(r)
                 d.pop("raw", None)  # listagem não precisa do JSON completo
                 if tipo == "itens":
                     d["municipio_nome"] = nomes.get(d.get("municipio_ibge"))
+                    if ipca:
+                        d["corrigido"] = relatorios.corrigir(
+                            d.get("valor_unitario_homologado"),
+                            d.get("data_resultado") or publicacao.get(
+                                d.get("contratacao_controle")), ipca)
                     # o que o item custa na unidade-base, quando o texto diz
-                    # quanto vem na embalagem
+                    # quanto vem na embalagem — sobre o valor corrigido, se a
+                    # correção estiver ligada, senão a coluna divergiria do
+                    # resumo, que corrige antes de normalizar
                     d["por_conteudo"] = relatorios.preco_por_conteudo(
-                        d.get("valor_unitario_homologado"),
+                        d.get("corrigido") if ipca
+                        else d.get("valor_unitario_homologado"),
                         d.get("descricao"), d.get("unidade"))
                 itens.append(d)
             return {"itens": itens, "total": total}
@@ -897,14 +933,16 @@ class Api:
         return [{"id": k, "texto": v} for k, v in relatorios.MOTIVOS_DESCARTE.items()]
 
     def estatisticas_preco(self, busca, ano=None, origem=None,
-                           excluidos=None, por_conteudo=False):
+                           excluidos=None, por_conteudo=False,
+                           corrigir=False):
         """Resumo do valor unitário homologado para um termo — a resposta de
         'quanto pagamos por isso?' que instrui a pesquisa de preços.
 
         Com `por_conteudo`, o resumo passa a ser sobre o preço da
         unidade-base (R$/folha, R$/quilo): a caixa com 5.000 folhas e o
         pacote com 100 deixam de entrar na mesma mediana como se fossem
-        comparáveis.
+        comparáveis. Com `corrigir`, cada preço é trazido a valor do último
+        mês do IPCA antes de qualquer conta.
         """
         if not (busca or "").strip():
             return None
@@ -931,11 +969,22 @@ class Api:
         db = abrir_db()
         try:
             linhas = db.execute(
-                "SELECT id, valor_unitario_homologado, descricao, unidade"
+                "SELECT id, valor_unitario_homologado, descricao, unidade,"
+                " COALESCE(data_resultado, (SELECT data_publicacao"
+                "   FROM contratacoes c"
+                "  WHERE c.numero_controle = itens.contratacao_controle)) data"
                 " FROM itens WHERE "
                 + " AND ".join(where) + " ORDER BY 2", args).fetchall()
             if not linhas:
                 return None
+            ipca = None
+            if corrigir:
+                ipca = relatorios.fatores_ipca(db)
+                linhas, sem_indice = _corrigir_pelo_ipca(linhas, ipca)
+                if not linhas:
+                    return {"n": 0, "corrigido": True,
+                            "sem_indice": sem_indice,
+                            "ipca_ate": ipca["ate"]}
             base = None
             if por_conteudo:
                 linhas, base, sem_conversao = _normalizar_por_conteudo(linhas)
@@ -944,6 +993,11 @@ class Api:
                             "sem_conversao": sem_conversao}
             resumo = relatorios.resumo_estatistico(
                 [r[1] for r in linhas])
+            if corrigir:
+                resumo.update(corrigido=True, ipca_ate=ipca["ate"],
+                              ipca_ate_extenso=relatorios.mes_por_extenso(
+                                  ipca["ate"]),
+                              sem_indice=sem_indice)
             if por_conteudo:
                 resumo.update(por_conteudo=True, base=base,
                               rotulo_base=relatorios.BASES[base][0],

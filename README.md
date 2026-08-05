@@ -74,6 +74,11 @@ oferece o descarte, mas desprezar preço coletado é decisão de quem assina.
 O filtro por **unidade de medida** agrupa as grafias do portal — *CX*, *Caixa*
 e *CAIXAS* são uma opção só.
 
+**Corrigir pelo IPCA** traz cada preço a valor de hoje pela série 433 do Banco
+Central, a partir da data do resultado: R$ 208,04 de março de 2022 equivalem a
+R$ 252,06 em junho de 2026. A correção vai até o último mês publicado e o
+documento declara qual é — o programa não projeta índice.
+
 **Comparar por conteúdo** desfaz a distorção da embalagem: a caixa de papel A4
 com 5.000 folhas sai a R$ 0,0466 por folha e o pacote com 100, a R$ 0,3890 —
 8,4 vezes mais caro. O conteúdo é lido do que o órgão publicou, e gramatura,

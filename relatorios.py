@@ -39,6 +39,9 @@ TITULOS = {"contratacoes": "Relação de Contratações",
 LIMITE_PADRAO_OBRAS = 125279.84
 LIMITE_PADRAO_COMPRAS = 62639.92
 
+MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
+              "jul", "ago", "set", "out", "nov", "dez"]
+
 
 def _e(v):
     return html.escape(str(v)) if v is not None else "–"
@@ -277,6 +280,70 @@ def _blocos(ids, tamanho=400):
     return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
 
 
+# ── correção monetária ──────────────────────────────────────────────────────
+# Comparar reais de 2022 com reais de 2026 subestima o preço atual: no acervo
+# do piloto há itens dos dois anos na mesma pesquisa. A série do IPCA fica no
+# banco (tabela `ipca`, alimentada pelo Banco Central) e a correção é sempre
+# declarada — documento que atualiza valor tem de dizer com que índice e até
+# quando.
+
+def fatores_ipca(db):
+    """Quanto multiplicar um preço de cada mês para chegar a valor de hoje.
+
+    O índice do mês da compra já está embutido no preço pago, então a
+    correção acumula os meses **seguintes**. O último mês disponível manda:
+    o IBGE publica com semanas de atraso, e projetar o que falta seria pôr
+    no documento um número que ninguém publicou.
+    """
+    linhas = [(r[0], r[1]) for r in db.execute(
+        "SELECT competencia, variacao FROM ipca ORDER BY competencia")]
+    if not linhas:
+        return {"ate": None, "fatores": {}}
+    fatores, acumulado = {}, 1.0
+    for competencia, variacao in reversed(linhas):
+        fatores[competencia] = acumulado
+        acumulado *= 1 + (variacao or 0) / 100
+    return {"ate": linhas[-1][0], "fatores": fatores}
+
+
+def competencia(data):
+    """AAAA-MM de uma data ISO; None quando não dá para saber o mês."""
+    texto = str(data or "")[:7]
+    return texto if len(texto) == 7 and texto[4] == "-" else None
+
+
+def corrigir(valor, data, ipca):
+    """Traz o valor a preço do último mês disponível do índice.
+
+    Devolve `None` quando não há como corrigir — sem data, sem série, ou
+    preço posterior ao último índice —, e nesse caso o valor original é o
+    que vale. Preço mais novo que o índice não é corrigido para trás.
+    """
+    if valor is None:
+        return None
+    mes = competencia(data)
+    if not mes or not ipca["fatores"]:
+        return None
+    fator = ipca["fatores"].get(mes)
+    if fator is None:
+        # antes da série, corrige desde o primeiro mês conhecido; depois
+        # dela, não há o que corrigir
+        primeiro = min(ipca["fatores"])
+        if mes < primeiro:
+            fator = ipca["fatores"][primeiro]
+        else:
+            return None
+    return valor * fator
+
+
+def mes_por_extenso(competencia_):
+    """"2026-06" vira "jun/2026", que é como o documento fala."""
+    if not competencia_:
+        return None
+    ano, mes = competencia_.split("-")
+    return f"{MESES_NOME[int(mes) - 1]}/{ano}"
+
+
 # ── quanto vem dentro da embalagem ──────────────────────────────────────────
 # Preço de embalagem não se compara: no acervo do piloto, a caixa de papel A4
 # com 5.000 folhas sai a R$ 0,047 por folha e o pacote com 100 folhas, a
@@ -458,7 +525,7 @@ def resumo_estatistico(valores):
 
 
 def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
-                 por_conteudo=False):
+                 por_conteudo=False, corrigir_ipca=False):
     """Histórico de preços unitários homologados para um termo de busca.
 
     Os itens desconsiderados saem do cálculo mas não do documento: eles
@@ -513,9 +580,23 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
         nomes[proprio[0]] = nome_proprio[0] if nome_proprio else proprio[0]
     for l in linhas:
         l["municipio_nome"] = nomes.get(l["municipio_ibge"]) or "–"
+    ipca = fatores_ipca(db) if corrigir_ipca else None
+    if ipca:
+        # a data do resultado é a do preço; sem ela, a da publicação do
+        # processo. Item que não dá para datar fica sem correção.
+        publicacao = {r[0]: r[1] for r in db.execute(
+            "SELECT numero_controle, data_publicacao FROM contratacoes")}
+        for l in linhas:
+            l["corrigido"] = corrigir(
+                l["valor_unitario_homologado"],
+                l["data_resultado"] or publicacao.get(
+                    l["contratacao_controle"]), ipca)
+        sem_indice = sum(1 for l in linhas if l["corrigido"] is None)
+        linhas = [l for l in linhas if l["corrigido"] is not None]
     for l in linhas:
         l["por_conteudo"] = preco_por_conteudo(
-            l["valor_unitario_homologado"], l["descricao"], l["unidade"])
+            l["corrigido"] if ipca else l["valor_unitario_homologado"],
+            l["descricao"], l["unidade"])
     base = None
     if por_conteudo:
         # comparar R$/quilo com R$/folha não diz nada: a série fica com a
@@ -532,7 +613,8 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
         linhas = sorted(comparaveis, key=lambda l: l["por_conteudo"]["valor"])
         valores = [l["por_conteudo"]["valor"] for l in linhas]
     else:
-        valores = [l["valor_unitario_homologado"] for l in linhas]
+        valores = [l["corrigido"] if ipca else l["valor_unitario_homologado"]
+                   for l in linhas]
         fora_da_comparacao = 0
     resumo = resumo_estatistico(valores)
     if resumo:
@@ -541,6 +623,10 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
             resumo.update(por_conteudo=True, base=base,
                           rotulo_base=BASES[base][0],
                           sem_conversao=fora_da_comparacao)
+        if ipca:
+            resumo.update(corrigido=True, ipca_ate=ipca["ate"],
+                          ipca_ate_extenso=mes_por_extenso(ipca["ate"]),
+                          sem_indice=sem_indice)
     # os desconsiderados vão ao documento com a razão de cada um — sem isso,
     # quem confere não tem como saber que a série foi filtrada
     desconsiderados = []
@@ -555,7 +641,8 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
     desconsiderados.sort(key=lambda l: l["valor_unitario_homologado"] or 0)
     return {"termo": (termo or "").strip(), "linhas": linhas, "resumo": resumo,
             "desconsiderados": desconsiderados, "ano": ano,
-            "por_conteudo": bool(por_conteudo and base)}
+            "por_conteudo": bool(por_conteudo and base),
+            "corrigido": bool(ipca)}
 
 
 # ── render ──────────────────────────────────────────────────────────────────
@@ -926,11 +1013,14 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
             f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
             f' ({_LEITURA_CV(r["cv"])}).</p>')
     coluna_conteudo = d.get("por_conteudo")
+    coluna_corrigido = d.get("corrigido")
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
       <td class="num">{l['quantidade_homologada'] or '–'}</td>
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>{
+        f'<td class="num">{moeda(l["corrigido"])}</td>'
+        if coluna_corrigido else ''}{
         f'<td class="num">{moeda_fina(l["por_conteudo"]["valor"])}</td>'
         if coluna_conteudo else ''}
       <td class="num">{moeda(l['valor_total_homologado'])}</td>
@@ -946,6 +1036,13 @@ outros entes como parâmetro). Confira a aderência de especificação, unidade 
 quantidade de cada item antes de usar como referência.
 Termo pesquisado: <b>{_e(d['termo'])}</b>.
 O número do processo leva à página oficial no PNCP, para conferência.{
+  f'<br><b>Correção monetária:</b> os valores foram trazidos a preços de '
+  f'{r["ipca_ate_extenso"]} pelo <b>IPCA</b> (série 433 do Banco Central), a '
+  f'partir da data do resultado de cada contratação. ' + (
+  f'{r["sem_indice"]} preço(s) coletado(s) não pôde(puderam) ser corrigido(s) '
+  'por falta de data utilizável e ficou(ficaram) fora deste levantamento.'
+  if r.get("sem_indice") else '')
+  if coluna_corrigido else ''}{
   f'<br><b>Comparação por conteúdo:</b> os valores em destaque são por '
   f'{r["rotulo_base"]}, calculados a partir do que cada embalagem declara '
   f'conter. ' + (f'{r["sem_conversao"]} item(ns) coletado(s) não '
@@ -956,6 +1053,7 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 <h2>Itens homologados, do menor para o maior preço unitário</h2>
 <table><thead><tr><th>Descrição</th><th class="unid">Unid.</th>
 <th class="num">Qtde</th><th class="num">Unitário</th>{
+  '<th class="num">Corrigido</th>' if coluna_corrigido else ''}{
   f'<th class="num">Por {r["rotulo_base"]}</th>' if coluna_conteudo else ''}
 <th class="num">Total</th><th class="forn">Fornecedor</th>
 <th class="muni">Município</th>
@@ -964,10 +1062,6 @@ O número do processo leva à página oficial no PNCP, para conferência.{
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
                    tema=tema)
-
-
-MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
-              "jul", "ago", "set", "out", "nov", "dez"]
 
 
 def render_executivo(d, municipio, uf, tema="pergaminho"):
@@ -1065,7 +1159,8 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
             raise ValueError("informe o que pesquisar")
         d = dados_precos(db, termo, ano, orgao,
                          params.get("excluidos"),
-                         params.get("por_conteudo"))
+                         params.get("por_conteudo"),
+                         params.get("corrigir_ipca"))
         conteudo = render_precos(d, municipio, uf, tema)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"

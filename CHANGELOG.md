@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0 — 2026-08-05
+
+**Corrigir pelo IPCA**
+
+- Nova caixa **Corrigir pelo IPCA** na aba Preços: cada valor é trazido a
+  preços de hoje antes de qualquer conta. R$ 208,04 pagos em março de 2022
+  equivalem a **R$ 252,06** em junho de 2026 — comparar reais de anos
+  diferentes subestimava o preço atual em mais de 20%.
+- O índice é a **série 433 do Banco Central**, baixada junto com a
+  sincronização e guardada no banco (poucos KB). Falha ao baixá-la não
+  atrapalha a coleta do acervo.
+- A data-base de cada preço é a **data do resultado**; sem ela, a da publicação
+  do processo. O índice do mês da compra já está no preço pago, então a
+  correção acumula os meses seguintes.
+- **O programa não projeta índice.** A correção vai até o último mês publicado,
+  e tela e relatório declaram qual é. Preço mais recente que o índice, ou sem
+  data utilizável, fica de fora e é contado no aviso.
+- As duas caixas convivem: com correção e conteúdo ligados, o preço por
+  conteúdo já sai corrigido — senão a coluna divergiria do resumo.
+
 ## 1.8.0 — 2026-08-05
 
 **Comparar por conteúdo**

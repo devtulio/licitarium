@@ -67,6 +67,7 @@ const DADOS = {
       valor_unitario_estimado: 24.9, valor_unitario_homologado: 18.75,
       por_conteudo: { valor: 0.0375, base: "un", conteudo: 500,
                       rotulo: "unidade" },
+      corrigido: 20.6,
       fornecedor_nome: "PAPELARIA CENTRAL LTDA",
       data_resultado: "2025-11-28" ,
       municipio_ibge: "3534203", municipio_nome: "Orindiúva" },
@@ -159,10 +160,16 @@ function scriptPonte(temaBanco = "portal") {
         return { itens, total: itens.length };
       },
       estatisticas_preco: async (busca, ano, origem, excluidos,
-                                 porConteudo) => {
+                                 porConteudo, corrigir) => {
         window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano,
-                                 origem, excluidos, porConteudo });
+                                 origem, excluidos, porConteudo, corrigir });
         if (!/papel/i.test(busca || "")) return null;
+        if (corrigir && !porConteudo) return {
+          n: 4, minimo: 20.6, maximo: 700000, media: 175030, mediana: 30.2,
+          fornecedores: 3, desvio: 349985, cv: 2.0, q1: 25.1, q3: 175015,
+          limite_inf: -224733, limite_sup: 424873, fora_da_curva: [],
+          proprios: 3, referencia: 1, corrigido: true, ipca_ate: "2026-06",
+          ipca_ate_extenso: "jun/2026", sem_indice: 1 };
         if (porConteudo) return window.__semConteudo
           ? { n: 0, por_conteudo: true, sem_conversao: 4 }
           : { n: 3, minimo: 0.0375, maximo: 0.389, media: 0.158,

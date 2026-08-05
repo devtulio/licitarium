@@ -50,6 +50,8 @@ const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
 let temReferencia = false;
 // comparar por conteúdo muda a grade e o resumo inteiros
 let porConteudo = false;
+// corrigir pelo IPCA: preço de 2022 não se compara com preço de 2026
+let corrigirIpca = false;
 // itens que o usuário tirou da pesquisa de preços. Guarda os DESCARTADOS
 // (e não os escolhidos) para que item novo, vindo de uma sincronização ou
 // de outra página, entre marcado por padrão.
@@ -330,6 +332,7 @@ function filtrosAtuais() {
            so_homologados: $("f-homologados").checked || null,
            origem: $("f-so-meu").checked ? "proprio" : null,
            unidade: $("f-unidade").value || null,
+           corrigir: corrigirIpca || null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
@@ -368,11 +371,7 @@ const COLUNAS = {
                  ["Qtde","quantidade"], ["Valor unitário","unitario"],
                  ["Fornecedor","fornecedor"], ["Município","municipio"],
                  ["Processo","origem"]],
-  // usada no lugar da anterior quando "comparar por conteúdo" está ligado
-  itensConteudo: [["",null], ["Descrição","descricao"], ["Unid.","unidade"],
-                 ["Qtde","quantidade"], ["Valor unitário","unitario"],
-                 ["Por conteúdo",null], ["Fornecedor","fornecedor"],
-                 ["Município","municipio"], ["Processo","origem"]],
+
 };
 
 // Sufixo societário não identifica ninguém e come metade da coluna:
@@ -477,6 +476,10 @@ function renderLinha(tipo, d) {
       <span class="dim">${esc(d.unidade ?? "–")}</span>
       <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
       <span class="num">${unit}</span>
+      ${corrigirIpca ? `<span class="num">${
+        d.corrigido != null ? dinheiro(d.corrigido)
+          : `<span class="dim" title="Sem data de resultado, ou posterior ao
+              último índice publicado">–</span>`}</span>` : ""}
       ${porConteudo ? `<span class="num">${
         d.por_conteudo
           ? `${dinheiroFino(d.por_conteudo.valor)}
@@ -516,6 +519,18 @@ function leituraCv(cv) {
 
 // Quem fica de fora precisa aparecer: item cuja embalagem não diz o
 // conteúdo, ou que está em outra unidade-base (quilo no meio de folhas).
+// Documento que atualiza valor tem de dizer com que índice e até quando.
+function correcaoHtml(s) {
+  if (!s.corrigido) return "";
+  const fora = s.sem_indice
+    ? ` ${s.sem_indice} ${s.sem_indice === 1 ? "item ficou" : "itens ficaram"}
+        de fora, por não ter data de resultado ou ser posterior ao índice.`
+    : "";
+  return `<div class="disp">Valores corrigidos pelo <b>IPCA</b> até
+    <b>${esc(s.ipca_ate_extenso ?? "–")}</b>, a partir da data do resultado de
+    cada contratação.${fora}</div>`;
+}
+
 function semConversaoHtml(s) {
   if (!s.por_conteudo || !s.sem_conversao) return "";
   const n = s.sem_conversao;
@@ -583,7 +598,7 @@ async function mostrarResumoPrecos() {
   const s = await api.estatisticas_preco(termo,
     $("f-ano").value ? +$("f-ano").value : null,
     $("f-so-meu").checked ? "proprio" : null,
-    [...precosDescartados.keys()], porConteudo);
+    [...precosDescartados.keys()], porConteudo, corrigirIpca);
   if (!s) { caixa.classList.add("oculto"); return; }
   if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
     caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
@@ -616,7 +631,7 @@ async function mostrarResumoPrecos() {
       <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
         Relatório de pesquisa de preços</button>
     </div>
-    ${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
+    ${correcaoHtml(s)}${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
   $("btn-descartar-fora")?.addEventListener("click", async () => {
@@ -643,8 +658,13 @@ function larguraAtualPx() {
 
 // A aba Preços tem dois conjuntos de colunas; o resto tem um só.
 function colunasDe(tipo) {
-  return (tipo === "itens" && porConteudo) ? COLUNAS.itensConteudo
-                                           : COLUNAS[tipo];
+  if (tipo !== "itens") return COLUNAS[tipo];
+  const cols = [...COLUNAS.itens];
+  // cada modo insere a sua coluna logo depois do valor efetivamente pago
+  let i = 5;
+  if (corrigirIpca) cols.splice(i++, 0, ["Corrigido", null]);
+  if (porConteudo) cols.splice(i, 0, ["Por conteúdo", null]);
+  return cols;
 }
 
 function aplicarLarguras(tipo) {
@@ -746,7 +766,8 @@ async function carregarLista() {
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
   estado.total = r.total;
   const g = `g-${estado.tipo}`
-    + (estado.tipo === "itens" && porConteudo ? " conteudo" : "");
+    + (estado.tipo === "itens" && porConteudo ? " conteudo" : "")
+    + (estado.tipo === "itens" && corrigirIpca ? " corrigido" : "");
   const cab = `<div class="linha cab ${g}">` +
     colunasDe(estado.tipo).map(([rotulo, chave]) => {
       const ativa = chave && estado.ord === chave;
@@ -842,6 +863,7 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("f-unidade").classList.toggle("oculto", !ehItens);
     if (!ehItens) $("f-unidade").value = "";
     $("cx-conteudo").classList.toggle("oculto", !ehItens);
+    $("cx-corrigir").classList.toggle("oculto", !ehItens);
     // o filtro de origem só faz sentido havendo município de referência
     $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
     $("f-busca").placeholder = ehItens
@@ -853,6 +875,11 @@ document.querySelectorAll("nav.abas button").forEach(b =>
   }));
 $("f-conteudo").addEventListener("change", () => {
   porConteudo = $("f-conteudo").checked;
+  estado.pagina = 1;
+  carregarLista();
+});
+$("f-corrigir").addEventListener("change", () => {
+  corrigirIpca = $("f-corrigir").checked;
   estado.pagina = 1;
   carregarLista();
 });

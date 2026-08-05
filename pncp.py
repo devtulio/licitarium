@@ -234,6 +234,48 @@ def estimar_volume(codigo_ibge, inicio=DATA_INICIO_PNCP, fim=None):
             "minutos": minutos, "parcial": falhas > 0}
 
 
+# ── correção monetária ──────────────────────────────────────────────────────
+# Preço de 2022 não se compara com preço de 2026: no acervo do piloto há itens
+# de 2022 a 2026 na mesma pesquisa, e a inflação do período passa de 20%. A
+# série mensal do IPCA cabe em poucos KB e vem do Banco Central, que é fonte
+# citável no processo.
+SGS_IPCA = 433
+URL_SGS = ("https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados"
+           "?formato=json&dataInicial={inicio}")
+
+
+def sync_ipca(db, inicio=None):
+    """Baixa a variação mensal do IPCA e guarda mês a mês.
+
+    O índice do mês corrente não existe: o IBGE publica com semanas de
+    atraso e o BCB republica depois. O programa corrige até o último mês
+    disponível e diz até onde foi — melhor que projetar um número que
+    ninguém publicou.
+    """
+    inicio = inicio or f"01/01/{DATA_INICIO_PNCP.year}"
+    url = URL_SGS.format(serie=SGS_IPCA, inicio=inicio)
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            dados = json.loads(r.read().decode("utf-8"))
+    except (urllib.error.URLError, ValueError, TimeoutError) as e:
+        raise PncpErro(f"não consegui baixar o IPCA: {e}") from e
+    gravados = 0
+    for linha in dados:
+        try:
+            dia, mes, ano = linha["data"].split("/")
+            variacao = float(linha["valor"])
+        except (KeyError, ValueError):
+            continue          # linha estranha não derruba a série inteira
+        db.execute(
+            "INSERT INTO ipca (competencia, variacao) VALUES (?,?)"
+            " ON CONFLICT(competencia) DO UPDATE SET variacao=excluded.variacao",
+            (f"{ano}-{mes}", variacao))
+        gravados += 1
+    db.commit()
+    return gravados
+
+
 def _janelas(inicio, fim, max_dias=JANELA_MAX_DIAS):
     """Fatia [inicio, fim] em janelas de no máximo max_dias."""
     atual = inicio
@@ -611,6 +653,14 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
         # 1 dia de sobreposição: garante pegar registros atualizados no
         # exato dia da última sincronização (upsert torna a repetição inócua)
         return date.fromisoformat(ultimo) - timedelta(days=1)
+
+    # fase 0 — índice de correção monetária: leve (poucos KB) e usado pela
+    # aba Preços; falhar aqui não pode impedir a coleta do acervo
+    try:
+        resumo["ipca"] = sync_ipca(db)
+    except PncpErro as e:
+        _log(db, "ipca", hoje, hoje, 0, "erro", str(e))
+        resumo["ipca"] = None
 
     # fase 1 — contratações por município
     inicio = janela_de("contratacoes")
