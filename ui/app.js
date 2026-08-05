@@ -6,6 +6,12 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const brl = new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"});
 const dinheiro = v => v == null ? "–" : brl.format(v);
+// preço de unidade-base costuma ter centavos de centavo: R$ 0,0466 por folha
+const brlFino = new Intl.NumberFormat("pt-BR",
+  {style: "currency", currency: "BRL", minimumFractionDigits: 4,
+   maximumFractionDigits: 4});
+const dinheiroFino = v =>
+  v == null ? "–" : (v >= 1 ? brl.format(v) : brlFino.format(v));
 const dataBr = s => {
   if (!s) return "–";
   const d = String(s).slice(0, 10).split("-");
@@ -42,6 +48,8 @@ const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
                  ord:null, dir:"desc" };
 // há município de referência? decide se a aba Preços mostra a origem
 let temReferencia = false;
+// comparar por conteúdo muda a grade e o resumo inteiros
+let porConteudo = false;
 // itens que o usuário tirou da pesquisa de preços. Guarda os DESCARTADOS
 // (e não os escolhidos) para que item novo, vindo de uma sincronização ou
 // de outra página, entre marcado por padrão.
@@ -360,6 +368,11 @@ const COLUNAS = {
                  ["Qtde","quantidade"], ["Valor unitário","unitario"],
                  ["Fornecedor","fornecedor"], ["Município","municipio"],
                  ["Processo","origem"]],
+  // usada no lugar da anterior quando "comparar por conteúdo" está ligado
+  itensConteudo: [["",null], ["Descrição","descricao"], ["Unid.","unidade"],
+                 ["Qtde","quantidade"], ["Valor unitário","unitario"],
+                 ["Por conteúdo",null], ["Fornecedor","fornecedor"],
+                 ["Município","municipio"], ["Processo","origem"]],
 };
 
 // Sufixo societário não identifica ninguém e come metade da coluna:
@@ -464,6 +477,12 @@ function renderLinha(tipo, d) {
       <span class="dim">${esc(d.unidade ?? "–")}</span>
       <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
       <span class="num">${unit}</span>
+      ${porConteudo ? `<span class="num">${
+        d.por_conteudo
+          ? `${dinheiroFino(d.por_conteudo.valor)}
+             <span class="base">/${esc(d.por_conteudo.rotulo)}</span>`
+          : `<span class="dim" title="A embalagem não diz quanto vem dentro"
+              >–</span>`}</span>` : ""}
       <span class="dim" title="${esc(d.fornecedor_nome ?? "")}"
         >${esc(fornecedorCurto(d.fornecedor_nome))}</span>
       <span class="dim${d.referencia ? " de-fora" : ""}"
@@ -495,16 +514,29 @@ function leituraCv(cv) {
   return "amostra muito dispersa — confira se os itens são comparáveis";
 }
 
+// Quem fica de fora precisa aparecer: item cuja embalagem não diz o
+// conteúdo, ou que está em outra unidade-base (quilo no meio de folhas).
+function semConversaoHtml(s) {
+  if (!s.por_conteudo || !s.sem_conversao) return "";
+  const n = s.sem_conversao;
+  return `<div class="disp"><b>${n} ${n === 1 ? "item ficou" : "itens ficaram"}
+    de fora desta comparação</b> — ${n === 1 ? "a embalagem dele não diz" :
+    "as embalagens não dizem"} quanto vem dentro, ou ${
+    n === 1 ? "está" : "estão"} em outra unidade de medida. O resumo acima é
+    só do que dá para comparar por ${esc(s.rotulo_base)}.</div>`;
+}
+
 function dispersaoHtml(s) {
   if (s.desvio == null) return "";
+  const val = s.por_conteudo ? dinheiroFino : dinheiro;
   const quartis = s.q1 != null
-    ? `Metade dos preços entre <b>${dinheiro(s.q1)}</b> e
-       <b>${dinheiro(s.q3)}</b>. `
+    ? `Metade dos preços entre <b>${val(s.q1)}</b> e
+       <b>${val(s.q3)}</b>. `
     : "";
   const pct = (s.cv * 100).toLocaleString("pt-BR",
     {maximumFractionDigits: 0});
   return `<div class="disp">${quartis}Desvio padrão
-    <b>${dinheiro(s.desvio)}</b> · coeficiente de variação <b>${pct}%</b>
+    <b>${val(s.desvio)}</b> · coeficiente de variação <b>${pct}%</b>
     <span class="dim">(${leituraCv(s.cv)})</span>${
       s.q1 == null
         ? ` <span class="dim">— com ${s.n} ${s.n === 1 ? "preço" : "preços"}
@@ -519,8 +551,10 @@ function foraDaCurvaHtml(s) {
   if (!n) return "";
   return `<div class="fora">
     <span>${n === 1 ? "1 preço destoa" : `${n} preços destoam`} do conjunto
-      (fora de ${dinheiro(Math.max(0, s.limite_inf))} a
-      ${dinheiro(s.limite_sup)}, pelo critério de Tukey). Confira se são
+      (fora de ${(s.por_conteudo ? dinheiroFino : dinheiro)(
+          Math.max(0, s.limite_inf))} a
+      ${(s.por_conteudo ? dinheiroFino : dinheiro)(s.limite_sup)},
+      pelo critério de Tukey). Confira se são
       itens comparáveis antes de usar.</span>
     <button class="btn ghost" id="btn-descartar-fora">
       Descartar ${n === 1 ? "o item" : "os itens"}</button></div>`;
@@ -549,27 +583,40 @@ async function mostrarResumoPrecos() {
   const s = await api.estatisticas_preco(termo,
     $("f-ano").value ? +$("f-ano").value : null,
     $("f-so-meu").checked ? "proprio" : null,
-    [...precosDescartados.keys()]);
+    [...precosDescartados.keys()], porConteudo);
   if (!s) { caixa.classList.add("oculto"); return; }
+  if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
+    caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
+      <div class="disp">Nenhum dos ${s.sem_conversao} itens desta pesquisa diz
+        quanto vem na embalagem, então não há como compará-los por conteúdo.
+        Desligue a caixa para ver os preços como foram pagos.</div>`;
+    caixa.classList.remove("oculto");
+    return;
+  }
   const cel = (v, r, destaque) =>
     `<div class="cel${destaque ? " destaque" : ""}">
        <div class="v">${v}</div><div class="r">${r}</div></div>`;
+  // no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
+  const val = s.por_conteudo ? dinheiroFino : dinheiro;
+  // "mediana por unidade" no modo; fora dele, os rótulos de sempre
+  const rot = (curto, longo) => s.por_conteudo
+    ? `${curto} por ${esc(s.rotulo_base)}` : longo;
   // quem decide precisa saber quanto do resultado é da própria série
   const origem = s.referencia
     ? ` <small class="dim">— ${s.proprios} do seu município e ${s.referencia} de referência</small>`
     : "";
   caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"${origem}</h3>
     <div class="grade">
-      ${cel(dinheiro(s.minimo), "menor unitário")}
-      ${cel(dinheiro(s.mediana), "mediana", true)}
-      ${cel(dinheiro(s.media), "média")}
-      ${cel(dinheiro(s.maximo), "maior unitário")}
+      ${cel(val(s.minimo), rot("menor", "menor unitário"))}
+      ${cel(val(s.mediana), rot("mediana", "mediana"), true)}
+      ${cel(val(s.media), rot("média", "média"))}
+      ${cel(val(s.maximo), rot("maior", "maior unitário"))}
       ${cel(s.n, "itens homologados")}
       ${cel(s.fornecedores, "fornecedores")}
       <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
         Relatório de pesquisa de preços</button>
     </div>
-    ${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
+    ${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
   $("btn-descartar-fora")?.addEventListener("click", async () => {
@@ -594,12 +641,18 @@ function larguraAtualPx() {
   return getComputedStyle(cab).gridTemplateColumns.split(" ").map(parseFloat);
 }
 
+// A aba Preços tem dois conjuntos de colunas; o resto tem um só.
+function colunasDe(tipo) {
+  return (tipo === "itens" && porConteudo) ? COLUNAS.itensConteudo
+                                           : COLUNAS[tipo];
+}
+
 function aplicarLarguras(tipo) {
   const lista = $("lista");
   const mapa = larguras[tipo];
   if (!mapa) { lista.style.removeProperty("--cols"); return; }
   const flex = COL_FLEX[tipo];
-  const n = COLUNAS[tipo].length;
+  const n = colunasDe(tipo).length;
   // larguras guardadas antes de a aba ganhar (ou perder) uma coluna não
   // servem: faltando uma, o grid receberia "NaNpx" e quebraria a lista
   for (let i = 0; i < n; i++)
@@ -642,7 +695,7 @@ function ligarAlcas() {
   const tipo = estado.tipo;
   const flex = COL_FLEX[tipo];
   document.querySelectorAll(".lista .cab > span").forEach((cel, i) => {
-    if (i === flex || i === COLUNAS[tipo].length - 1) return;  // última não
+    if (i === flex || i === colunasDe(tipo).length - 1) return;  // última não
     const alca = document.createElement("span");
     alca.className = "alca";
     alca.title = "Arraste para ajustar · duplo clique para caber no conteúdo";
@@ -692,9 +745,10 @@ async function carregarLista() {
   mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
   estado.total = r.total;
-  const g = `g-${estado.tipo}`;
+  const g = `g-${estado.tipo}`
+    + (estado.tipo === "itens" && porConteudo ? " conteudo" : "");
   const cab = `<div class="linha cab ${g}">` +
-    COLUNAS[estado.tipo].map(([rotulo, chave]) => {
+    colunasDe(estado.tipo).map(([rotulo, chave]) => {
       const ativa = chave && estado.ord === chave;
       const seta = ativa ? `<span class="seta">${estado.dir === "asc" ? "▲" : "▼"}</span>` : "";
       const sort = chave ? ` data-ord="${chave}" role="button" tabindex="0"
@@ -787,6 +841,7 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("cx-homologados").classList.toggle("oculto", !ehItens);
     $("f-unidade").classList.toggle("oculto", !ehItens);
     if (!ehItens) $("f-unidade").value = "";
+    $("cx-conteudo").classList.toggle("oculto", !ehItens);
     // o filtro de origem só faz sentido havendo município de referência
     $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
     $("f-busca").placeholder = ehItens
@@ -796,6 +851,11 @@ document.querySelectorAll("nav.abas button").forEach(b =>
     $("f-vigentes").checked = false;
     carregarLista();
   }));
+$("f-conteudo").addEventListener("change", () => {
+  porConteudo = $("f-conteudo").checked;
+  estado.pagina = 1;
+  carregarLista();
+});
 ["f-propostas", "f-vigentes", "f-homologados", "f-so-meu"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 

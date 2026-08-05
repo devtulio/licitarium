@@ -26,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.7.0"
+VERSAO = "1.8.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -440,6 +440,29 @@ def _unidade_canonica(texto):
     return _CANONICA.get(sem_acento.upper().rstrip("."), limpo.capitalize())
 
 
+def _normalizar_por_conteudo(linhas):
+    """Troca o preço de embalagem pelo preço da unidade-base.
+
+    Comparar R$/quilo com R$/folha não quer dizer nada, então a série fica
+    com a base **mais frequente** do resultado; o que sobrou é contado e
+    dito ao usuário, em vez de sumir em silêncio.
+    """
+    convertidos = []
+    for r in linhas:
+        p = relatorios.preco_por_conteudo(r[1], r[2], r[3])
+        if p:
+            convertidos.append((r[0], p["valor"], p["base"]))
+    if not convertidos:
+        return [], None, len(linhas)
+    contagem = {}
+    for _, _, base in convertidos:
+        contagem[base] = contagem.get(base, 0) + 1
+    base = max(contagem, key=lambda b: (contagem[b], b))
+    serie = sorted(((i, v) for i, v, b in convertidos if b == base),
+                   key=lambda x: x[1])
+    return serie, base, len(linhas) - len(serie)
+
+
 def _blocos(ids, tamanho=400):
     """Fatia a lista de ids em blocos para o SQLite.
 
@@ -772,6 +795,11 @@ class Api:
                 d.pop("raw", None)  # listagem não precisa do JSON completo
                 if tipo == "itens":
                     d["municipio_nome"] = nomes.get(d.get("municipio_ibge"))
+                    # o que o item custa na unidade-base, quando o texto diz
+                    # quanto vem na embalagem
+                    d["por_conteudo"] = relatorios.preco_por_conteudo(
+                        d.get("valor_unitario_homologado"),
+                        d.get("descricao"), d.get("unidade"))
                 itens.append(d)
             return {"itens": itens, "total": total}
         finally:
@@ -869,9 +897,15 @@ class Api:
         return [{"id": k, "texto": v} for k, v in relatorios.MOTIVOS_DESCARTE.items()]
 
     def estatisticas_preco(self, busca, ano=None, origem=None,
-                           excluidos=None):
+                           excluidos=None, por_conteudo=False):
         """Resumo do valor unitário homologado para um termo — a resposta de
-        'quanto pagamos por isso?' que instrui a pesquisa de preços."""
+        'quanto pagamos por isso?' que instrui a pesquisa de preços.
+
+        Com `por_conteudo`, o resumo passa a ser sobre o preço da
+        unidade-base (R$/folha, R$/quilo): a caixa com 5.000 folhas e o
+        pacote com 100 deixam de entrar na mesma mediana como se fossem
+        comparáveis.
+        """
         if not (busca or "").strip():
             return None
         termo = _termo_fts(busca)
@@ -897,26 +931,41 @@ class Api:
         db = abrir_db()
         try:
             linhas = db.execute(
-                "SELECT id, valor_unitario_homologado FROM itens WHERE "
+                "SELECT id, valor_unitario_homologado, descricao, unidade"
+                " FROM itens WHERE "
                 + " AND ".join(where) + " ORDER BY 2", args).fetchall()
             if not linhas:
                 return None
+            base = None
+            if por_conteudo:
+                linhas, base, sem_conversao = _normalizar_por_conteudo(linhas)
+                if not linhas:
+                    return {"n": 0, "por_conteudo": True,
+                            "sem_conversao": sem_conversao}
             resumo = relatorios.resumo_estatistico(
                 [r[1] for r in linhas])
+            if por_conteudo:
+                resumo.update(por_conteudo=True, base=base,
+                              rotulo_base=relatorios.BASES[base][0],
+                              sem_conversao=sem_conversao)
             # itens fora do intervalo de Tukey: apontados, nunca removidos
             # sozinhos — descartar preço de pesquisa é decisão de quem assina
             if resumo.get("limite_sup") is not None:
                 resumo["fora_da_curva"] = [
                     r[0] for r in linhas
                     if r[1] < resumo["limite_inf"] or r[1] > resumo["limite_sup"]]
-            fornecedores = db.execute(
-                "SELECT COUNT(DISTINCT fornecedor_ni) FROM itens WHERE "
-                + " AND ".join(where), args).fetchone()[0]
-            # quanto do resultado é do próprio município: quem decide precisa
-            # saber se está olhando a própria série ou a de fora
-            proprios = db.execute(
-                "SELECT COUNT(*) FROM itens WHERE referencia=0 AND "
-                + " AND ".join(where), args).fetchone()[0]
+            # contagens sobre a mesma série que virou resumo: no modo por
+            # conteúdo, os itens sem conversão não entraram
+            ids = [r[0] for r in linhas]
+            fornecedores, proprios = 0, 0
+            for grupo in _blocos(ids):
+                marcas = ",".join("?" * len(grupo))
+                fornecedores += db.execute(
+                    f"SELECT COUNT(DISTINCT fornecedor_ni) FROM itens"
+                    f" WHERE id IN ({marcas})", grupo).fetchone()[0]
+                proprios += db.execute(
+                    f"SELECT COUNT(*) FROM itens WHERE referencia=0"
+                    f" AND id IN ({marcas})", grupo).fetchone()[0]
             resumo.update(fornecedores=fornecedores, proprios=proprios,
                           referencia=resumo["n"] - proprios)
             return resumo

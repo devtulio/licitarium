@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.8.0 — 2026-08-05
+
+**Comparar por conteúdo**
+
+- Nova caixa **Comparar por conteúdo** na aba Preços. Ligada, o resumo inteiro
+  passa a ser por **unidade-base** (R$/folha, R$/quilo, R$/litro, R$/metro) e a
+  lista ganha a coluna correspondente.
+- Resolve a distorção da embalagem: a caixa de papel A4 com 5.000 folhas a
+  R$ 232,80 custa **R$ 0,0466 por folha**, enquanto o pacote com 100 folhas a
+  R$ 38,90 custa **R$ 0,3890** — 8,4 vezes mais caro. Os dois entravam na
+  mesma mediana como se fossem comparáveis.
+- O conteúdo é lido do que o órgão publicou, no campo de unidade
+  (*Embalagem 1,00 KG*) ou na descrição quando ela declara a embalagem
+  (*C/5000 FLS*, *CAIXA COM 100 UNIDADES*).
+- **O programa prefere não converter a converter errado.** Gramatura
+  (*75G/M²*), dimensão (*210MM X 297MM*) e capacidade de artefato
+  (*SERINGA 10ML*) não viram conteúdo — nesses casos a coluna fica com um
+  traço. Metade dos testes desta versão existe para garantir isso.
+- Comparar R$/quilo com R$/folha não diria nada: a comparação usa a
+  unidade-base mais frequente e informa **quantos itens ficaram de fora**.
+- O relatório em PDF acompanha o modo, com a coluna nova, os valores em
+  unidade-base e a declaração de quantos preços não entraram na comparação.
+
 ## 1.7.0 — 2026-08-05
 
 **A razão de cada preço descartado, gravada e impressa**

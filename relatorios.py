@@ -7,6 +7,7 @@ import csv
 import html
 import json
 import re
+import unicodedata
 from datetime import date, datetime
 
 # fonte da verdade da arte: design/estandarte-t3.svg
@@ -63,6 +64,16 @@ def moeda(v):
     if v is None:
         return "–"
     inteiro, decimal = f"{v:,.2f}".split(".")
+    return "R$ " + inteiro.replace(",", ".") + "," + decimal
+
+
+def moeda_fina(v):
+    """Preço de unidade-base tem centavo de centavo: R$ 0,0466 por folha."""
+    if v is None:
+        return "–"
+    if v >= 1:
+        return moeda(v)
+    inteiro, decimal = f"{v:,.4f}".split(".")
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
 
 
@@ -266,6 +277,113 @@ def _blocos(ids, tamanho=400):
     return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
 
 
+# ── quanto vem dentro da embalagem ──────────────────────────────────────────
+# Preço de embalagem não se compara: no acervo do piloto, a caixa de papel A4
+# com 5.000 folhas sai a R$ 0,047 por folha e o pacote com 100 folhas, a
+# R$ 0,389 — oito vezes mais caro, e os dois entram na mesma mediana. O
+# conteúdo está escrito no texto ("CAIXA C/5000 FLS", "Embalagem 1,00 KG"),
+# então dá para ler e converter.
+#
+# O risco aqui é o falso positivo: "PAPEL A4 75G/M2" tem um número seguido de
+# "G" que não é peso, e "210MM X 297MM" é dimensão. Por isso a leitura recusa
+# gramatura, dimensão e tudo que não case com um padrão explícito.
+
+BASES = {
+    "un": ("unidade", 1.0),
+    "kg": ("quilo", 1.0),
+    "l": ("litro", 1.0),
+    "m": ("metro", 1.0),
+}
+
+# fator para a unidade-base de cada família
+_MEDIDAS = {
+    "MG": ("kg", 1e-6), "G": ("kg", 1e-3), "GR": ("kg", 1e-3),
+    "GRAMA": ("kg", 1e-3), "GRAMAS": ("kg", 1e-3),
+    "KG": ("kg", 1.0), "QUILO": ("kg", 1.0), "QUILOS": ("kg", 1.0),
+    "KILO": ("kg", 1.0), "QUILOGRAMA": ("kg", 1.0),
+    "ML": ("l", 1e-3), "MILILITRO": ("l", 1e-3), "MILILITROS": ("l", 1e-3),
+    "CL": ("l", 1e-2), "L": ("l", 1.0), "LT": ("l", 1.0),
+    "LITRO": ("l", 1.0), "LITROS": ("l", 1.0),
+    "MM": ("m", 1e-3), "CM": ("m", 1e-2), "M": ("m", 1.0),
+    "MT": ("m", 1.0), "METRO": ("m", 1.0), "METROS": ("m", 1.0),
+}
+# o que se conta, não se mede
+_CONTAGEM = {"FL", "FLS", "FOLHA", "FOLHAS", "UN", "UND", "UNID", "UNIDADE",
+             "UNIDADES", "PC", "PCS", "PECA", "PECAS", "CP", "COMP",
+             "COMPRIMIDO", "COMPRIMIDOS", "CAPSULA", "CAPSULAS", "CAPS",
+             "ENVELOPE", "ENVELOPES", "SACHE", "SACHES", "AMPOLA", "AMPOLAS"}
+
+_NUM = r"(\d{1,3}(?:\.\d{3})+|\d+(?:[.,]\d+)?)"
+# No campo unidade o texto já descreve a embalagem: "Embalagem 1,00 KG",
+# "Pacote 400,00 G", "Frasco 10,00 ML".
+_NA_UNIDADE = re.compile(rf"{_NUM}\s*([A-Z]+)")
+# Na descrição a medida solta engana: em "SERINGA 10ML" o volume é a
+# capacidade da seringa, não o que se comprou — comparar seringas por
+# R$/litro não quer dizer nada. Só vale com marcador de embalagem.
+_NA_DESCRICAO = re.compile(
+    rf"(?:C\s*/\s*|COM\s+|CONTENDO\s+|CAIXA\s+COM\s+|PACOTE\s+COM\s+|"
+    rf"FARDO\s+COM\s+|EMBALAGEM\s+COM\s+){_NUM}\s*([A-Z]+)")
+# gramatura e dimensão têm cara de medida e não são conteúdo nenhum
+_GRAMATURA = re.compile(rf"{_NUM}\s*(?:G|GR)\s*/\s*M", re.I)
+_DIMENSAO = re.compile(rf"{_NUM}\s*(MM|CM|M)\s*(?:X|POR)\s*{_NUM}", re.I)
+
+
+def _sem_acento(texto):
+    return (unicodedata.normalize("NFD", texto or "")
+            .encode("ascii", "ignore").decode().upper())
+
+
+def _numero(bruto):
+    """"1.000" é mil; "1,00" e "1.00" são um. O PNCP escreve dos dois jeitos."""
+    limpo = bruto.replace(".", "") if re.fullmatch(r"\d{1,3}(\.\d{3})+", bruto) \
+        else bruto.replace(",", ".")
+    try:
+        return float(limpo)
+    except ValueError:
+        return None
+
+
+def conteudo(descricao, unidade):
+    """Quanto a embalagem contém, na unidade-base da família.
+
+    Devolve `(quantidade, base)` — por exemplo `(5000.0, "un")` para uma caixa
+    com 5.000 folhas e `(0.4, "kg")` para um pacote de 400 g — ou `None`
+    quando o texto não diz de forma inequívoca.
+    """
+    return (_ler_conteudo(_sem_acento(unidade), _NA_UNIDADE)
+            or _ler_conteudo(_sem_acento(descricao), _NA_DESCRICAO))
+
+
+def _ler_conteudo(texto, padrao):
+    if not texto:
+        return None
+    # tira da frente o que engana antes de procurar quantidade
+    texto = _GRAMATURA.sub(" ", _DIMENSAO.sub(" ", texto))
+    for bruto, palavra in padrao.findall(texto):
+        quantidade = _numero(bruto)
+        if not quantidade or quantidade <= 0:
+            continue
+        if palavra in _CONTAGEM:
+            return quantidade, "un"
+        medida = _MEDIDAS.get(palavra)
+        if medida:
+            base, fator = medida
+            return quantidade * fator, base
+    return None
+
+
+def preco_por_conteudo(valor, descricao, unidade):
+    """Preço na unidade-base: R$/folha, R$/kg, R$/litro, R$/metro."""
+    if valor is None:
+        return None
+    lido = conteudo(descricao, unidade)
+    if not lido:
+        return None
+    quantidade, base = lido
+    return {"valor": valor / quantidade, "base": base,
+            "conteudo": quantidade, "rotulo": BASES[base][0]}
+
+
 # Motivos típicos de desconsideração numa pesquisa de preços. A lista existe
 # para o documento sair com linguagem uniforme; "outro" abre texto livre.
 MOTIVOS_DESCARTE = {
@@ -339,7 +457,8 @@ def resumo_estatistico(valores):
     return r
 
 
-def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
+def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
+                 por_conteudo=False):
     """Histórico de preços unitários homologados para um termo de busca.
 
     Os itens desconsiderados saem do cálculo mas não do documento: eles
@@ -394,10 +513,34 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
         nomes[proprio[0]] = nome_proprio[0] if nome_proprio else proprio[0]
     for l in linhas:
         l["municipio_nome"] = nomes.get(l["municipio_ibge"]) or "–"
-    valores = [l["valor_unitario_homologado"] for l in linhas]
+    for l in linhas:
+        l["por_conteudo"] = preco_por_conteudo(
+            l["valor_unitario_homologado"], l["descricao"], l["unidade"])
+    base = None
+    if por_conteudo:
+        # comparar R$/quilo com R$/folha não diz nada: a série fica com a
+        # base predominante e o documento declara quantos ficaram de fora
+        contagem = {}
+        for l in linhas:
+            if l["por_conteudo"]:
+                b = l["por_conteudo"]["base"]
+                contagem[b] = contagem.get(b, 0) + 1
+        base = max(contagem, key=lambda b: (contagem[b], b)) if contagem else None
+        comparaveis = [l for l in linhas
+                       if l["por_conteudo"] and l["por_conteudo"]["base"] == base]
+        fora_da_comparacao = len(linhas) - len(comparaveis)
+        linhas = sorted(comparaveis, key=lambda l: l["por_conteudo"]["valor"])
+        valores = [l["por_conteudo"]["valor"] for l in linhas]
+    else:
+        valores = [l["valor_unitario_homologado"] for l in linhas]
+        fora_da_comparacao = 0
     resumo = resumo_estatistico(valores)
     if resumo:
         resumo["fornecedores"] = len({l["fornecedor_ni"] for l in linhas})
+        if por_conteudo and base:
+            resumo.update(por_conteudo=True, base=base,
+                          rotulo_base=BASES[base][0],
+                          sem_conversao=fora_da_comparacao)
     # os desconsiderados vão ao documento com a razão de cada um — sem isso,
     # quem confere não tem como saber que a série foi filtrada
     desconsiderados = []
@@ -411,7 +554,8 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
         l["motivo"] = rotulo_motivo(motivos.get(l["id"]))
     desconsiderados.sort(key=lambda l: l["valor_unitario_homologado"] or 0)
     return {"termo": (termo or "").strip(), "linhas": linhas, "resumo": resumo,
-            "desconsiderados": desconsiderados, "ano": ano}
+            "desconsiderados": desconsiderados, "ano": ano,
+            "por_conteudo": bool(por_conteudo and base)}
 
 
 # ── render ──────────────────────────────────────────────────────────────────
@@ -759,11 +903,16 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
                  f'para <b>{_e(d["termo"])}</b> no acervo local.</div>')
         return _pagina(f"{TITULOS['precos']} — {_e(d['termo'])}", corpo,
                        municipio, uf, periodo, paisagem=True, tema=tema)
+    # no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
+    val = moeda_fina if d.get("por_conteudo") else moeda
+    # "mediana por unidade" no modo por conteúdo; fora dele, os de sempre
+    base = f" por {r['rotulo_base']}" if d.get("por_conteudo") else ""
+    unit = base or " unitário"
     cards = f"""<div class="cards">
-<div class="card"><div class="n">{moeda(r['minimo'])}</div><div class="l">menor unitário</div></div>
-<div class="card"><div class="n">{moeda(r['mediana'])}</div><div class="l">mediana</div></div>
-<div class="card"><div class="n">{moeda(r['media'])}</div><div class="l">média</div></div>
-<div class="card"><div class="n">{moeda(r['maximo'])}</div><div class="l">maior unitário</div></div>
+<div class="card"><div class="n">{val(r['minimo'])}</div><div class="l">menor{unit}</div></div>
+<div class="card"><div class="n">{val(r['mediana'])}</div><div class="l">mediana{base}</div></div>
+<div class="card"><div class="n">{val(r['media'])}</div><div class="l">média{base}</div></div>
+<div class="card"><div class="n">{val(r['maximo'])}</div><div class="l">maior{unit}</div></div>
 <div class="card"><div class="n">{r['n']}</div><div class="l">itens</div></div>
 <div class="card"><div class="n">{r['fornecedores']}</div><div class="l">fornecedores</div></div>
 </div>"""
@@ -776,11 +925,14 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
             f'<p class="disp">{faixa}Desvio padrão <b>{moeda(r["desvio"])}</b>'
             f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
             f' ({_LEITURA_CV(r["cv"])}).</p>')
+    coluna_conteudo = d.get("por_conteudo")
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
       <td class="num">{l['quantidade_homologada'] or '–'}</td>
-      <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
+      <td class="num">{moeda(l['valor_unitario_homologado'])}</td>{
+        f'<td class="num">{moeda_fina(l["por_conteudo"]["valor"])}</td>'
+        if coluna_conteudo else ''}
       <td class="num">{moeda(l['valor_total_homologado'])}</td>
       <td class="forn">{_e(l['fornecedor_nome'])}</td>
       <td class="muni">{_e(l['municipio_nome'])}</td>
@@ -793,11 +945,18 @@ preços do art. 23 da Lei 14.133/2021 (que admite contratações similares de
 outros entes como parâmetro). Confira a aderência de especificação, unidade e
 quantidade de cada item antes de usar como referência.
 Termo pesquisado: <b>{_e(d['termo'])}</b>.
-O número do processo leva à página oficial no PNCP, para conferência.</div>
+O número do processo leva à página oficial no PNCP, para conferência.{
+  f'<br><b>Comparação por conteúdo:</b> os valores em destaque são por '
+  f'{r["rotulo_base"]}, calculados a partir do que cada embalagem declara '
+  f'conter. ' + (f'{r["sem_conversao"]} item(ns) coletado(s) não '
+  'entrou nesta comparação por não declarar o conteúdo ou estar em outra '
+  'unidade de medida.' if r.get("sem_conversao") else '')
+  if coluna_conteudo else ''}</div>
 {cards}
 <h2>Itens homologados, do menor para o maior preço unitário</h2>
 <table><thead><tr><th>Descrição</th><th class="unid">Unid.</th>
-<th class="num">Qtde</th><th class="num">Unitário</th>
+<th class="num">Qtde</th><th class="num">Unitário</th>{
+  f'<th class="num">Por {r["rotulo_base"]}</th>' if coluna_conteudo else ''}
 <th class="num">Total</th><th class="forn">Fornecedor</th>
 <th class="muni">Município</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
@@ -904,7 +1063,9 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         termo = (params.get("termo") or "").strip()
         if not termo:
             raise ValueError("informe o que pesquisar")
-        d = dados_precos(db, termo, ano, orgao, params.get("excluidos"))
+        d = dados_precos(db, termo, ano, orgao,
+                         params.get("excluidos"),
+                         params.get("por_conteudo"))
         conteudo = render_precos(d, municipio, uf, tema)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"

@@ -74,6 +74,11 @@ oferece o descarte, mas desprezar preço coletado é decisão de quem assina.
 O filtro por **unidade de medida** agrupa as grafias do portal — *CX*, *Caixa*
 e *CAIXAS* são uma opção só.
 
+**Comparar por conteúdo** desfaz a distorção da embalagem: a caixa de papel A4
+com 5.000 folhas sai a R$ 0,0466 por folha e o pacote com 100, a R$ 0,3890 —
+8,4 vezes mais caro. O conteúdo é lido do que o órgão publicou, e gramatura,
+dimensão ou capacidade de artefato não são confundidas com conteúdo.
+
 Preço descartado sai do cálculo **com a razão registrada**: o relatório traz a
 seção *Itens desconsiderados nesta pesquisa*, com o motivo de cada um, e marca
 o que ficou sem justificativa. Os descartes ficam gravados por termo, então a

@@ -65,6 +65,8 @@ const DADOS = {
       numero_item: 1, descricao: "PAPEL SULFITE A4 75G RESMA 500 FOLHAS",
       unidade: "RESMA", quantidade: 300, quantidade_homologada: 300,
       valor_unitario_estimado: 24.9, valor_unitario_homologado: 18.75,
+      por_conteudo: { valor: 0.0375, base: "un", conteudo: 500,
+                      rotulo: "unidade" },
       fornecedor_nome: "PAPELARIA CENTRAL LTDA",
       data_resultado: "2025-11-28" ,
       municipio_ibge: "3534203", municipio_nome: "Orindiúva" },
@@ -156,10 +158,19 @@ function scriptPonte(temaBanco = "portal") {
           itens = itens.filter(i => !filtros.excluidos.includes(String(i.id)));
         return { itens, total: itens.length };
       },
-      estatisticas_preco: async (busca, ano, origem, excluidos) => {
+      estatisticas_preco: async (busca, ano, origem, excluidos,
+                                 porConteudo) => {
         window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano,
-                                 origem, excluidos });
+                                 origem, excluidos, porConteudo });
         if (!/papel/i.test(busca || "")) return null;
+        if (porConteudo) return window.__semConteudo
+          ? { n: 0, por_conteudo: true, sem_conversao: 4 }
+          : { n: 3, minimo: 0.0375, maximo: 0.389, media: 0.158,
+              mediana: 0.0466, fornecedores: 2, desvio: 0.19, cv: 1.2,
+              q1: 0.042, q3: 0.21, limite_inf: -0.21, limite_sup: 0.46,
+              fora_da_curva: [], proprios: 2, referencia: 1,
+              por_conteudo: true, base: "un", rotulo_base: "unidade",
+              sem_conversao: 2 };
         const fora = (excluidos || []).includes("X-3#10") ? []
                                                 : ["X-3#10"];
         return { n: 7, minimo: 15.4, maximo: 249.8, media: 53.63,

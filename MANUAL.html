@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.7.0</title>
+<title>Manual Operacional — Licitarium v1.8.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.7.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.8.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.7.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.8.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.7.0.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.8.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -343,6 +343,39 @@ relatório ao processo.</p>
 <p>A escolha <b>fica gravada por pesquisa</b>: voltar a buscar o mesmo termo
 amanhã traz de volta os descartes e as justificativas, e o relatório gerado
 depois sai igual ao que você viu na tela.</p>
+
+<h3>Comparar por conteúdo</h3>
+<p>Preço de embalagem não se compara. Uma caixa de papel A4 com 5.000 folhas a
+R$ 232,80 custa <b>R$ 0,0466 por folha</b>; um pacote com 100 folhas a
+R$ 38,90 custa <b>R$ 0,3890 por folha</b> — oito vezes mais caro, embora o
+número menor pareça mais barato.</p>
+<p>A caixa <b>Comparar por conteúdo</b>, na aba Preços, resolve isso: ligada,
+todo o resumo (menor, mediana, média, dispersão, fora da curva) passa a ser
+por <b>unidade-base</b>, e a lista ganha a coluna <b>Por conteúdo</b>.
+Desligada, tudo volta ao preço como foi pago.</p>
+<table>
+  <tr><th>O que o texto diz</th><th>Unidade-base</th></tr>
+  <tr><td>folhas, unidades, comprimidos, ampolas…</td><td>por unidade</td></tr>
+  <tr><td>gramas e quilos</td><td>por quilo</td></tr>
+  <tr><td>mililitros e litros</td><td>por litro</td></tr>
+  <tr><td>milímetros, centímetros e metros</td><td>por metro</td></tr>
+</table>
+<p>O conteúdo é lido do que o órgão publicou: do campo de unidade
+(<i>Embalagem 1,00 KG</i>, <i>Pacote 400,00 G</i>) ou da descrição, quando ela
+declara a embalagem (<i>C/5000 FLS</i>, <i>CAIXA COM 100 UNIDADES</i>).</p>
+<div class="caixa"><b>O programa prefere não converter a converter errado.</b>
+Em <i>PAPEL A4 75G/M²</i> o número é a gramatura, não o peso comprado; em
+<i>210MM X 297MM</i> é a dimensão da folha; em <i>SERINGA 10ML</i> é a
+capacidade da seringa, e comparar seringas por R$/litro não significa nada.
+Nesses casos a coluna fica com um traço.</p>
+<p>Como comparar R$/quilo com R$/folha não diria nada, a comparação usa a
+<b>unidade-base mais frequente</b> do resultado e informa quantos itens
+ficaram de fora — por não declarar conteúdo ou por estar em outra medida. Se
+nenhum item da pesquisa declarar o conteúdo, o programa diz isso, em vez de
+mostrar um resumo vazio.</p>
+<p>O <b>relatório</b> acompanha: com a caixa ligada, ele sai com a coluna por
+conteúdo, os valores em destaque na unidade-base e a informação de quantos
+preços coletados ficaram fora da comparação.</p>
 
 <h3>Filtrar por unidade de medida</h3>
 <p>Cada órgão digita a unidade como quer: <i>CX</i>, <i>Caixa</i> e
