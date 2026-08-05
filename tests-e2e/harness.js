@@ -141,7 +141,10 @@ function scriptPonte(temaBanco = "portal") {
         modalidades: [{ id: 8, nome: "Dispensa" },
                       { id: 6, nome: "Pregão - Eletrônico" }],
         orgaos: [{ cnpj: "45148970000177", nome: "MUNICIPIO DE ORINDIUVA" },
-                 { cnpj: "51351716000174", nome: "ORINDIUVA CAMARA MUNICIPAL" }] }),
+                 { cnpj: "51351716000174", nome: "ORINDIUVA CAMARA MUNICIPAL" }],
+        // já agrupadas pelo backend: "CX" e "Caixa" chegam como uma opção só
+        unidades: [{ nome: "Unidade", n: 12 }, { nome: "Caixa", n: 4 },
+                   { nome: "Serviço", n: 1 }] }),
       listar: async (tipo, filtros, pagina) => {
         window.__chamadas.push({ metodo: "listar", tipo, filtros, pagina });
         let itens = DADOS[tipo] || [];
@@ -157,8 +160,12 @@ function scriptPonte(temaBanco = "portal") {
         window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano,
                                  origem, excluidos });
         if (!/papel/i.test(busca || "")) return null;
-        return { n: 3, minimo: 15.4, maximo: 24.9, media: 19.68,
+        const fora = (excluidos || []).includes("X-3#10") ? []
+                                                : ["X-3#10"];
+        return { n: 7, minimo: 15.4, maximo: 249.8, media: 53.63,
                  mediana: 18.75, fornecedores: 2,
+                 desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
+                 limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,
                  proprios: 2, referencia: 1 };
       },
       detalhe: async (tipo, nc) =>

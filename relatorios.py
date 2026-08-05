@@ -266,6 +266,55 @@ def _blocos(ids, tamanho=400):
     return [ids[i:i + tamanho] for i in range(0, len(ids), tamanho)]
 
 
+def _quantil(ordenados, p):
+    """Quantil por interpolação linear (o método de `numpy.percentile`)."""
+    if not ordenados:
+        return None
+    pos = (len(ordenados) - 1) * p
+    baixo = int(pos)
+    alto = min(baixo + 1, len(ordenados) - 1)
+    return (ordenados[baixo]
+            + (ordenados[alto] - ordenados[baixo]) * (pos - baixo))
+
+
+# Abaixo disso, quartil não descreve distribuição nenhuma: com quatro preços,
+# Q1 e Q3 são praticamente o menor e o maior, e "fora da curva" viraria
+# opinião. A pesquisa de preços continua válida — só não ganha a análise.
+MINIMO_PARA_DISPERSAO = 5
+
+
+def resumo_estatistico(valores):
+    """Descreve a série de preços: centro, dispersão e o que destoa.
+
+    Média e mediana andam juntas de propósito — a distância entre as duas é
+    o que denuncia a série puxada por um extremo. A dispersão é medida em
+    desvio padrão e em coeficiente de variação (desvio sobre média), que
+    permite comparar a variação de itens de preços muito diferentes.
+
+    O corte de itens atípicos é o de Tukey (1,5 vez a amplitude
+    interquartil), robusto a assimetria — o preço unitário de compra pública
+    quase nunca é simétrico. Nada é removido aqui: a função só aponta, e
+    quem decide descartar é quem assina a pesquisa.
+    """
+    if not valores:
+        return None
+    v = sorted(valores)
+    n = len(v)
+    media = sum(v) / n
+    r = {"n": n, "minimo": v[0], "maximo": v[-1], "media": media,
+         "mediana": _quantil(v, 0.5), "amplitude": v[-1] - v[0]}
+    if n >= 2:
+        variancia = sum((x - media) ** 2 for x in v) / (n - 1)
+        r["desvio"] = variancia ** 0.5
+        r["cv"] = r["desvio"] / media if media else None
+    if n >= MINIMO_PARA_DISPERSAO:
+        q1, q3 = _quantil(v, 0.25), _quantil(v, 0.75)
+        iqr = q3 - q1
+        r.update(q1=q1, q3=q3, iqr=iqr,
+                 limite_inf=q1 - 1.5 * iqr, limite_sup=q3 + 1.5 * iqr)
+    return r
+
+
 def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
     """Histórico de preços unitários homologados para um termo de busca."""
     where = ["valor_unitario_homologado IS NOT NULL"]
@@ -310,17 +359,9 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None):
     for l in linhas:
         l["municipio_nome"] = nomes.get(l["municipio_ibge"]) or "–"
     valores = [l["valor_unitario_homologado"] for l in linhas]
-    resumo = None
-    if valores:
-        n = len(valores)
-        meio = n // 2
-        resumo = {
-            "n": n, "minimo": valores[0], "maximo": valores[-1],
-            "media": sum(valores) / n,
-            "mediana": valores[meio] if n % 2
-                       else (valores[meio - 1] + valores[meio]) / 2,
-            "fornecedores": len({l["fornecedor_ni"] for l in linhas}),
-        }
+    resumo = resumo_estatistico(valores)
+    if resumo:
+        resumo["fornecedores"] = len({l["fornecedor_ni"] for l in linhas})
     return {"termo": (termo or "").strip(), "linhas": linhas, "resumo": resumo,
             "ano": ano}
 
@@ -401,6 +442,10 @@ def _css(paisagem, tema="pergaminho"):
   td.proc a {{ color:var(--acento); text-decoration:none;
                border-bottom:1px dotted var(--acento); }}
   .cards {{ display:flex; gap:10px; margin-bottom:6px; }}
+  /* dispersão da série: leitura de apoio aos números em destaque */
+  p.disp {{ margin:0 0 6px; font-size:10.5px; color:var(--suave);
+            break-inside:avoid; }}
+  p.disp b {{ color:var(--texto); }}
   .card {{ background:var(--superficie); border:1px solid var(--borda);
            border-radius:3px;
            padding:10px 12px; break-inside:avoid; flex:1 1 auto; }}
@@ -602,6 +647,17 @@ pela <b>{est}</b> dos valores homologados.</div>
                    paisagem=True, tema=tema)
 
 
+def _LEITURA_CV(cv):
+    """Mesma leitura da tela — o documento não pode discordar dela."""
+    if cv < 0.15:
+        return "preços homogêneos"
+    if cv < 0.25:
+        return "variação moderada"
+    if cv < 0.50:
+        return "amostra dispersa; a mediana representa melhor o conjunto"
+    return "amostra muito dispersa; confira a comparabilidade dos itens"
+
+
 def render_precos(d, municipio, uf, tema="pergaminho"):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
@@ -618,6 +674,15 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
 <div class="card"><div class="n">{r['n']}</div><div class="l">itens</div></div>
 <div class="card"><div class="n">{r['fornecedores']}</div><div class="l">fornecedores</div></div>
 </div>"""
+    # dispersão no documento: quem confere a pesquisa precisa saber se a
+    # média descreve o conjunto ou se foi puxada por um extremo
+    if r.get("desvio") is not None:
+        faixa = (f"Metade dos preços está entre <b>{moeda(r['q1'])}</b> e "
+                 f"<b>{moeda(r['q3'])}</b>. " if r.get("q1") is not None else "")
+        cards += (
+            f'<p class="disp">{faixa}Desvio padrão <b>{moeda(r["desvio"])}</b>'
+            f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
+            f' ({_LEITURA_CV(r["cv"])}).</p>')
     def _processo(l):
         texto = f"{_e(l['sequencial'])}/{_e(l['ano'])}"
         url = url_pncp(l.get("orgao_cnpj"), l.get("ano"), l.get("sequencial"))

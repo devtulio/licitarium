@@ -66,6 +66,14 @@ Para cada termo: **menor preço, mediana, média, maior preço**, quantos itens 
 quantos fornecedores — subsídio direto à pesquisa de preços do **art. 23 da Lei
 14.133/2021**, com a origem de cada valor rastreável até o processo no PNCP.
 
+A série vem descrita: **faixa central, desvio padrão e coeficiente de
+variação**, com a leitura escrita ao lado — acima de 50% de variação, a amostra
+provavelmente mistura itens não comparáveis. Preço que destoa é **apontado pelo
+critério de Tukey**, nunca removido sozinho: o programa mostra a faixa normal e
+oferece o descarte, mas desprezar preço coletado é decisão de quem assina.
+O filtro por **unidade de medida** agrupa as grafias do portal — *CX*, *Caixa*
+e *CAIXAS* são uma opção só.
+
 **Municípios de referência.** Um município pequeno compra pouco e compra
 variado — no acervo do piloto, 98% das descrições aparecem uma única vez, e
 mediana sobre um preço só não sustenta pesquisa. Por isso é possível indicar

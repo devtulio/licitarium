@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.4.3</title>
+<title>Manual Operacional — Licitarium v1.5.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.4.3 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.5.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.4.3</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.5.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.4.3.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.5.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -286,6 +286,36 @@ com esse levantamento, do menor para o maior preço unitário — subsídio para
 pesquisa de preços do art. 23 da Lei 14.133/2021. A caixa <b>Só com preço
 fechado</b> (ligada por padrão) esconde itens que ainda não têm resultado
 homologado.</p>
+<h3>Análise da série de preços</h3>
+<p>Abaixo dos valores em destaque o programa descreve como os preços se
+distribuem: a <b>faixa central</b> (metade dos preços fica entre esses dois
+valores), o <b>desvio padrão</b> e o <b>coeficiente de variação</b> — quanto a
+série varia em relação à própria média —, com a leitura escrita ao lado.</p>
+<table>
+  <tr><td><b>Até 15%</b></td><td>preços homogêneos</td></tr>
+  <tr><td><b>15% a 25%</b></td><td>variação moderada</td></tr>
+  <tr><td><b>25% a 50%</b></td><td>amostra dispersa — a mediana representa
+      melhor o conjunto que a média</td></tr>
+  <tr><td><b>Acima de 50%</b></td><td>amostra muito dispersa — provavelmente
+      há itens não comparáveis na lista</td></tr>
+</table>
+<p>Média e mediana aparecem sempre juntas de propósito: a distância entre as
+duas é o que denuncia a série puxada por um extremo. Desvio e coeficiente de
+variação também saem impressos no relatório.</p>
+<h3>Preços fora da curva</h3>
+<p>Quando um preço destoa do conjunto, um aviso aparece indicando quantos são
+e qual a faixa considerada normal. O critério é o de <b>Tukey</b>: fica fora
+quem está a mais de uma vez e meia a faixa central de distância dela. É um
+critério robusto para preços, que raramente se distribuem de forma
+simétrica.</p>
+<div class="caixa"><b>O programa aponta, você decide.</b> Nada é descartado
+automaticamente. O botão do aviso desmarca os itens de uma vez, mas eles
+continuam na lista para você conferir e reverter — desprezar um preço
+coletado é decisão de quem assina a pesquisa, e precisa de justificativa.</div>
+<p>Com <b>menos de cinco preços</b> a análise se cala: nesse tamanho a faixa
+central seria praticamente o menor e o maior valor, e apontar um deles como
+fora da curva seria opinião com aparência de estatística. A pesquisa continua
+válida — só não ganha essa camada.</p>
 <h3>Escolher quais preços entram</h3>
 <p>Cada linha da lista tem uma <b>caixa de seleção</b>, marcada por padrão.
 Desmarque o que não for comparável e o resumo se refaz na hora — o item some
@@ -300,9 +330,21 @@ para R$ 33,90.</p>
 <b>Restaurar todos</b>. A escolha vale para a pesquisa em curso: ao trocar o
 termo, tudo volta a ficar marcado.</p>
 
+<h3>Filtrar por unidade de medida</h3>
+<p>Cada órgão digita a unidade como quer: <i>CX</i>, <i>Caixa</i> e
+<i>CAIXAS</i> são a mesma coisa, e no acervo do piloto existem 566 grafias
+distintas. O filtro <b>Todas as unidades</b>, na aba Preços, já vem com essas
+variações <b>agrupadas</b> — escolher <i>Caixa</i> traz os itens em caixa
+independentemente de como o órgão escreveu. O número entre parênteses é a
+quantidade de itens em cada unidade, e a lista começa pelas mais comuns.</p>
+<p>A coluna da lista continua mostrando o texto original publicado no PNCP: o
+agrupamento serve para filtrar, não substitui o dado da fonte. Unidade que não
+esteja na lista de equivalências aparece como foi publicada.</p>
 <div class="caixa"><b>Confira a aderência.</b> Preço só é comparável entre
 itens equivalentes: verifique especificação, unidade de medida e quantidade
-antes de usar um valor do histórico como referência.</div>
+antes de usar um valor do histórico como referência. Atenção à embalagem —
+uma caixa com 5.000 folhas e um pacote com 100 são preços que não se
+comparam diretamente.</div>
 <p>Filtre por <b>ano</b>, <b>modalidade</b>, <b>situação</b> ou digite qualquer
 termo na <b>busca</b> (procura no objeto e no número de controle). Nas
 contratações e no PCA, o ano usado é o <b>ano do processo/plano</b> (ex.: um

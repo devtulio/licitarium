@@ -203,6 +203,18 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 .precos .cel .r { font-size:10px; color:var(--muted); letter-spacing:.05em;
                   text-transform:uppercase; margin-top:2px; }
 .precos .cel.destaque .v { color:var(--accent); }
+/* dispersão: a leitura fina fica em texto corrido, para não competir com os
+   quatro números que respondem "quanto pagamos por isso?" */
+.precos .disp { margin-top:10px; font-size:12px; color:var(--muted);
+                line-height:1.55; }
+.precos .disp b { color:var(--fg); font-weight:600;
+                  font-variant-numeric:tabular-nums; }
+.precos .fora { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+                margin-top:8px; padding:7px 12px; font-size:12.5px;
+                border-radius:var(--radius);
+                background:color-mix(in srgb, var(--warn) 12%, var(--surface));
+                border:1px solid color-mix(in srgb, var(--warn) 40%,
+                                           transparent); }
 .cab span[data-ord] { cursor:pointer; user-select:none; }
 .cab span[data-ord]:hover { color:var(--accent); }
 .cab .seta { font-size:9px; }

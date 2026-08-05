@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.5.0 — 2026-08-05
+
+**Análise estatística da pesquisa de preços**
+
+- Ao lado de média e mediana, o resumo passa a mostrar a **faixa central** dos
+  preços, o **desvio padrão** e o **coeficiente de variação**, com a leitura
+  escrita: até 15% os preços são homogêneos; acima de 50% a amostra é dispersa
+  demais e provavelmente tem item não comparável no meio. Os mesmos números
+  saem no relatório em PDF.
+- **Preço fora da curva é apontado**, pelo critério de Tukey (uma vez e meia a
+  faixa central), com a faixa normal escrita no aviso e um botão que descarta
+  os itens de uma vez. Nada sai sozinho da conta: desprezar preço coletado é
+  decisão de quem assina, e o item continua na lista para conferência.
+- Com menos de cinco preços a análise se cala, em vez de apresentar como
+  estatística o que seria opinião.
+
+**Filtro por unidade de medida**
+
+- A aba Preços ganhou o filtro **Todas as unidades**, com as grafias já
+  agrupadas: *CX*, *Caixa* e *CAIXAS* viram uma opção só. No acervo do piloto
+  isso reduz 566 textos distintos a 192 opções, ordenadas da mais comum para a
+  mais rara e com a contagem de itens ao lado. A coluna da lista continua
+  mostrando o texto original do PNCP.
+
+**Outras melhorias**
+
+- A coluna **Qtde** da aba Preços passa a ordenar, como as demais.
+
 ## 1.4.3 — 2026-08-03
 
 - **O aviso de volume dizia um tamanho menor que o real.** Ele previa os MB

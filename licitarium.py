@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import urllib.request
 import webbrowser
 from datetime import date, datetime
@@ -22,7 +23,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.4.3"
+VERSAO = "1.5.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -139,6 +140,8 @@ ORDENAVEIS = {
             "categoria": "categoria", "quantidade": "quantidade",
             "valor": "valor_total"},
     "itens": {"descricao": "descricao", "unidade": "unidade",
+              # a quantidade homologada manda; sem resultado, a do edital
+              "quantidade": "COALESCE(quantidade_homologada, quantidade)",
               "unitario": "COALESCE(valor_unitario_homologado,"
                           " valor_unitario_estimado)",
               "fornecedor": "fornecedor_nome", "data": "data_resultado",
@@ -225,6 +228,10 @@ def abrir_db():
         db.commit()
     # WAL + busy_timeout: a thread de sync grava enquanto a ponte JS lê/grava
     # config — sem isso, "database is locked" na primeira concorrência
+    # o filtro por unidade agrupa sinônimos, e o agrupamento é o mesmo em
+    # Python e em SQL — daí a função viajar para dentro do banco
+    db.create_function("unidade_canonica", 1, _unidade_canonica,
+                       deterministic=True)
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA busy_timeout=10000")
     # o índice de busca nasce vazio; banco que já tinha itens precisa popular
@@ -236,6 +243,63 @@ def abrir_db():
         db.execute("INSERT INTO itens_fts(itens_fts) VALUES('rebuild')")
         db.commit()
     return db
+
+
+# Cada órgão digita a unidade como quer: no acervo do piloto são 566 textos
+# distintos para 16 mil itens — "UN", "UNIDADE", "Unidade  " e "UND" são a
+# mesma coisa, e filtrar por texto cru obrigaria a marcar um por um. O grupo
+# só serve de filtro; a coluna e os relatórios seguem mostrando o original.
+UNIDADES_SINONIMAS = {
+    "Unidade": ("UN", "UND", "UNID", "UNIDADE", "UNIDADES", "UD"),
+    "Peça": ("PC", "PCA", "PECA", "PECAS", "PC.", "PÇ"),
+    "Caixa": ("CX", "CAIXA", "CAIXAS", "CXA"),
+    "Pacote": ("PCT", "PACOTE", "PACOTES", "PCTE"),
+    "Fardo": ("FD", "FARDO", "FARDOS"),
+    "Embalagem": ("EMB", "EMBALAGEM", "EMBALAGENS"),
+    "Quilograma": ("KG", "QUILO", "QUILOS", "QUILOGRAMA", "KILO",
+                   "KILOGRAMA", "KGS"),
+    "Grama": ("G", "GR", "GRAMA", "GRAMAS"),
+    "Litro": ("L", "LT", "LTS", "LITRO", "LITROS"),
+    "Mililitro": ("ML", "MILILITRO", "MILILITROS"),
+    "Metro": ("M", "MT", "MTS", "METRO", "METROS"),
+    "Metro quadrado": ("M2", "M²", "METRO QUADRADO"),
+    "Metro cúbico": ("M3", "M³", "METRO CUBICO"),
+    "Frasco": ("FR", "FRS", "FRASCO", "FRASCOS"),
+    "Ampola": ("AMP", "AMPOLA", "AMPOLAS"),
+    "Comprimido": ("CP", "CMP", "COMP", "COMPRIMIDO", "COMPRIMIDOS"),
+    "Cápsula": ("CAP", "CAPS", "CAPSULA", "CAPSULAS"),
+    "Serviço": ("SV", "SERV", "SERVICO", "SERVICOS"),
+    "Rolo": ("RL", "ROLO", "ROLOS"),
+    "Galão": ("GL", "GALAO", "GALOES"),
+    "Tubo": ("TB", "TUBO", "TUBOS"),
+    "Par": ("PAR", "PARES"),
+    "Dúzia": ("DZ", "DUZIA", "DUZIAS"),
+    "Kit": ("KIT", "KITS", "CONJUNTO", "CJ"),
+    "Lata": ("LT.", "LATA", "LATAS"),
+    "Saco": ("SC", "SACO", "SACOS"),
+    "Bloco": ("BL", "BLOCO", "BLOCOS"),
+    "Resma": ("RM", "RESMA", "RESMAS"),
+    "Hora": ("H", "HR", "HORA", "HORAS"),
+    "Mês": ("MES", "MESES", "MENSAL"),
+}
+_CANONICA = {texto: grupo
+             for grupo, textos in UNIDADES_SINONIMAS.items()
+             for texto in textos}
+# "Embalagem 1,00 KG", "Pacote 400,00 G", "Frasco 10,00 ML": o PNCP cola a
+# quantidade na unidade. O grupo é a palavra; o tamanho continua legível na
+# coluna, que mostra o texto original.
+_SO_A_PALAVRA = re.compile(r"^([A-Za-zÀ-ÿ]+)[\s.]+[\d.,]+.*$")
+
+
+def _unidade_canonica(texto):
+    """Agrupa as grafias de uma mesma unidade sob um rótulo legível."""
+    if not texto:
+        return None
+    limpo = " ".join(str(texto).split())
+    chave = _SO_A_PALAVRA.sub(r"\1", limpo)
+    sem_acento = (unicodedata.normalize("NFD", chave)
+                  .encode("ascii", "ignore").decode())
+    return _CANONICA.get(sem_acento.upper().rstrip("."), limpo.capitalize())
 
 
 def _blocos(ids, tamanho=400):
@@ -526,6 +590,9 @@ class Api:
             where.append("valor_unitario_homologado IS NOT NULL")
         if f.get("origem") == "proprio" and tipo == "itens":
             where.append("referencia=0")
+        if f.get("unidade") and tipo == "itens":
+            where.append("unidade_canonica(unidade)=?")
+            args.append(f["unidade"])
         if f.get("busca"):
             termo = _termo_fts(f["busca"]) if tipo == "itens" else None
             if termo:
@@ -623,15 +690,19 @@ class Api:
             args += grupo
         db = abrir_db()
         try:
-            valores = [r[0] for r in db.execute(
-                "SELECT valor_unitario_homologado FROM itens WHERE "
-                + " AND ".join(where) + " ORDER BY 1", args)]
-            if not valores:
+            linhas = db.execute(
+                "SELECT id, valor_unitario_homologado FROM itens WHERE "
+                + " AND ".join(where) + " ORDER BY 2", args).fetchall()
+            if not linhas:
                 return None
-            n = len(valores)
-            meio = n // 2
-            mediana = (valores[meio] if n % 2
-                       else (valores[meio - 1] + valores[meio]) / 2)
+            resumo = relatorios.resumo_estatistico(
+                [r[1] for r in linhas])
+            # itens fora do intervalo de Tukey: apontados, nunca removidos
+            # sozinhos — descartar preço de pesquisa é decisão de quem assina
+            if resumo.get("limite_sup") is not None:
+                resumo["fora_da_curva"] = [
+                    r[0] for r in linhas
+                    if r[1] < resumo["limite_inf"] or r[1] > resumo["limite_sup"]]
             fornecedores = db.execute(
                 "SELECT COUNT(DISTINCT fornecedor_ni) FROM itens WHERE "
                 + " AND ".join(where), args).fetchone()[0]
@@ -640,10 +711,9 @@ class Api:
             proprios = db.execute(
                 "SELECT COUNT(*) FROM itens WHERE referencia=0 AND "
                 + " AND ".join(where), args).fetchone()[0]
-            return {"n": n, "minimo": valores[0], "maximo": valores[-1],
-                    "media": sum(valores) / n, "mediana": mediana,
-                    "fornecedores": fornecedores,
-                    "proprios": proprios, "referencia": n - proprios}
+            resumo.update(fornecedores=fornecedores, proprios=proprios,
+                          referencia=resumo["n"] - proprios)
+            return resumo
         finally:
             db.close()
 
@@ -663,8 +733,21 @@ class Api:
                 " ORDER BY 2")]
             orgaos = [{"cnpj": r[0], "nome": r[1]} for r in db.execute(
                 "SELECT cnpj, razao_social FROM orgaos ORDER BY razao_social")]
+            # unidades do banco de preços, já agrupadas: as raras ficam no
+            # fim da lista porque a ordem é por quantidade de itens
+            contagem = {}
+            for (texto,) in db.execute(
+                    "SELECT unidade FROM itens"
+                    " WHERE valor_unitario_homologado IS NOT NULL"
+                    "   AND unidade IS NOT NULL"):
+                grupo = _unidade_canonica(texto)
+                if grupo:
+                    contagem[grupo] = contagem.get(grupo, 0) + 1
+            unidades = [{"nome": g, "n": n} for g, n in
+                        sorted(contagem.items(), key=lambda x: (-x[1], x[0]))]
             return {"anos": anos, "situacoes": situacoes,
-                    "modalidades": modalidades, "orgaos": orgaos}
+                    "modalidades": modalidades, "orgaos": orgaos,
+                    "unidades": unidades}
         finally:
             db.close()
 

@@ -301,6 +301,10 @@ async function carregarFiltros() {
   preencher($("f-situacao"), f.situacoes);
   preencher($("f-orgao"),
             f.orgaos.map(o => ({nome: o.nome ?? o.cnpj, id: o.cnpj})));
+  // a unidade vem agrupada do backend ("CX" e "Caixa" são uma opção só) e
+  // ordenada pelo que mais aparece, que é o que se procura primeiro
+  preencher($("f-unidade"), (f.unidades ?? []).map(
+    u => ({nome: `${u.nome} (${u.n})`, id: u.nome})));
 }
 
 function filtrosAtuais() {
@@ -312,13 +316,14 @@ function filtrosAtuais() {
            vigentes: $("f-vigentes").checked || null,
            so_homologados: $("f-homologados").checked || null,
            origem: $("f-so-meu").checked ? "proprio" : null,
+           unidade: $("f-unidade").value || null,
            busca: $("f-busca").value.trim() || null,
            ord: estado.ord, dir: estado.dir };
 }
 
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const CAMPOS_FILTRO = ["f-ano", "f-modalidade", "f-situacao", "f-orgao",
-                       "f-busca"];
+                       "f-unidade", "f-busca"];
 const CAIXAS_FILTRO = ["f-propostas", "f-vigentes"];  // f-homologados é
 // padrão ligado na aba Preços, então não conta como "filtro ativo"
 
@@ -347,7 +352,7 @@ const COLUNAS = {
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
   itens:        [["",null], ["Descrição","descricao"], ["Unid.","unidade"],
-                 ["Qtde",null], ["Valor unitário","unitario"],
+                 ["Qtde","quantidade"], ["Valor unitário","unitario"],
                  ["Fornecedor","fornecedor"], ["Município","municipio"],
                  ["Processo","origem"]],
 };
@@ -474,6 +479,48 @@ function renderLinha(tipo, d) {
     <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
 }
 
+// Quanto a série varia em relação à própria média. Acima de 25% o TCU e os
+// manuais de pesquisa de preços já tratam a amostra como dispersa demais
+// para a média servir de estimativa — daí a leitura vir escrita, e não só
+// o número.
+function leituraCv(cv) {
+  if (cv < 0.15) return "preços homogêneos";
+  if (cv < 0.25) return "variação moderada";
+  if (cv < 0.50) return "amostra dispersa — prefira a mediana";
+  return "amostra muito dispersa — confira se os itens são comparáveis";
+}
+
+function dispersaoHtml(s) {
+  if (s.desvio == null) return "";
+  const quartis = s.q1 != null
+    ? `Metade dos preços entre <b>${dinheiro(s.q1)}</b> e
+       <b>${dinheiro(s.q3)}</b>. `
+    : "";
+  const pct = (s.cv * 100).toLocaleString("pt-BR",
+    {maximumFractionDigits: 0});
+  return `<div class="disp">${quartis}Desvio padrão
+    <b>${dinheiro(s.desvio)}</b> · coeficiente de variação <b>${pct}%</b>
+    <span class="dim">(${leituraCv(s.cv)})</span>${
+      s.q1 == null
+        ? ` <span class="dim">— com ${s.n} ${s.n === 1 ? "preço" : "preços"}
+            não dá para medir quartis nem apontar valor fora da curva</span>`
+        : ""}</div>`;
+}
+
+// Aponta, não remove: descartar preço de uma pesquisa é decisão de quem
+// assina, e o art. 23 exige justificativa para desprezar valor coletado.
+function foraDaCurvaHtml(s) {
+  const n = (s.fora_da_curva ?? []).length;
+  if (!n) return "";
+  return `<div class="fora">
+    <span>${n === 1 ? "1 preço destoa" : `${n} preços destoam`} do conjunto
+      (fora de ${dinheiro(Math.max(0, s.limite_inf))} a
+      ${dinheiro(s.limite_sup)}, pelo critério de Tukey). Confira se são
+      itens comparáveis antes de usar.</span>
+    <button class="btn ghost" id="btn-descartar-fora">
+      Descartar ${n === 1 ? "o item" : "os itens"}</button></div>`;
+}
+
 let ultimoTermoPrecos = null;
 
 async function mostrarResumoPrecos() {
@@ -513,9 +560,15 @@ async function mostrarResumoPrecos() {
       ${cel(s.fornecedores, "fornecedores")}
       <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
         Relatório de pesquisa de preços</button>
-    </div>`;
+    </div>
+    ${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
+  $("btn-descartar-fora")?.addEventListener("click", () => {
+    (s.fora_da_curva ?? []).forEach(id => precosDescartados.add(String(id)));
+    carregarLista();
+    atualizarSelecaoPrecos();
+  });
 }
 
 // ── largura das colunas: arrastar ajusta, duplo clique dá autofit ─────────
@@ -720,6 +773,8 @@ document.querySelectorAll("nav.abas button").forEach(b =>
       !["contratos", "atas"].includes(estado.tipo));
     const ehItens = estado.tipo === "itens";
     $("cx-homologados").classList.toggle("oculto", !ehItens);
+    $("f-unidade").classList.toggle("oculto", !ehItens);
+    if (!ehItens) $("f-unidade").value = "";
     // o filtro de origem só faz sentido havendo município de referência
     $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
     $("f-busca").placeholder = ehItens
@@ -746,7 +801,7 @@ $("kpi-card-homologado").addEventListener("click",
   () => irPara("contratacoes", {ano: String(new Date().getFullYear())}));
 $("kpi-card-vigentes").addEventListener("click",
   () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
-["f-ano","f-modalidade","f-situacao","f-orgao"].forEach(id =>
+["f-ano","f-modalidade","f-situacao","f-orgao","f-unidade"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 let buscaTimer;
 $("f-busca").addEventListener("input", () => {
