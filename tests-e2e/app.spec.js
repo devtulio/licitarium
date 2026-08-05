@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { abrirApp } = require("./harness");
+const { abrirApp, abrirLista } = require("./harness");
 
 test.beforeEach(async ({ page }) => abrirApp(page));
 
@@ -63,6 +63,7 @@ test("boot: app abre com município, KPIs e alertas", async ({ page }) => {
 
 test("lista renderiza e ordenação por clique manda ord/dir à ponte",
     async ({ page }) => {
+  await abrirLista(page);   // a tela inicial agora é o Painel
   await expect(page.locator(".linha:not(.cab)")).toHaveCount(3);
   const cabObjeto = page.locator('.cab span[data-ord="objeto"]');
   await cabObjeto.click();
@@ -320,6 +321,7 @@ test("parâmetros do PCA chegam ao motor", async ({ page }) => {
 });
 
 test("valor sem homologação é marcado como estimado", async ({ page }) => {
+  await abrirLista(page);   // a tela inicial agora é o Painel
   const linhas = page.locator(".linha:not(.cab)");
   // X-1 tem homologado: valor limpo, sem marca
   await expect(linhas.nth(0).locator(".est")).toHaveCount(0);
@@ -330,6 +332,7 @@ test("valor sem homologação é marcado como estimado", async ({ page }) => {
 
 test("badge de situação encurtada mantém o texto completo no title",
     async ({ page }) => {
+  await abrirLista(page);   // a tela inicial agora é o Painel
   const badge = page.locator(".linha:not(.cab)").nth(1).locator(".badge");
   await expect(badge).toHaveText("Divulgada");
   await expect(badge).toHaveAttribute("title", "Divulgada no PNCP");
@@ -337,6 +340,7 @@ test("badge de situação encurtada mantém o texto completo no title",
 
 test("limpar filtros aparece com filtro ativo e restaura a lista",
     async ({ page }) => {
+  await abrirLista(page);   // a tela inicial agora é o Painel
   await expect(page.locator("#btn-limpar")).toBeHidden();
   await page.locator("#f-busca").fill("merenda");
   await expect(page.locator("#btn-limpar")).toBeVisible();
@@ -414,6 +418,7 @@ test("limites de dispensa usam máscara de dinheiro e salvam número puro",
 });
 
 test("chip de vencimento navega para contratos vigentes", async ({ page }) => {
+  await abrirLista(page);   // a tela inicial agora é o Painel
   await page.locator("#chip-vencendo").click();
   await expect(page.locator('nav.abas button[data-tipo="contratos"]'))
     .toHaveClass(/on/);

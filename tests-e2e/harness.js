@@ -342,4 +342,11 @@ async function abrirApp(page, opcoes = {}) {
   await page.evaluate(() => window.dispatchEvent(new Event("pywebviewready")));
 }
 
-module.exports = { URL_UI, DADOS, abrirApp };
+// Desde a 1.10.0 o programa abre no Painel: os testes de lista precisam
+// dizer em qual aba querem estar.
+async function abrirLista(page, tipo = "contratacoes") {
+  await page.locator(`nav.abas button[data-tipo="${tipo}"]`).click();
+  await page.locator("#lista").waitFor({ state: "visible" });
+}
+
+module.exports = { abrirLista, URL_UI, DADOS, abrirApp };
