@@ -171,6 +171,17 @@ function scriptPonte(temaBanco = "portal") {
       detalhe: async (tipo, nc) =>
         ({ ...(DADOS[tipo] || []).find(d => d.numero_controle === nc),
            raw: { exemplo: true } }),
+      exportar_acervo: async () => {
+        window.__chamadas.push({ metodo: "exportar_acervo" });
+        return window.__respostaExportar ?? { ok: true, arquivo: "C:/tmp/c.zip",
+          mb: 12.3, contagens: { contratacoes: 131, itens: 2674,
+                                 municipios_referencia: 6 } };
+      },
+      importar_acervo: async () => {
+        window.__chamadas.push({ metodo: "importar_acervo" });
+        return window.__respostaImportar ?? { ok: true, itens: 2674,
+          municipio: "Orindiúva", exportado_em: "2026-08-05T09:00:00" };
+      },
       sincronizar: async () => true,
       status_sync: async () => ({ rodando: false }),
       checar_atualizacao: async () => null,

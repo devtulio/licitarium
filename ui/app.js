@@ -1182,6 +1182,35 @@ function atualizarSelecaoPrecos() {
   });
 }
 
+// ── cópia do acervo ───────────────────────────────────────────────────────
+// Restaurar troca o banco inteiro, então a confirmação diz o que entra e o
+// que sai — e o programa precisa reabrir para ler o arquivo novo.
+$("btn-exportar-acervo")?.addEventListener("click", async () => {
+  const msg = $("acervo-msg");
+  msg.textContent = "Salvando cópia…";
+  const r = await api.exportar_acervo();
+  if (!r.ok) { msg.textContent = r.erro ? `Falhou: ${r.erro}` : ""; return; }
+  const c = r.contagens || {};
+  msg.textContent = `Cópia salva (${r.mb} MB): ${c.contratacoes || 0}`
+    + ` contratações, ${(c.itens || 0).toLocaleString("pt-BR")} itens e`
+    + ` ${c.municipios_referencia || 0} municípios de referência.`;
+});
+
+$("btn-importar-acervo")?.addEventListener("click", async () => {
+  const msg = $("acervo-msg");
+  if (!confirm("Restaurar uma cópia substitui todo o acervo atual.\n\n"
+               + "O banco de agora é guardado ao lado, renomeado, e o "
+               + "programa precisa ser fechado e aberto de novo.\n\n"
+               + "Escolher o arquivo?")) return;
+  msg.textContent = "Conferindo o arquivo…";
+  const r = await api.importar_acervo();
+  if (!r.ok) { msg.textContent = r.erro ? `Falhou: ${r.erro}` : ""; return; }
+  msg.textContent = `Acervo restaurado (${(r.itens || 0).toLocaleString("pt-BR")}`
+    + ` itens). Feche e abra o Licitarium para usá-lo.`;
+  alert("Acervo restaurado.\n\nFeche e abra o Licitarium para carregar o "
+        + "acervo restaurado.");
+});
+
 function ligarBuscaReferencia() {
   const uf = $("ref-uf");
   if (uf.options.length === 0) {

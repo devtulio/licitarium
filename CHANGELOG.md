@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.0 — 2026-08-05
+
+**Cópia do acervo**
+
+- **Configurações → Cópia do acervo** ganhou dois botões: **Salvar cópia…**
+  guarda tudo num arquivo `.zip` (contratações, contratos, atas, itens, PCA,
+  configurações e a lista de municípios de referência) e **Restaurar cópia…**
+  devolve esse arquivo ao lugar.
+- O Licitarium nasceu sem cópia de segurança porque o acervo é reconstruível a
+  partir do PNCP — e continua sendo. Só que reconstruir o próprio município
+  leva minutos enquanto **cada município de referência custa de minutos a
+  horas**, e a lista deles se perde junto com o banco. A cópia troca essas
+  horas por um arquivo.
+- A cópia sai pela API de backup do SQLite, e não copiando o arquivo do disco:
+  com a sincronização gravando, um arquivo copiado nasceria pela metade.
+- Restaurar confere o arquivo antes de tocar em qualquer coisa e **guarda o
+  acervo atual** como `.substituido-<data>`, em vez de apagá-lo.
+
 ## 1.5.2 — 2026-08-05
 
 - **O programa não aposenta mais um banco por conta própria.** A 1.5.1 passou

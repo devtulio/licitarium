@@ -229,6 +229,13 @@ públicos; o Peculium guarda dados pessoais num cofre cifrado.
 
 ---
 
+## Cópia do acervo
+
+O banco é um espelho reconstruível do PNCP, mas recoletar **municípios de
+referência** custa de minutos a horas cada um. Em Configurações, **Salvar
+cópia…** guarda o acervo inteiro num `.zip` e **Restaurar cópia…** o devolve,
+conferindo o arquivo antes e preservando o banco anterior.
+
 ## Como citar
 
 Cada versão recebe um DOI no Zenodo. O DOI acima resolve sempre para a versão

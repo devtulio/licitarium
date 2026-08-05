@@ -5,15 +5,18 @@ A versão vigente é a constante VERSAO, logo abaixo — e só ela.
 """
 import csv
 import json
+import shutil
 import re
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
 import urllib.request
 import webbrowser
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -23,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.5.2"
+VERSAO = "1.6.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -119,6 +122,11 @@ END;
 # substituto (mesmo valor). Mantém compatibilidade com versões anteriores.
 DIALOGO_SALVAR = getattr(getattr(webview, "FileDialog", None), "SAVE",
                          None) or webview.SAVE_DIALOG
+DIALOGO_ABRIR = getattr(getattr(webview, "FileDialog", None), "OPEN",
+                        None) or webview.OPEN_DIALOG
+# versão do formato da cópia de segurança: muda quando o zip deixar de ser
+# lido pelas versões anteriores
+ACERVO_SCHEMA = 1
 
 TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
            "atas": "atas", "pca": "pca_itens", "itens": "itens"}
@@ -1211,6 +1219,113 @@ class Api:
                                                        so_incluidos=True)]
         finally:
             db.close()
+
+    # ── acervo: cópia de segurança e restauração ────────────────────────
+
+    def exportar_acervo(self):
+        """Salva o acervo inteiro num arquivo .zip.
+
+        O banco é reconstruível a partir do PNCP — mas reconstruir custa
+        horas quando há municípios de referência (foram seis, e a coleta de
+        cada um leva minutos a horas). A cópia troca essas horas por um
+        arquivo.
+
+        A cópia sai pela API de backup do SQLite, e não copiando o arquivo:
+        a thread de sincronização pode estar gravando, e um arquivo copiado
+        no meio de uma transação nasce inconsistente.
+        """
+        db = abrir_db()
+        try:
+            municipio = pncp._config(db, "municipio_nome") or "acervo"
+            contagens = {t: db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                         for t in ("contratacoes", "contratos", "atas",
+                                   "itens", "pca_itens",
+                                   "municipios_referencia")}
+        finally:
+            db.close()
+        agora = datetime.now()
+        sugerido = (f"DB_LICITARIUM_BACKUP_{agora:%Y-%m-%d}_"
+                    f"{agora:%H-%M-%S}.zip")
+        destino = self._janela.create_file_dialog(
+            DIALOGO_SALVAR, save_filename=sugerido, file_types=("Zip (*.zip)",))
+        if not destino:
+            return {"ok": False, "erro": None}       # cancelado
+        caminho = destino if isinstance(destino, str) else destino[0]
+        manifesto = {"_sgx": "LICITARIUM", "schema": ACERVO_SCHEMA,
+                     "exportedAt": agora.isoformat(), "versao": VERSAO,
+                     "municipio": municipio, "contagens": contagens}
+        with tempfile.TemporaryDirectory() as tmp:
+            copia = Path(tmp) / "licitarium.db"
+            origem = abrir_db()
+            try:
+                destino_db = sqlite3.connect(copia)
+                try:
+                    origem.backup(destino_db)
+                finally:
+                    destino_db.close()
+            finally:
+                origem.close()
+            with zipfile.ZipFile(caminho, "w", zipfile.ZIP_DEFLATED) as z:
+                z.write(copia, "licitarium.db")
+                z.writestr("manifesto.json",
+                           json.dumps(manifesto, ensure_ascii=False, indent=2))
+        return {"ok": True, "arquivo": caminho,
+                "mb": round(Path(caminho).stat().st_size / 1e6, 1),
+                "contagens": contagens}
+
+    def importar_acervo(self):
+        """Põe no lugar do acervo atual o de um arquivo .zip exportado.
+
+        Substituir o banco de um programa em execução é o tipo de operação
+        que só se faz com o arquivo já conferido: o zip é aberto num
+        diretório temporário e o banco de dentro passa por `quick_check`
+        antes de qualquer coisa. O acervo atual não é apagado — vira
+        `.substituido-<data>`, e desfazer é renomear de volta.
+        """
+        escolha = self._janela.create_file_dialog(
+            DIALOGO_ABRIR, file_types=("Cópia do Licitarium (*.zip)",))
+        if not escolha:
+            return {"ok": False, "erro": None}
+        caminho = escolha if isinstance(escolha, str) else escolha[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                with zipfile.ZipFile(caminho) as z:
+                    nomes = z.namelist()
+                    if "licitarium.db" not in nomes:
+                        return {"ok": False,
+                                "erro": "o arquivo não é uma cópia do "
+                                        "Licitarium (falta o banco)"}
+                    z.extract("licitarium.db", tmp)
+                    manifesto = (json.loads(z.read("manifesto.json"))
+                                 if "manifesto.json" in nomes else {})
+            except (zipfile.BadZipFile, json.JSONDecodeError, KeyError):
+                return {"ok": False, "erro": "arquivo .zip ilegível"}
+            novo = Path(tmp) / "licitarium.db"
+            conferencia = sqlite3.connect(f"file:{novo}?mode=ro", uri=True)
+            try:
+                if conferencia.execute(
+                        "PRAGMA quick_check(1)").fetchone()[0] != "ok":
+                    return {"ok": False,
+                            "erro": "o banco dentro do arquivo está corrompido"}
+                itens = conferencia.execute(
+                    "SELECT COUNT(*) FROM itens").fetchone()[0]
+            except sqlite3.DatabaseError:
+                return {"ok": False,
+                        "erro": "o banco dentro do arquivo não pôde ser lido"}
+            finally:
+                conferencia.close()
+            carimbo = datetime.now().strftime("%Y%m%d-%H%M%S")
+            if ARQUIVO_DB.exists():
+                ARQUIVO_DB.rename(ARQUIVO_DB.with_name(
+                    f"{ARQUIVO_DB.name}.substituido-{carimbo}"))
+            for sufixo in ("-wal", "-shm"):
+                f = Path(str(ARQUIVO_DB) + sufixo)
+                if f.exists():
+                    f.unlink()
+            shutil.move(str(novo), str(ARQUIVO_DB))
+        return {"ok": True, "itens": itens,
+                "municipio": manifesto.get("municipio"),
+                "exportado_em": manifesto.get("exportedAt")}
 
     def exportar_csv(self, tipo, filtros=None):
         if tipo == "minuta_pca":
