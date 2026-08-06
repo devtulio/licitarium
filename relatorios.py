@@ -8,6 +8,7 @@ import html
 import json
 import re
 import unicodedata
+from collections import Counter
 from datetime import date, datetime
 
 import pca_builder
@@ -662,6 +663,31 @@ def _ler_conteudo(texto, padrao):
     return None
 
 
+def base_implicita(unidade):
+    """O conteúdo veio da unidade já ser a base, e não de uma declaração.
+
+    Item assim é comparável, mas não deve **escolher** a unidade-base da
+    série: R$/unidade de um item vendido a unidade é o próprio preço, e não
+    diz nada sobre embalagem. Medido no acervo: sem esta regra, "leite" era
+    comparado por unidade (140 votos implícitos) e deixava de fora 89 itens
+    em litro e 101 em quilo — justamente os que a comparação existe para pôr
+    lado a lado. O mesmo em café, que perdia 100 itens em quilo.
+    """
+    return _sem_acento(unidade).strip() in BASE_PURA
+
+
+def escolher_base(bases):
+    """A unidade-base da série, decidida só por quem declarou conteúdo.
+
+    `bases` é a lista de (base, implicita). Quando ninguém declarou nada, o
+    voto implícito vale — é o caso de uma pesquisa só de itens avulsos, em
+    que comparar por unidade continua sendo o certo.
+    """
+    declarados = Counter(b for b, implicita in bases if not implicita)
+    contagem = declarados or Counter(b for b, _ in bases)
+    return max(contagem, key=lambda b: (contagem[b], b)) if contagem else None
+
+
 def preco_por_conteudo(valor, descricao, unidade):
     """Preço na unidade-base: R$/folha, R$/kg, R$/litro, R$/metro."""
     if valor is None:
@@ -824,12 +850,9 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
     if por_conteudo:
         # comparar R$/quilo com R$/folha não diz nada: a série fica com a
         # base predominante e o documento declara quantos ficaram de fora
-        contagem = {}
-        for l in linhas:
-            if l["por_conteudo"]:
-                b = l["por_conteudo"]["base"]
-                contagem[b] = contagem.get(b, 0) + 1
-        base = max(contagem, key=lambda b: (contagem[b], b)) if contagem else None
+        base = escolher_base([(l["por_conteudo"]["base"],
+                               base_implicita(l["unidade"]))
+                              for l in linhas if l["por_conteudo"]])
         comparaveis = [l for l in linhas
                        if l["por_conteudo"] and l["por_conteudo"]["base"] == base]
         fora_da_comparacao = len(linhas) - len(comparaveis)

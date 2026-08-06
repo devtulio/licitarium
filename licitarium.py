@@ -471,14 +471,14 @@ def _normalizar_por_conteudo(linhas):
     for r in linhas:
         p = relatorios.preco_por_conteudo(r[1], r[2], r[3])
         if p:
-            convertidos.append((r[0], p["valor"], p["base"]))
+            convertidos.append((r[0], p["valor"], p["base"],
+                                relatorios.base_implicita(r[3])))
     if not convertidos:
         return [], None, len(linhas)
-    contagem = {}
-    for _, _, base in convertidos:
-        contagem[base] = contagem.get(base, 0) + 1
-    base = max(contagem, key=lambda b: (contagem[b], b))
-    serie = sorted(((i, v) for i, v, b in convertidos if b == base),
+    # quem só é comparável porque a unidade já era a base não vota na
+    # escolha — ver relatorios.escolher_base
+    base = relatorios.escolher_base([(b, i) for _, _, b, i in convertidos])
+    serie = sorted(((i, v) for i, v, b, _ in convertidos if b == base),
                    key=lambda x: x[1])
     return serie, base, len(linhas) - len(serie)
 

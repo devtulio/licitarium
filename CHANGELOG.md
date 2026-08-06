@@ -24,6 +24,14 @@
   destaque, que a diferença para os valores nominais não decorre apenas da
   correção monetária. O texto do relatório também deixou de atribuir a exclusão
   só à "falta de data": a causa mais comum é o preço ser posterior ao índice.
+- **A unidade-base da comparação passou a ser escolhida só por quem declara
+  conteúdo.** Como todo item vendido a unidade agora vale "1 unidade", esses
+  itens passariam a decidir a base pelo peso do número: em *leite*, 140 avulsos
+  faziam a comparação sair **por unidade** e jogavam fora 89 itens em litro e
+  101 em quilo — justamente os que a comparação existe para pôr lado a lado. O
+  mesmo em *café*, que perdia 100 itens em quilo. Agora o voto é de quem
+  declarou embalagem; se ninguém declarou, o avulso decide, que é o certo numa
+  pesquisa só de itens unitários.
 - A comparação por conteúdo **não filtra lote** — o item lançado como *"Proposta
   para todos os itens"* entra com o valor do lote. Quem o tira da série é o
   descarte com razão, com o motivo próprio, que deixa registro no documento.
