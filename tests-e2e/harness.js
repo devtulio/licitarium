@@ -180,7 +180,10 @@ function scriptPonte(temaBanco = "portal") {
           fornecedores: 3, desvio: 349985, cv: 2.0, q1: 25.1, q3: 175015,
           limite_inf: -224733, limite_sup: 424873, fora_da_curva: [],
           proprios: 3, referencia: 1, corrigido: true, ipca_ate: "2026-06",
-          ipca_ate_extenso: "jun/2026", sem_indice: 1 };
+          ipca_ate_extenso: "jun/2026",
+          // 1 de 5 é 20% da série: acima do limiar, o backend acusa
+          sem_indice: window.__serieInteira ? 0 : 1,
+          amostra_reduzida: !window.__serieInteira };
         if (porConteudo) return window.__semConteudo
           ? { n: 0, por_conteudo: true, sem_conversao: 4 }
           : { n: 3, minimo: 0.0375, maximo: 0.389, media: 0.158,

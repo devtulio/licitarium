@@ -27,6 +27,30 @@ test("ligada, o resumo declara o índice e até quando corrigiu",
   expect(chamada.corrigir).toBe(true);
 });
 
+test("quando a correção tira parte grande da série, o resumo avisa",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator("#f-busca").fill("papel");
+  await page.locator("#f-corrigir").check();
+
+  const alerta = page.locator("#precos-resumo .disp.alerta");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText("deixou de fora 1 dos 5 preços");
+  await expect(alerta).toContainText("não é só correção monetária");
+  // o aviso tem de se distinguir do texto corrido em volta
+  await expect(alerta).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
+
+test("série inteira corrigida não mostra alerta nenhum", async ({ page }) => {
+  await page.evaluate(() => { window.__serieInteira = true; });
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator("#f-busca").fill("papel");
+  await page.locator("#f-corrigir").check();
+
+  await expect(page.locator("#precos-resumo")).toContainText("IPCA");
+  await expect(page.locator("#precos-resumo .disp.alerta")).toHaveCount(0);
+});
+
 test("ligada, a lista ganha a coluna Corrigido", async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="itens"]').click();
   await expect(page.locator('.cab span', { hasText: "Corrigido" }))

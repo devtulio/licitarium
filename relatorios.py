@@ -528,6 +528,22 @@ def corrigir(valor, data, ipca):
     return valor * fator
 
 
+# Corrigir pelo IPCA não é só reescalar: o preço posterior ao último índice
+# publicado sai da série, e com ele muda a composição da amostra. Medido no
+# acervo real: em "instalação manutenção", 76 de 330 preços saíram, todos
+# recentes e baratos, e a mediana subiu 92% — nada disso foi inflação. Acima
+# deste limiar a tela e o documento passam a dizer isso com todas as letras.
+LIMIAR_AMOSTRA_REDUZIDA = 0.10
+
+
+def marcar_amostra_reduzida(resumo, sem_indice):
+    """Anota no resumo se a correção tirou parte relevante da série."""
+    total = (resumo.get("n") or 0) + (sem_indice or 0)
+    resumo["amostra_reduzida"] = bool(
+        total and sem_indice / total >= LIMIAR_AMOSTRA_REDUZIDA)
+    return resumo
+
+
 def mes_por_extenso(competencia_):
     """"2026-06" vira "jun/2026", que é como o documento fala."""
     if not competencia_:
@@ -572,6 +588,11 @@ _CONTAGEM = {"FL", "FLS", "FOLHA", "FOLHAS", "UN", "UND", "UNID", "UNIDADE",
              "COMPRIMIDO", "COMPRIMIDOS", "CAPSULA", "CAPSULAS", "CAPS",
              "ENVELOPE", "ENVELOPES", "SACHE", "SACHES", "AMPOLA", "AMPOLAS"}
 
+# Unidade de compra que já é a própria base — o preço unitário do PNCP já
+# está nela, então o conteúdo é 1 e não há o que dividir.
+BASE_PURA = {u: base for u, (base, fator) in _MEDIDAS.items() if fator == 1.0}
+BASE_PURA.update({u: "un" for u in _CONTAGEM})
+
 _NUM = r"(\d{1,3}(?:\.\d{3})+|\d+(?:[.,]\d+)?)"
 # No campo unidade o texto já descreve a embalagem: "Embalagem 1,00 KG",
 # "Pacote 400,00 G", "Frasco 10,00 ML".
@@ -609,8 +630,18 @@ def conteudo(descricao, unidade):
     com 5.000 folhas e `(0.4, "kg")` para um pacote de 400 g — ou `None`
     quando o texto não diz de forma inequívoca.
     """
-    return (_ler_conteudo(_sem_acento(unidade), _NA_UNIDADE)
-            or _ler_conteudo(_sem_acento(descricao), _NA_DESCRICAO))
+    u = _sem_acento(unidade).strip()
+    lido = _ler_conteudo(u, _NA_UNIDADE)
+    if lido:
+        return lido
+    # Unidade de compra que JÁ é a base: o preço unitário já está por quilo,
+    # litro, metro ou unidade, e o conteúdo é 1. Sem esta parada, a leitura
+    # seguia para a descrição e dividia o preço pela caixa de TRANSPORTE:
+    # "ABÓBORA... CEAGESP: SACO COM 20 KG. UNIDADE LICITADA: KG" a R$ 5,45/kg
+    # virava R$ 0,27/kg. Eram 1.245 itens do acervo real, 16% das leituras.
+    if u in BASE_PURA:
+        return 1.0, BASE_PURA[u]
+    return _ler_conteudo(_sem_acento(descricao), _NA_DESCRICAO)
 
 
 def _ler_conteudo(texto, padrao):
@@ -819,6 +850,7 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
             resumo.update(corrigido=True, ipca_ate=ipca["ate"],
                           ipca_ate_extenso=mes_por_extenso(ipca["ate"]),
                           sem_indice=sem_indice)
+            marcar_amostra_reduzida(resumo, sem_indice)
     # os desconsiderados vão ao documento com a razão de cada um — sem isso,
     # quem confere não tem como saber que a série foi filtrada
     desconsiderados = []
@@ -1233,9 +1265,15 @@ O número do processo leva à página oficial no PNCP, para conferência.{
   f'<br><b>Correção monetária:</b> os valores foram trazidos a preços de '
   f'{r["ipca_ate_extenso"]} pelo <b>IPCA</b> (série 433 do Banco Central), a '
   f'partir da data do resultado de cada contratação. ' + (
-  f'{r["sem_indice"]} preço(s) coletado(s) não pôde(puderam) ser corrigido(s) '
-  'por falta de data utilizável e ficou(ficaram) fora deste levantamento.'
-  if r.get("sem_indice") else '')
+  f'{r["sem_indice"]} preço(s) coletado(s) não pôde(puderam) ser corrigido(s), '
+  'por ser(em) posterior(es) ao último índice publicado ou não ter(em) data '
+  'utilizável, e ficou(ficaram) fora deste levantamento.'
+  if r.get("sem_indice") else '') + (
+  f'<br><b>Atenção:</b> os {r["sem_indice"]} preços excluídos são '
+  f'{100 * r["sem_indice"] / (r["sem_indice"] + r["n"]):.0f}% dos coletados. '
+  'A série apurada tem composição diferente da original, e a diferença para '
+  'os valores nominais não decorre apenas da correção monetária.'
+  if r.get("amostra_reduzida") else '')
   if coluna_corrigido else ''}{
   f'<br><b>Comparação por conteúdo:</b> os valores em destaque são por '
   f'{r["rotulo_base"]}, calculados a partir do que cada embalagem declara '

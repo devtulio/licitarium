@@ -531,9 +531,18 @@ function correcaoHtml(s) {
     ? ` ${s.sem_indice} ${s.sem_indice === 1 ? "item ficou" : "itens ficaram"}
         de fora, por não ter data de resultado ou ser posterior ao índice.`
     : "";
+  // Quando sai parte grande da série, o número que mudou não é só de escala:
+  // é outra amostra. Sem este aviso, a mediana maior lê como inflação.
+  const aviso = s.amostra_reduzida
+    ? `<div class="disp alerta"><b>Atenção:</b> a correção deixou de fora
+        ${s.sem_indice} dos ${s.sem_indice + s.n} preços — os mais recentes,
+        ainda sem índice publicado. A série ficou com outra composição, então
+        a diferença para os valores originais <b>não é só correção
+        monetária</b>.</div>`
+    : "";
   return `<div class="disp">Valores corrigidos pelo <b>IPCA</b> até
     <b>${esc(s.ipca_ate_extenso ?? "–")}</b>, a partir da data do resultado de
-    cada contratação.${fora}</div>`;
+    cada contratação.${fora}</div>${aviso}`;
 }
 
 function semConversaoHtml(s) {

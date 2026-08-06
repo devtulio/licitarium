@@ -214,6 +214,12 @@ nav.abas button.on { color:var(--accent); font-weight:600;
                 line-height:1.55; }
 .precos .disp b { color:var(--fg); font-weight:600;
                   font-variant-numeric:tabular-nums; }
+/* mesma tinta de atenção da faixa .fora, sem o flex — aqui é parágrafo */
+.precos .disp.alerta { color:var(--fg); padding:8px 12px; margin-top:8px;
+                border-radius:var(--radius);
+                background:color-mix(in srgb, var(--warn) 12%, var(--surface));
+                border:1px solid color-mix(in srgb, var(--warn) 40%,
+                                           transparent); }
 .precos .fora { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
                 margin-top:8px; padding:7px 12px; font-size:12.5px;
                 border-radius:var(--radius);

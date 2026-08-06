@@ -151,6 +151,48 @@ def test_item_sem_data_utilizavel_fica_de_fora_e_e_contado(api):
         db.close()
     s = api.estatisticas_preco("papel a4", corrigir=True)
     assert s["n"] == 2 and s["sem_indice"] == 1
+    # 1 de 3 é um terço da série: a composição mudou, e isso tem de aparecer
+    assert s["amostra_reduzida"] is True
+
+
+def test_serie_inteira_corrigida_nao_acusa_amostra_reduzida(api):
+    s = api.estatisticas_preco("papel a4", corrigir=True)
+    assert s["sem_indice"] == 0 and s["amostra_reduzida"] is False
+
+
+@pytest.mark.parametrize("n, sem_indice, esperado", [
+    (100, 0, False),
+    (100, 10, False),    # 9,1% da série original: abaixo do limiar
+    (90, 10, True),      # 10% cravado
+    (254, 76, True),     # o caso real de "instalação manutenção"
+    (0, 5, True),        # nada sobrou: é o aviso mais necessário de todos
+])
+def test_limiar_da_amostra_reduzida(n, sem_indice, esperado):
+    """A conta é sobre a série ORIGINAL — n é o que sobrou, não o total."""
+    r = relatorios.marcar_amostra_reduzida({"n": n}, sem_indice)
+    assert r["amostra_reduzida"] is esperado
+
+
+def test_documento_explica_que_a_diferenca_nao_e_so_inflacao(api):
+    """No papel, o alerta precisa estar escrito — ninguém vê o resumo depois.
+
+    Sem esta frase, a mediana maior lê como inflação, quando pode ser o
+    efeito de os preços recentes terem saído da série.
+    """
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET data_publicacao=NULL")
+        db.execute("UPDATE itens SET data_resultado=NULL WHERE id='I3'")
+        db.commit()
+    finally:
+        db.close()
+    d = relatorios.dados_precos(db_aberto := _db(), "papel a4",
+                                corrigir_ipca=True)
+    db_aberto.close()
+    assert d["resumo"]["amostra_reduzida"] is True
+    html = relatorios.render_precos(d, "Orindiúva", "SP")
+    assert "não decorre apenas da correção monetária" in html
+    assert "33% dos coletados" in html
 
 
 def test_lista_traz_o_valor_corrigido_de_cada_item(api):

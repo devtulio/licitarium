@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.10.5</title>
+<title>Manual Operacional — Licitarium v1.11.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.10.5 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.11.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.10.5</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.11.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.10.5.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.11.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -405,6 +405,13 @@ com semanas de atraso. A correção vai até o <b>último mês publicado</b>, e
 tanto a tela quanto o relatório dizem qual é — <i>"valores corrigidos pelo
 IPCA até jun/2026"</i>. Preço mais recente que o índice, ou sem data
 utilizável, fica de fora do levantamento e é contado no aviso.</div>
+<div class="caixa"><b>Quando muitos preços ficam de fora, a série muda de
+composição.</b> Os excluídos são sempre os mais recentes, e costumam ser os
+mais caros — ou os mais baratos. Se passarem de <b>10% dos coletados</b>, a
+tela e o relatório passam a dizer, com destaque, que a diferença para os
+valores nominais <b>não vem só da correção monetária</b>. Num caso real do
+acervo, sair 76 de 330 preços moveu a mediana em 92%, quando o IPCA do período
+não chegava a 25%.</div>
 <p>As duas caixas podem ficar ligadas ao mesmo tempo: nesse caso o preço por
 conteúdo já sai corrigido, e a coluna <b>Corrigido</b> aparece entre o valor
 pago e a de conteúdo.</p>
@@ -428,11 +435,26 @@ Desligada, tudo volta ao preço como foi pago.</p>
 <p>O conteúdo é lido do que o órgão publicou: do campo de unidade
 (<i>Embalagem 1,00 KG</i>, <i>Pacote 400,00 G</i>) ou da descrição, quando ela
 declara a embalagem (<i>C/5000 FLS</i>, <i>CAIXA COM 100 UNIDADES</i>).</p>
+<p>Quando a <b>unidade licitada já é a unidade-base</b> — quilo, litro, metro
+ou unidade —, o preço unitário <b>já está</b> nela, e o programa não divide
+nada. É o caso do hortifruti: a descrição traz o padrão comercial do CEAGESP
+(<i>"SACO COM 20 KG"</i>), mas a compra é por quilo, e a caixa citada é a de
+transporte. O ganho é que a mercadoria a granel passa a se comparar com a
+embalada — o feijão vendido por quilo entra na mesma série do pacote de
+5&nbsp;kg.</p>
 <div class="caixa"><b>O programa prefere não converter a converter errado.</b>
 Em <i>PAPEL A4 75G/M²</i> o número é a gramatura, não o peso comprado; em
 <i>210MM X 297MM</i> é a dimensão da folha; em <i>SERINGA 10ML</i> é a
 capacidade da seringa, e comparar seringas por R$/litro não significa nada.
-Nesses casos a coluna fica com um traço.</p>
+Item vendido por unidade vale <b>1 unidade</b>, e a medida solta do texto é
+ignorada; quando nem a unidade nem a descrição dizem algo utilizável, a coluna
+fica com um traço.</p>
+<div class="caixa"><b>A comparação por conteúdo não filtra lote.</b> O item
+lançado como <i>"Proposta para todos os itens"</i> vem com unidade
+<i>unidade</i> e o valor do lote inteiro, então entra na série com esse valor.
+Para tirá-lo, use o <b>descarte com razão</b> (seção seguinte), com o motivo
+<i>"Valor de lote lançado como item único"</i> — assim a exclusão fica
+registrada no relatório, como o art. 23 exige.</div>
 <p>Como comparar R$/quilo com R$/folha não diria nada, a comparação usa a
 <b>unidade-base mais frequente</b> do resultado e informa quantos itens
 ficaram de fora — por não declarar conteúdo ou por estar em outra medida. Se

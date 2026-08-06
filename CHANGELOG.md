@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.11.0 — 2026-08-06
+
+**Dois defeitos que só o acervo cheio revelou**
+
+- **Preço por quilo saía dividido pela caixa de transporte.** A descrição do
+  hortifruti traz o padrão comercial do CEAGESP — *"SACO COM 20 KG"* — junto da
+  especificação, e a unidade licitada é o quilo. O preço unitário já estava por
+  quilo, mas o programa lia os 20 kg da descrição e dividia de novo: abóbora a
+  R$ 5,45/kg virava **R$ 0,27/kg**, banana R$ 0,165/kg. Eram **1.245 itens**,
+  16% de tudo que o extrator lia.
+- Agora, quando a **unidade licitada já é a unidade-base** (quilo, litro, metro
+  ou unidade), o conteúdo vale 1 e nada é dividido. O efeito colateral é bem-
+  vindo: a mercadoria **a granel passa a se comparar com a embalada** — o feijão
+  por quilo entra na mesma série do pacote de 5 kg, e a caneta avulsa na do
+  pacote com 12. Antes as duas ficavam de fora da comparação.
+- **A correção pelo IPCA podia mover a mediana sem que fosse inflação.** Os
+  preços mais recentes que o último índice publicado saem da série — e com eles
+  muda a composição da amostra. Em *"instalação manutenção"*, 76 de 330 preços
+  saíram, todos recentes e baratos, e a mediana subiu **92%**, num período em
+  que o IPCA acumulado não passava de 25%.
+- Acima de **10% da série excluída**, a tela e o relatório passam a dizer, com
+  destaque, que a diferença para os valores nominais não decorre apenas da
+  correção monetária. O texto do relatório também deixou de atribuir a exclusão
+  só à "falta de data": a causa mais comum é o preço ser posterior ao índice.
+- A comparação por conteúdo **não filtra lote** — o item lançado como *"Proposta
+  para todos os itens"* entra com o valor do lote. Quem o tira da série é o
+  descarte com razão, com o motivo próprio, que deixa registro no documento.
+
 ## 1.10.5 — 2026-08-06
 
 **Quando o programa não abre, ele passa a dizer por quê**

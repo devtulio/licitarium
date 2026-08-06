@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.10.5"
+VERSAO = "1.11.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1003,6 +1003,7 @@ class Api:
                               ipca_ate_extenso=relatorios.mes_por_extenso(
                                   ipca["ate"]),
                               sem_indice=sem_indice)
+                relatorios.marcar_amostra_reduzida(resumo, sem_indice)
             if por_conteudo:
                 resumo.update(por_conteudo=True, base=base,
                               rotulo_base=relatorios.BASES[base][0],

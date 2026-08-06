@@ -77,20 +77,32 @@ def test_le_o_conteudo_declarado(descricao, unidade, esperado):
     ("PAPEL SULFITE 90 G/M² BRANCO", "RESMA"),
     # dimensão não é conteúdo
     ("PAPEL A4 210MM X 297MM", "CX"),
-    ("LONA PLASTICA 4M X 100M", "UN"),
-    # capacidade do artefato: a seringa não é vendida a granel
-    ("SERINGA 10ML DESCARTAVEL", "UN"),
-    ("BALDE PLASTICO 20 LITROS", "UN"),
     # medida solta na descrição, sem dizer que é embalagem
     ("FIO DE NYLON ROLO 50M", "ROLO"),
-    ("PNEU 175/70 R13", "UN"),
-    # nada numérico
-    ("CADEIRA DE RODAS REFORÇADA DOBRÁVEL", "UN"),
     ("SERVIÇO DE MANUTENÇÃO PREDIAL", "Serviço"),
     (None, None),
 ])
 def test_recusa_o_que_nao_e_conteudo(descricao, unidade):
     assert relatorios.conteudo(descricao, unidade) is None
+
+
+@pytest.mark.parametrize("descricao", [
+    # dimensão, capacidade do artefato e código de medida do pneu: nenhum
+    # deles é o que se comprou, e nenhum pode virar metro nem litro
+    "LONA PLASTICA 4M X 100M",
+    "SERINGA 10ML DESCARTAVEL",
+    "BALDE PLASTICO 20 LITROS",
+    "PNEU 175/70 R13",
+    "CADEIRA DE RODAS REFORÇADA DOBRÁVEL",
+])
+def test_unidade_avulsa_vale_um_e_nunca_a_medida_do_texto(descricao):
+    """Vendido por unidade: o conteúdo é 1, e a medida do texto é ignorada.
+
+    O que estes casos protegem é a recusa da medida enganosa. Que o item
+    valha `(1.0, "un")` é o preço unitário dito de outro jeito — o balde de
+    20 litros custa o que custa por balde, não por litro.
+    """
+    assert relatorios.conteudo(descricao, "UN") == (1.0, "un")
 
 
 def test_preco_por_conteudo_desfaz_a_distorcao_da_embalagem():
@@ -129,6 +141,32 @@ def test_resumo_normal_continua_sobre_o_preco_pago(api):
 
 def test_pesquisa_sem_conteudo_legivel_avisa_em_vez_de_mentir(tmp_path,
                                                              monkeypatch):
+    """Unidade que o extrator não reconhece continua fora da comparação."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "v.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO contratacoes (numero_controle, ano, objeto)"
+               " VALUES ('K',2026,'x')")
+    db.execute("INSERT INTO itens (id, contratacao_controle, descricao,"
+               " unidade, valor_unitario_homologado)"
+               " VALUES ('U1','K','CADEIRA DE RODAS DOBRAVEL','SERVICO',"
+               " 635000.0)")
+    db.commit()
+    db.close()
+
+    s = licitarium.Api().estatisticas_preco("cadeira", por_conteudo=True)
+    assert s["n"] == 0 and s["sem_conversao"] == 1
+
+
+def test_lote_lancado_como_item_unico_nao_e_filtrado_pelo_conteudo(tmp_path,
+                                                                  monkeypatch):
+    """O modo por conteúdo não é peneira de lote — o descarte com razão é.
+
+    "Proposta para todos os itens" vem com unidade UN e valor do lote
+    inteiro. Como UN é unidade-base, o item entra na comparação com R$/un
+    igual ao próprio unitário; quem o tira da série é o descarte com o
+    motivo "lote", que existe para isto e deixa a razão no documento.
+    """
     monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
     monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "v.db")
     db = licitarium.abrir_db()
@@ -140,8 +178,10 @@ def test_pesquisa_sem_conteudo_legivel_avisa_em_vez_de_mentir(tmp_path,
     db.commit()
     db.close()
 
-    s = licitarium.Api().estatisticas_preco("cadeira", por_conteudo=True)
-    assert s["n"] == 0 and s["sem_conversao"] == 1
+    api = licitarium.Api()
+    s = api.estatisticas_preco("cadeira", por_conteudo=True)
+    assert s["n"] == 1 and s["maximo"] == pytest.approx(635000.0)
+    assert "lote" in relatorios.MOTIVOS_DESCARTE
 
 
 def test_lista_traz_o_valor_por_conteudo_de_cada_item(api):
