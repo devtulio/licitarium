@@ -24,6 +24,16 @@
   destaque, que a diferença para os valores nominais não decorre apenas da
   correção monetária. O texto do relatório também deixou de atribuir a exclusão
   só à "falta de data": a causa mais comum é o preço ser posterior ao índice.
+- **Embalagem individual dispensa o marcador.** Até aqui, a medida na descrição
+  só era lida com `C/`, `COM` ou `CAIXA COM` — a regra existia para não
+  confundir *"SERINGA 10ML"* (capacidade do artefato) com conteúdo. Mas quando a
+  unidade de compra **é** a embalagem do produto (pacote, balde, galão, pote,
+  lata, frasco), a medida escrita é o conteúdo: *"BATATA PALHA 1KG"* num pacote
+  é um quilo. Recupera **1.501 itens**, quase todos de merenda escolar.
+- Caixa e fardo ficam **de fora** dessa leitura, de propósito: são embalagens
+  coletivas e o preço é o da caixa inteira. Foi de onde saíram todos os erros da
+  amostra — *"FERMENTO BIOLÓGICO 10G"* em caixa a R$ 216 daria **R$ 21.600/kg**,
+  e *"ÓLEO DE SOJA 900ML"* em caixa a R$ 139,50 daria R$ 155/litro.
 - **A unidade-base da comparação passou a ser escolhida só por quem declara
   conteúdo.** Como todo item vendido a unidade agora vale "1 unidade", esses
   itens passariam a decidir a base pelo peso do número: em *leite*, 140 avulsos

@@ -604,6 +604,19 @@ _NA_UNIDADE = re.compile(rf"{_NUM}\s*([A-Z]+)")
 _NA_DESCRICAO = re.compile(
     rf"(?:C\s*/\s*|COM\s+|CONTENDO\s+|CAIXA\s+COM\s+|PACOTE\s+COM\s+|"
     rf"FARDO\s+COM\s+|EMBALAGEM\s+COM\s+){_NUM}\s*([A-Z]+)")
+# Embalagem que contém o produto direto: aqui a medida escrita na descrição é
+# o conteúdo, mesmo sem marcador — "BATATA PALHA 1KG" num pacote é um quilo de
+# batata palha. Recupera 1.501 itens do acervo real, quase todos de merenda.
+#
+# CX e FD ficam DE FORA de propósito: são embalagens coletivas, e o preço é o
+# da caixa inteira, não o da medida escrita. Foi de onde saíram todos os erros
+# da amostra — "FERMENTO BIOLÓGICO 10G" em caixa a R$ 216 virava R$ 21.600/kg,
+# e "ÓLEO DE SOJA 900ML" em caixa a R$ 139,50 virava R$ 155/litro.
+EMBALAGEM_INDIVIDUAL = {"PCT", "PACOTE", "BALDE", "GL", "GALAO", "SC", "SACO",
+                        "POTE", "LATA", "FR", "FRASCO", "TB", "TUBO",
+                        "BISNAGA", "SACHE"}
+_SOLTA = re.compile(rf"{_NUM}\s*([A-Z]+)")
+
 # gramatura e dimensão têm cara de medida e não são conteúdo nenhum
 _GRAMATURA = re.compile(rf"{_NUM}\s*(?:G|GR)\s*/\s*M", re.I)
 _DIMENSAO = re.compile(rf"{_NUM}\s*(MM|CM|M)\s*(?:X|POR)\s*{_NUM}", re.I)
@@ -642,7 +655,11 @@ def conteudo(descricao, unidade):
     # virava R$ 0,27/kg. Eram 1.245 itens do acervo real, 16% das leituras.
     if u in BASE_PURA:
         return 1.0, BASE_PURA[u]
-    return _ler_conteudo(_sem_acento(descricao), _NA_DESCRICAO)
+    d = _sem_acento(descricao)
+    # o marcador explícito é o mais confiável e vem primeiro
+    return (_ler_conteudo(d, _NA_DESCRICAO)
+            or (_ler_conteudo(d, _SOLTA) if u in EMBALAGEM_INDIVIDUAL
+                else None))
 
 
 def _ler_conteudo(texto, padrao):

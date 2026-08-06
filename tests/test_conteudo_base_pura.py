@@ -47,6 +47,44 @@ def test_unidade_com_numero_continua_mandando_na_descricao():
     assert relatorios.conteudo("BISCOITO", "Pacote 400,00 G") == (0.4, "kg")
 
 
+# ── medida solta, quando a unidade é a embalagem do produto ─────────────
+
+@pytest.mark.parametrize("descricao, unidade, esperado", [
+    ("BATATA PALHA TRADICIONAL 1KG", "PCT", (1.0, "kg")),
+    ("AÇAFRÃO CÚRCUMA EM PÓ 30G", "PCT", (0.03, "kg")),
+    ("AZEITONA VERDE 2KG", "BALDE", (2.0, "kg")),
+    ("SUCO DE LARANJA 100% INTEGRAL 4L", "GL", (4.0, "l")),
+    ("GRAXA LUBRIFICANTE SAE NLGI 2 20KG", "BALDE", (20.0, "kg")),
+])
+def test_embalagem_individual_le_a_medida_sem_marcador(descricao, unidade,
+                                                       esperado):
+    """Num pacote, "1KG" é o que vem dentro — não precisa dizer "COM"."""
+    lido = relatorios.conteudo(descricao, unidade)
+    assert lido[0] == pytest.approx(esperado[0]) and lido[1] == esperado[1]
+
+
+@pytest.mark.parametrize("descricao, unidade", [
+    # caixa é embalagem COLETIVA: o preço é o da caixa, não o da medida
+    ("FERMENTO BIOLÓGICO 10G", "CX"),
+    ("CREME DE LEITE UHT 1L", "CX"),
+    ("ÓLEO DE SOJA REFINADO 900ML", "CX"),
+    ("LEITE UHT INTEGRAL 1L", "FD"),
+])
+def test_embalagem_coletiva_nao_le_medida_solta(descricao, unidade):
+    """R$ 216 a caixa de fermento não é R$ 21.600 o quilo.
+
+    Sem esta recusa, o preço da caixa inteira sai apresentado como preço da
+    unidade-base — e os quatro casos aqui vieram do acervo real.
+    """
+    assert relatorios.conteudo(descricao, unidade) is None
+
+
+def test_marcador_explicito_ganha_da_medida_solta():
+    """Com "COM 12", o 12 é o conteúdo, não o 500 que aparece antes."""
+    assert relatorios.conteudo("MACARRAO 500G PACOTE COM 12 UNIDADES",
+                               "PCT") == (12.0, "un")
+
+
 def test_granel_e_embalado_passam_a_se_comparar():
     """É o ganho: os dois viram R$/kg e entram na mesma série."""
     granel = relatorios.preco_por_conteudo(6.00, "FEIJÃO CARIOCA", "KG")
