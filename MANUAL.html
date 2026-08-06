@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.10.3</title>
+<title>Manual Operacional — Licitarium v1.10.4</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.10.3 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.10.4 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.10.3</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.10.4</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.10.3.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.10.4.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -485,17 +485,30 @@ processo no seu navegador.</p>
 <h2>5. Sincronização</h2>
 <ul>
   <li><b>Automática:</b> a cada abertura, o Licitarium busca apenas o que mudou
-      desde a última execução. Ficou uma semana sem abrir? Ele busca a semana.</li>
-  <li><b>Manual:</b> botão <b>Sincronizar</b> no topo, a qualquer momento.</li>
+      desde a última execução. Ficou uma semana sem abrir? Ele busca a semana.
+      Se o programa foi aberto há menos de <b>10 minutos</b>, a coleta
+      automática é dispensada — nada muda no PNCP nesse intervalo, e repetir a
+      busca só sobrecarrega o portal.</li>
+  <li><b>Manual:</b> botão <b>Sincronizar</b> no topo, a qualquer momento — e
+      esse sempre coleta, sem esperar intervalo nenhum.</li>
   <li><b>Sem internet:</b> o programa funciona normalmente com os dados locais
       e avisa que não conseguiu atualizar.</li>
   <li><b>Itens (banco de preços):</b> é a última etapa e a mais demorada, pois
       consulta cada contratação individualmente — por isso é feita com várias
       consultas simultâneas. Depois da primeira carga, só revisita processos
       novos ou alterados e, dentro deles, só os itens que mudaram.</li>
-  <li><b>Compactação:</b> quando o arquivo do acervo acumula espaço ocioso, o
-      Licitarium o compacta ao final da sincronização.</li>
+  <li><b>Compactação:</b> quando o arquivo do acervo acumula muito espaço
+      ocioso (5% do arquivo), o Licitarium o compacta ao final da
+      sincronização. A compactação bloqueia a leitura por instantes, por isso
+      só acontece quando há desperdício de verdade.</li>
 </ul>
+<div class="caixa"><b>"O PNCP não respondeu a tempo."</b> É a falha mais comum,
+e quase sempre não tem a ver com a sua internet: o portal fica lento em certos
+horários e a resposta não chega no prazo. O Licitarium tenta de novo cinco
+vezes, esperando mais a cada tentativa e reduzindo o número de conexões
+simultâneas quando percebe o portal sobrecarregado. O que falhou fica marcado
+em <b>Configurações → Sincronizações recentes</b> e é refeito na coleta
+seguinte — nada se perde, só atrasa.</div>
 <p>O histórico das sincronizações (com eventuais erros) fica em
 <b>Configurações → Sincronizações recentes</b>.</p>
 <p><b>Atualização do programa:</b> ao abrir, o Licitarium confere se há versão

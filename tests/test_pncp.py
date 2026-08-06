@@ -1,6 +1,7 @@
 """Testes do motor de sync (HTTP mockado — nenhuma chamada real ao PNCP)."""
 import sqlite3
 import sys
+import urllib.error
 from datetime import date
 from pathlib import Path
 
@@ -323,3 +324,81 @@ def test_sync_incremental_com_sobreposicao(db, monkeypatch):
     pncp._config(db, "last_sync_contratacoes", "2026-07-20")
     pncp.sincronizar_tudo(db, "1")
     assert chamadas and all(c == "20260719" for c in chamadas)
+
+
+def test_erro_de_servidor_reduz_o_paralelismo(monkeypatch):
+    """Portal sobrecarregado é pedido de trégua, não convite a insistir.
+
+    Antes, só o 429 registrava bloqueio: diante de uma sequência de 502 o
+    programa continuava atacando com quatro conexões simultâneas.
+    """
+    pncp._bloqueios.clear()
+    assert pncp._paralelismo_atual() == pncp.CONEXOES_PARALELAS
+
+    chamadas = []
+
+    def falhar(req, timeout=None):
+        chamadas.append(req.full_url)
+        raise urllib.error.HTTPError(req.full_url, 503, "Service Unavailable",
+                                     {}, None)
+
+    monkeypatch.setattr(pncp.urllib.request, "urlopen", falhar)
+    monkeypatch.setattr(pncp.time, "sleep", lambda s: None)
+    with pytest.raises(pncp.PncpErro):
+        pncp._get("/v1/x", {}, tentativas=3, pacing=False)
+
+    assert len(chamadas) == 3            # tentou de novo antes de desistir
+    assert len(pncp._bloqueios) >= 2     # e anotou os avisos do servidor
+    assert pncp._paralelismo_atual() < pncp.CONEXOES_PARALELAS
+    pncp._bloqueios.clear()
+
+
+def test_backoff_tem_sorteio_para_nao_repetir_a_rajada():
+    esperas = {round(pncp._espera(2), 4) for _ in range(20)}
+    assert len(esperas) > 1               # não é sempre o mesmo instante
+    assert all(4 <= e <= 4.5 for e in esperas)
+
+
+def test_timeout_cresce_a_cada_tentativa():
+    """O PNCP não recusa, demora: repetir com o mesmo prazo repete a falha."""
+    assert [pncp._timeout(i) for i in range(5)] == [30, 45, 60, 75, 90]
+    assert pncp._timeout(9) == 90        # não cresce para sempre
+
+
+def test_erro_de_timeout_nao_fala_em_falta_de_conexao(monkeypatch):
+    """"Sem conexão" mandava o usuário procurar defeito na internet dele."""
+    def estourar(req, timeout=None):
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr(pncp.urllib.request, "urlopen", estourar)
+    monkeypatch.setattr(pncp.time, "sleep", lambda s: None)
+    with pytest.raises(pncp.PncpErro) as e:
+        pncp._get("/v1/x", {}, tentativas=2, pacing=False)
+    assert "não respondeu" in str(e.value) and "portal" in str(e.value)
+    pncp._bloqueios.clear()
+
+
+def test_sync_da_abertura_respeita_intervalo_minimo(tmp_path, monkeypatch):
+    """Abrir o programa cinco vezes numa hora não coleta cinco vezes."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "s.db")
+    db = licitarium.abrir_db()
+    chamou = []
+    monkeypatch.setattr(pncp, "sync_ipca", lambda *a, **k: chamou.append("ipca"))
+    monkeypatch.setattr(pncp, "sync_contratacoes",
+                        lambda *a, **k: chamou.append("contratacoes") or 0)
+    monkeypatch.setattr(pncp, "descobrir_orgaos", lambda db: [])
+    monkeypatch.setattr(pncp, "sync_itens", lambda *a, **k: 0)
+    try:
+        pncp.sincronizar_tudo(db, "3534203", forcado=True)
+        assert chamou, "a primeira coleta tem de rodar"
+
+        chamou.clear()
+        r = pncp.sincronizar_tudo(db, "3534203", forcado=False)
+        assert r.get("pulado") is True and not chamou
+
+        # o botão Sincronizar continua valendo sempre
+        pncp.sincronizar_tudo(db, "3534203", forcado=True)
+        assert chamou
+    finally:
+        db.close()

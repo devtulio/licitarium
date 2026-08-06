@@ -456,6 +456,11 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .chip.aviso { border-color:color-mix(in srgb, var(--warn) 45%, transparent);
               background:color-mix(in srgb, var(--warn) 10%, var(--surface));
               color:var(--warn); }
+/* enquanto o painel busca os dados: sinal discreto, sem trocar o conteúdo
+   por um esqueleto — a consulta leva ~150 ms, e piscar seria pior */
+.painel.carregando .vista { opacity:.45; transition:opacity .12s; }
+.painel.carregando .painel-topo select,
+.painel.carregando .painel-topo button { cursor:progress; }
 .painel svg text { font-family:var(--font-ui); }
 .painel .rot { font-size:10.5px; fill:var(--muted); }
 .painel .val { font-size:11px; fill:var(--text);

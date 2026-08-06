@@ -294,6 +294,8 @@ def dados_painel(db, ano, orgao=None, limites=None):
     # calendário, não desempenho: em agosto, "caiu 67%" só diz que faltam
     # quatro meses. Quando o exercício pedido é o corrente, o anterior é
     # cortado no mesmo dia.
+    og_c = " AND c.orgao_cnpj=?" if orgao else ""     # consultas com JOIN
+    og_k = " AND k.orgao_cnpj=?" if orgao else ""
     hoje = date.today()
     parcial = ano == hoje.year
     corte = f"{ano - 1}-{hoje:%m-%d}" if parcial else f"{ano - 1}-12-31"
@@ -377,17 +379,20 @@ def dados_painel(db, ano, orgao=None, limites=None):
     # ── vigilância: o que exige ação
     funil = {
         "publicadas": executivo["cards"]["n"],
+        # `contratacoes` e `itens` têm as duas uma coluna orgao_cnpj: sem o
+        # prefixo, filtrar por órgão fazia o SQLite recusar a consulta
+        # inteira ("ambiguous column name") e o painel não abria
         "com_resultado": db.execute(
             f"""SELECT COUNT(DISTINCT c.numero_controle) FROM contratacoes c
                  JOIN itens i ON i.contratacao_controle = c.numero_controle
                 WHERE c.referencia=0 AND c.ano=?
-                  AND i.valor_unitario_homologado IS NOT NULL{og}""",
+                  AND i.valor_unitario_homologado IS NOT NULL{og_c}""",
             [ano] + og_args).fetchone()[0],
         "com_contrato": db.execute(
-            f"""SELECT COUNT(DISTINCT contratacao_controle) FROM contratos
-                WHERE contratacao_controle IN (
+            f"""SELECT COUNT(DISTINCT contratacao_controle) FROM contratos k
+                WHERE k.contratacao_controle IN (
                   SELECT numero_controle FROM contratacoes
-                   WHERE referencia=0 AND ano=?){og}""",
+                   WHERE referencia=0 AND ano=?){og_k}""",
             [ano] + og_args).fetchone()[0],
         # vigentes DO EXERCÍCIO: contar todos os contratos vigentes, de
         # qualquer ano, fazia a última etapa do funil ficar maior que a
@@ -397,7 +402,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
                  WHERE date(k.vigencia_fim) >= date('now')
                    AND k.contratacao_controle IN (
                      SELECT numero_controle FROM contratacoes
-                      WHERE referencia=0 AND ano=?){og}""",
+                      WHERE referencia=0 AND ano=?){og_k}""",
             [ano] + og_args).fetchone()[0],
     }
     # processo publicado há muito tempo e sem resultado é pendência, não
@@ -406,7 +411,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
         f"""SELECT COUNT(*) FROM contratacoes c
              WHERE c.referencia=0 AND c.valor_homologado IS NULL
                AND date(c.data_publicacao) < date('now','-90 day')
-               AND c.ano=?{og}""", [ano] + og_args).fetchone()[0]
+               AND c.ano=?{og_c}""", [ano] + og_args).fetchone()[0]
     propostas = db.execute(
         f"""SELECT COUNT(*) FROM contratacoes
              WHERE referencia=0

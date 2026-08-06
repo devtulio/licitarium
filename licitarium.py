@@ -26,7 +26,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.10.3"
+VERSAO = "1.10.4"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1140,13 +1140,20 @@ class Api:
 
     # ── sincronização ───────────────────────────────────────────────────
 
-    def sincronizar(self):
+    def sincronizar(self, forcado=True):
+        """Dispara a coleta. `forcado=False` é a da abertura do programa.
+
+        A da abertura respeita um intervalo mínimo: abrir cinco vezes numa
+        hora disparava cinco coletas completas, e o PNCP não muda em dez
+        minutos. O botão Sincronizar continua valendo sempre.
+        """
         if not self._sync_ativo.acquire(blocking=False):
             return False  # já rodando
-        threading.Thread(target=self._rodar_sync, daemon=True).start()
+        threading.Thread(target=self._rodar_sync, args=(bool(forcado),),
+                         daemon=True).start()
         return True
 
-    def _rodar_sync(self):
+    def _rodar_sync(self, forcado=True):
         try:
             self._status.update(rodando=True, msg="Conectando ao PNCP…",
                                 resumo=None, erro=None)
@@ -1156,7 +1163,8 @@ class Api:
                 ibge = pncp._config(db, "municipio_ibge")
                 if not ibge:
                     return
-                resumo = pncp.sincronizar_tudo(db, ibge, self._progresso)
+                resumo = pncp.sincronizar_tudo(db, ibge, self._progresso,
+                                               forcado=forcado)
                 self._status.update(resumo=resumo)
             finally:
                 db.close()

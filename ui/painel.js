@@ -495,16 +495,39 @@ function vistaVigilancia(d) {
 
 // ══ ciclo de vida ═════════════════════════════════════════════════════════
 
-async function carregarPainel() {
-  const alvo = { execucao: "p-execucao", analise: "p-analise",
+const VISTAS = { execucao: "p-execucao", analise: "p-analise",
                  vigilancia: "p-vigilancia" };
-  for (const id of Object.values(alvo))
-    $(id).classList.toggle("oculto", alvo[P.vista] !== id);
+
+function mostrarVista() {
+  for (const id of Object.values(VISTAS))
+    $(id).classList.toggle("oculto", VISTAS[P.vista] !== id);
   // vista oculta tem largura zero: ao aparecer, os gráficos são desenhados
-  desenharGraficos($(alvo[P.vista]));
+  desenharGraficos($(VISTAS[P.vista]));
+}
+
+async function carregarPainel() {
+  mostrarVista();
   if (!api.painel) return;
-  const dados = await api.painel($("p-ano").value || null,
-                                 $("p-orgao").value || null);
+  // a consulta é rápida, mas o banco pode estar compactando depois de uma
+  // sincronização: sem sinal na tela, a espera parece travamento
+  const painel = $("painel");
+  painel.setAttribute("aria-busy", "true");
+  painel.classList.add("carregando");
+  let dados;
+  try {
+    dados = await api.painel($("p-ano").value || null,
+                             $("p-orgao").value || null);
+  } catch (e) {
+    painel.classList.remove("carregando");
+    painel.removeAttribute("aria-busy");
+    $("painel-chips").classList.add("oculto");
+    $(VISTAS[P.vista]).innerHTML =
+      `<div class="card"><div class="vazio">Não consegui montar o painel:
+        ${esc(String(e && e.message || e))}</div></div>`;
+    return;
+  }
+  painel.classList.remove("carregando");
+  painel.removeAttribute("aria-busy");
   P.dados = dados;
   mostrarChips(dados.alertas);
   $("p-execucao").innerHTML = vistaExecucao(dados);
@@ -560,7 +583,9 @@ $("painel").querySelectorAll(".subabas button").forEach(b =>
       x.classList.toggle("on", x === b));
     // a subaba fica lembrada: quem usa o painel para vigiar abre nela
     api.set_config?.("painel_vista", P.vista);
-    carregarPainel();
+    // as três vistas já estão montadas: trocar é mostrar, não recarregar —
+    // antes cada clique refazia a consulta inteira ao banco
+    mostrarVista();
   }));
 
 ["p-ano", "p-orgao"].forEach(id =>

@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.10.4 — 2026-08-05
+
+**O Painel travava ao filtrar por órgão — e era um erro de consulta**
+
+- `contratações` e `itens` têm as duas uma coluna com o CNPJ do órgão. Na
+  consulta que junta as duas, sem dizer de qual tabela, o SQLite recusa tudo
+  com *ambiguous column name*: escolher um órgão simplesmente não montava o
+  painel, e a tela ficava como estava — parecendo travada.
+- **Trocar de subaba ia ao banco de novo** sem necessidade: as três visões já
+  estão montadas, então trocar agora é só mostrar.
+- **A compactação do acervo bloqueia toda leitura** enquanto roda — 0,6 s num
+  acervo de 114 MB — e disparava com apenas 0,8 MB de espaço livre, ou seja,
+  em quase toda sincronização. Agora só quando há desperdício de verdade (5% do
+  arquivo e no mínimo 2.000 páginas).
+- O painel mostra que está carregando e, se a consulta falhar, **diz o erro**
+  em vez de ficar mudo.
+
+**Erros do PNCP: o portal não recusa, ele demora**
+
+- No acervo do piloto, **todos** os erros de um dia foram *the read operation
+  timed out* — nenhuma recusa, nenhum bloqueio. Insistir com o mesmo prazo
+  curto repetia a falha: o tempo de espera agora **cresce a cada tentativa**
+  (30, 45, 60, 75, 90 s).
+- A mensagem dizia "sem conexão com o PNCP", o que mandava procurar defeito na
+  internet. Agora diz que **o portal não respondeu a tempo**.
+- Erro de servidor e tempo esgotado passam a **reduzir o número de conexões
+  simultâneas**, como o 429 já fazia: diante de um portal sobrecarregado o
+  programa insistia a quatro conexões.
+- O tempo de espera entre tentativas ganhou **sorteio**, para as conexões que
+  falharam juntas não voltarem no mesmo instante.
+- **Abrir o programa não repete a coleta inteira**: a sincronização automática
+  respeita um intervalo de 10 minutos desde a última. O botão **Sincronizar**
+  continua valendo sempre.
+
 ## 1.10.3 — 2026-08-05
 
 **Cada tema com a sua paleta de gráficos**

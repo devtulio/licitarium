@@ -137,3 +137,27 @@ test("chips concordam em número", async ({ page }) => {
   await expect(chips.nth(2)).toContainText("processo com proposta aberta");
   await expect(chips.nth(3)).toContainText("processo sem resultado");
 });
+
+test("trocar de subaba não vai ao banco de novo", async ({ page }) => {
+  const antes = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "painel").length);
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  await page.locator('.subabas button[data-vista="vigilancia"]').click();
+  await page.locator('.subabas button[data-vista="execucao"]').click();
+  const depois = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "painel").length);
+  expect(depois).toBe(antes);           // as três vistas já estão montadas
+});
+
+test("falha na consulta explica em vez de deixar a tela muda",
+    async ({ page }) => {
+  await page.evaluate(() => {
+    window.pywebview.api.painel = async () => {
+      throw new Error("database is locked");
+    };
+  });
+  await page.locator("#p-ano").selectOption({ index: 0 });
+  await expect(page.locator("#p-execucao")).toContainText("Não consegui montar");
+  await expect(page.locator("#p-execucao")).toContainText("database is locked");
+  await expect(page.locator("#painel")).not.toHaveClass(/carregando/);
+});

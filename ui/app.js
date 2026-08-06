@@ -250,7 +250,9 @@ async function iniciarApp(e) {
   // o programa consertou algo no banco para conseguir abrir: dizer, senão o
   // usuário só descobre pelo dado que faltou
   if (e.aviso_abertura) alert(`Licitarium\n\n${e.aviso_abertura}`);
-  api.sincronizar();  // sync ao abrir (catch-up incremental)
+  // sync ao abrir: não forçado, então respeita o intervalo mínimo — abrir o
+  // programa várias vezes seguidas não repete a coleta inteira
+  api.sincronizar(false);
   api.checar_atualizacao().then(at => {
     if (!at) return;
     const alvo = $("rodape-versao");

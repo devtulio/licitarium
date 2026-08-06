@@ -276,3 +276,19 @@ def test_impressao_ignora_vista_vazia(tmp_path, monkeypatch):
                                           ["analise", ""]], ANO)
     html = Path(r["arquivo"]).read_text(encoding="utf-8")
     assert "Análise comparativa" not in html
+
+
+def test_filtro_de_orgao_nao_quebra_o_painel(api):
+    """`contratacoes` e `itens` têm as duas uma coluna orgao_cnpj.
+
+    Sem prefixo na consulta com JOIN, o SQLite recusa tudo com "ambiguous
+    column name" — e o painel não abre para quem filtra por órgão.
+    """
+    d = api.painel(ANO, "111")
+    assert d["vigilancia"]["funil"]["publicadas"] == 4
+    assert d["execucao"]["cards"]["n"] == 4
+
+    # órgão sem nada no acervo devolve painel vazio, não exceção
+    vazio = api.painel(ANO, "000")
+    assert vazio["execucao"]["cards"]["n"] == 0
+    assert vazio["vigilancia"]["funil"]["publicadas"] == 0

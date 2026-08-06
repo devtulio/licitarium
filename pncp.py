@@ -10,6 +10,7 @@ as demais colunas são projeção para filtro/listagem.
 import collections
 import concurrent.futures
 import json
+import random
 import threading
 import time
 import urllib.error
@@ -89,6 +90,26 @@ def _paralelismo_atual():
     return 2 if n else CONEXOES_PARALELAS
 
 
+# O PNCP não recusa: ele demora. No acervo do piloto, todos os erros de um
+# dia inteiro foram "The read operation timed out" — nenhum 429, nenhum 502.
+# Insistir com o mesmo prazo curto repete a falha; por isso cada tentativa
+# espera mais que a anterior.
+TIMEOUTS = (30, 45, 60, 75, 90)
+
+
+def _timeout(tentativa):
+    return TIMEOUTS[min(tentativa, len(TIMEOUTS) - 1)]
+
+
+def _espera(tentativa):
+    """Backoff com sorteio: 1, 2, 4, 8 s mais até meio segundo de desvio.
+
+    Sem o desvio, as quatro conexões que falharam juntas voltam juntas — e
+    o portal, que já estava sobrecarregado, leva a mesma rajada de novo.
+    """
+    return 2 ** tentativa + random.uniform(0, 0.5)
+
+
 def _get(caminho, params, tentativas=5, base=None, pacing=True):
     """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados.
 
@@ -107,7 +128,7 @@ def _get(caminho, params, tentativas=5, base=None, pacing=True):
         try:
             req = urllib.request.Request(
                 url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=_timeout(tentativa)) as resp:
                 if resp.status == 204:
                     return None
                 corpo = resp.read()
@@ -124,13 +145,24 @@ def _get(caminho, params, tentativas=5, base=None, pacing=True):
                            else 5 * (tentativa + 1))
                 continue
             if e.code in (500, 502, 503, 504) and tentativa < tentativas - 1:
-                time.sleep(2 ** tentativa)
+                # portal sobrecarregado conta como bloqueio: o paralelismo
+                # cai sozinho na próxima leva, em vez de insistir a quatro
+                # conexões contra um servidor que já está pedindo trégua
+                _registrar_bloqueio()
+                time.sleep(_espera(tentativa))
                 continue
             raise PncpErro(f"HTTP {e.code} em {caminho}") from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             if tentativa < tentativas - 1:
-                time.sleep(2 ** tentativa)
+                _registrar_bloqueio()
+                time.sleep(_espera(tentativa))
                 continue
+            # "sem conexão" fazia o usuário procurar defeito na internet
+            # dele; o que costuma acontecer é o portal demorar demais
+            if "timed out" in str(e).lower() or isinstance(e, TimeoutError):
+                raise PncpErro(
+                    f"o PNCP não respondeu em {_timeout(tentativa)}s — o "
+                    "portal está lento ou fora do ar") from e
             raise PncpErro(f"sem conexão com o PNCP ({e})") from e
 
 
@@ -638,11 +670,32 @@ def _log(db, tipo, inicio, fim, registros, status, erro=None):
     db.commit()
 
 
-def sincronizar_tudo(db, codigo_ibge, progresso=None):
+# Abrir o programa dispara uma sincronização. Abrir cinco vezes numa hora
+# disparava cinco coletas completas contra um portal que já estava lento —
+# e nada muda no PNCP em dez minutos.
+INTERVALO_MINIMO = 600      # segundos
+
+
+def sincronizar_tudo(db, codigo_ibge, progresso=None, forcado=True):
     """Sync completo incremental. Falha em um tipo não bloqueia os demais.
+
+    Com `forcado=False` (a sincronização automática da abertura), desiste
+    se a última execução foi há menos de `INTERVALO_MINIMO`.
 
     Retorna resumo {tipo: registros | None se falhou}.
     """
+    if not forcado:
+        ultima = _config(db, "ultimo_sync_em")
+        if ultima:
+            try:
+                idade = (datetime.now()
+                         - datetime.fromisoformat(ultima)).total_seconds()
+            except ValueError:
+                idade = INTERVALO_MINIMO
+            if idade < INTERVALO_MINIMO:
+                return {"pulado": True,
+                        "faltam": int(INTERVALO_MINIMO - idade)}
+    _config(db, "ultimo_sync_em", datetime.now().isoformat())
     hoje = date.today()
     resumo = {}
 
@@ -727,9 +780,14 @@ def sincronizar_tudo(db, codigo_ibge, progresso=None):
         _log(db, "itens", hoje, hoje, 0, "erro", str(e))
         resumo["itens"] = None
 
-    # devolve ao disco o espaço que as regravações deixaram para trás
-    # (200 páginas ≈ 0,8 MB; VACUUM do acervo municipal leva ~0,1 s)
-    if db.execute("PRAGMA freelist_count").fetchone()[0] > 200:
+    # Devolve ao disco o espaço que as regravações deixaram para trás. O
+    # VACUUM **bloqueia toda leitura** enquanto roda — 0,62 s num acervo de
+    # 114 MB —, e o limiar antigo (200 páginas ≈ 0,8 MB) disparava em quase
+    # toda sincronização: quem estivesse no Painel via a tela congelar sem
+    # motivo aparente. Agora só vale a pena quando há desperdício de verdade.
+    livres = db.execute("PRAGMA freelist_count").fetchone()[0]
+    total = db.execute("PRAGMA page_count").fetchone()[0]
+    if livres > 2000 and livres > total * 0.05:
         if progresso:
             progresso("Compactando o acervo…")
         db.execute("VACUUM")
