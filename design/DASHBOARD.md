@@ -96,6 +96,30 @@ mantendo proporção e sobrava faixa morta dos dois lados — em monitor largo,
 metade do cartão era vazio. Vista oculta tem largura zero: por isso o desenho
 também acontece ao trocar de subaba.
 
+## Desempenho (medido, não estimado)
+
+Num acervo sintético de 114 MB — 3.360 contratações e 25 mil itens, com `raw`
+do tamanho real:
+
+| etapa | custo |
+|---|---|
+| `dados_painel` sem filtro | 121 ms |
+| `dados_painel` com filtro de órgão | 167 ms |
+| montar as três vistas + desenhar | 2 ms |
+| `VACUUM` do acervo | 620 ms, **bloqueando toda leitura** |
+
+Daí três regras:
+
+- **Trocar de subaba não consulta o banco.** As três vistas já estão montadas;
+  trocar é mostrar.
+- **A compactação exige desperdício real** (5% do arquivo e ao menos 2.000
+  páginas). O limiar antigo, de 200 páginas, disparava em quase toda
+  sincronização e congelava a tela por meio segundo sem motivo aparente.
+- **Consulta com JOIN qualifica a coluna.** `contratacoes` e `itens` têm as
+  duas `orgao_cnpj`: sem o prefixo, filtrar por órgão derruba a consulta inteira
+  com *ambiguous column name* — e o painel não abre, o que na tela parece
+  travamento.
+
 ## Impressão
 
 `🖨 Imprimir` gera **A3 paisagem**, uma vista por página. O SVG enviado ao

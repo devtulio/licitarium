@@ -142,8 +142,10 @@ clara**, para não gastar tinta nem prejudicar a leitura em papel.
 
 - Na primeira execução você escolhe o município (tabela IBGE embutida, 5.571
   municípios) e o Licitarium baixa todo o histórico publicado desde 2021.
-- A cada abertura, sincroniza só o que mudou; dá para sincronizar à mão quando
-  quiser. A interface fica utilizável durante a sincronização.
+- A cada abertura, sincroniza só o que mudou — respeitando um intervalo de 10
+  minutos desde a última coleta, porque nada muda no PNCP nesse tempo e repetir
+  a busca só sobrecarrega o portal. O botão **Sincronizar** coleta sempre. A
+  interface fica utilizável durante a sincronização.
 - Os órgãos do município (prefeitura, câmara, fundos…) são **descobertos
   sozinhos** a partir das contratações; você pode acrescentar outros por CNPJ.
 - Tudo num banco SQLite local, em `%LOCALAPPDATA%\Licitarium`. O banco é cache
@@ -155,6 +157,19 @@ clara**, para não gastar tinta nem prejudicar a leitura em papel.
 depois de uma semana sem abrir): **33 segundos**, 69 consultas ao portal. As
 três fases baixam em paralelo e, dentro de cada contratação, só os itens que
 mudaram são reconsultados.
+
+**Quando o portal falha**, quase sempre é lentidão, não recusa: num dia de
+medição no acervo do piloto, os 20 erros registrados eram todos tempo de
+resposta esgotado — nenhum bloqueio, nenhum erro de servidor. O cliente tenta
+cinco vezes, **esperando mais a cada tentativa** (30 a 90 s), sorteia o
+intervalo entre elas para as conexões não voltarem em bloco e **reduz o número
+de conexões simultâneas** ao perceber o portal sobrecarregado. O que falha fica
+registrado e é refeito na coleta seguinte.
+
+**Desempenho do Painel**: a consulta que alimenta as três visões custa ~120 ms
+num acervo de 114 MB (3.360 contratações, 25 mil itens); montar e desenhar os
+gráficos, ~2 ms. A compactação do banco, que bloqueia leituras, só roda quando
+há mais de 5% do arquivo em espaço ocioso.
 
 ### Privacidade
 
@@ -255,6 +270,9 @@ Os gráficos são SVG desenhado pelo próprio programa — sem biblioteca e sem
 rede —, seguem um método com paleta validada para daltonismo e contraste, e
 saem em **A3 paisagem** pelo botão de impressão. As decisões estão em
 [design/DASHBOARD.md](design/DASHBOARD.md).
+
+Os gráficos são desenhados na largura real do cartão e redesenhados quando a
+janela muda de tamanho; trocar de visão não vai ao banco de novo.
 
 ## Cópia do acervo
 
