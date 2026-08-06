@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.11.1 — 2026-08-06
+
+**Os gráficos do Painel respondem ao cursor**
+
+- Passar o mouse sobre uma barra, ponto ou célula **acende a marca e recua as
+  demais**. Num gráfico de doze meses com duas séries, é o que permite saber qual
+  marca se está lendo — antes só havia o rótulo do sistema, que não diz qual
+  retângulo o produziu.
+- **Barra não muda de tamanho.** Ela vale o número que representa, e crescer ao
+  ser apontada faria a marca mentir sobre o valor. Quem cresce é o que é ponto —
+  círculo da agenda, seta de estouro de limite —, onde tamanho não codifica dado.
+- Transições de 150 ms, e nenhuma animação de entrada: o painel redesenha a cada
+  troca de exercício e de subaba, e repetir o espetáculo a cada vez cansaria.
+  Quem pede menos movimento no sistema (`prefers-reduced-motion`) recebe o
+  realce sem transição.
+
 ## 1.11.0 — 2026-08-06
 
 **Dois defeitos que só o acervo cheio revelou**

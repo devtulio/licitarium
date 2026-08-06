@@ -38,6 +38,15 @@ piso de visão normal e contraste contra a superfície.
   de de-ênfase.
 - **`<title>` em cada marca** — é o tooltip nativo, funciona offline e sai da
   impressão sem sujeira.
+- **A marca sob o cursor acende; as irmãs recuam** (`fill-opacity: .38`, 150 ms).
+  Sem isso, o `<title>` diz o número mas não diz de qual retângulo ele veio.
+  **O realce é do desenho, nunca do dado**: barra não muda de tamanho, porque a
+  marca vale o valor que representa. Cresce só o que é ponto — círculo da agenda,
+  seta de estouro —, onde o tamanho não codifica nada. Nenhuma animação de
+  entrada: o painel redesenha a cada troca de exercício e de subaba.
+  A regra que esmaece as irmãs usa `:has()` e vive **separada** da que acende a
+  marca — onde o seletor não existir, ela é descartada sozinha e o realce
+  continua de pé.
 - **Vazio é vazio.** Sem dado, o cartão diz o que falta; nunca desenha zero.
 
 ### Paleta

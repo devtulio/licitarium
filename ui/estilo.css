@@ -474,3 +474,27 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .painel .eixo { stroke:var(--border); stroke-width:1; }
 .painel .vazio { color:var(--muted); font-size:13px; padding:26px 0;
                  text-align:center; }
+
+/* ── o gráfico responde ao cursor ─────────────────────────────────────
+   A marca sob o ponteiro acende e as irmãs recuam, que é o que faz o
+   leitor saber qual barra está lendo num gráfico de doze meses. Só
+   :hover — nada de animação de entrada: o painel redesenha a cada troca
+   de exercício e de subaba, e repetir o espetáculo cansaria.
+   O realce é do desenho, nunca do dado: barra não muda de tamanho, senão
+   a marca deixaria de valer o número que representa. Quem cresce é o que
+   é ponto (círculo e seta), onde o tamanho não codifica valor. */
+.painel svg :is(rect, circle, path) {
+  transition:fill-opacity .15s ease, filter .15s ease, transform .15s ease;
+  transform-box:fill-box; transform-origin:center; }
+/* regra própria de propósito: onde :has() faltar, ela é descartada
+   sozinha e o realce abaixo continua funcionando */
+.painel svg:has(:is(rect, circle, path):hover)
+        :is(rect, circle, path):not(:hover) { fill-opacity:.38; }
+.painel svg :is(rect, circle, path):hover { filter:brightness(1.16); }
+.painel svg :is(circle, path):hover { transform:scale(1.22);
+  stroke:var(--surface); stroke-width:2; paint-order:stroke; }
+
+@media (prefers-reduced-motion: reduce) {
+  .painel svg :is(rect, circle, path) { transition:none; }
+  .painel svg :is(circle, path):hover { transform:none; }
+}

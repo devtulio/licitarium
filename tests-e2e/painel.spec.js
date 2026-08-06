@@ -18,6 +18,37 @@ test("o Painel é a tela inicial e não mostra a lista", async ({ page }) => {
   await expect(page.locator("#kpis-topo")).toBeVisible();
 });
 
+test("a marca sob o cursor acende e as irmãs recuam", async ({ page }) => {
+  const barras = page.locator("#p-execucao svg rect");
+  const alvo = barras.first();
+  const irma = barras.nth(3);
+
+  // em repouso ninguém está esmaecido nem aceso
+  await expect(irma).toHaveCSS("fill-opacity", "1");
+  await expect(alvo).toHaveCSS("filter", "none");
+
+  await alvo.hover();
+  await expect(alvo).toHaveCSS("filter", "brightness(1.16)");
+  await expect(irma).toHaveCSS("fill-opacity", "0.38");
+
+  // saindo do gráfico, tudo volta — realce não é estado, é resposta
+  await page.locator(".painel-topo").hover();
+  await expect(irma).toHaveCSS("fill-opacity", "1");
+  await expect(alvo).toHaveCSS("filter", "none");
+});
+
+test("barra não muda de tamanho ao ser realçada", async ({ page }) => {
+  /* A barra vale o número que representa: crescer no hover faria a marca
+     mentir sobre o valor. Quem cresce é o ponto, onde tamanho não é dado. */
+  const barra = page.locator("#p-execucao svg rect").first();
+  const antes = await barra.boundingBox();
+  await barra.hover();
+  await expect(barra).toHaveCSS("filter", "brightness(1.16)");
+  const depois = await barra.boundingBox();
+  expect(depois.width).toBeCloseTo(antes.width, 1);
+  expect(depois.height).toBeCloseTo(antes.height, 1);
+});
+
 test("as três vistas trocam e ficam lembradas", async ({ page }) => {
   await expect(page.locator("#p-execucao")).toBeVisible();
   await expect(page.locator("#p-analise")).toBeHidden();
