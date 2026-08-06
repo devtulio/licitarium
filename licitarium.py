@@ -13,6 +13,7 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 import unicodedata
 import urllib.request
 import webbrowser
@@ -1629,6 +1630,77 @@ del "%~f0"
 """
 
 
+ARQUIVO_LOG = "ultimo-erro.log"
+
+
+def registrar_falha(assunto, erro):
+    """Deixa por escrito o que derrubou a abertura.
+
+    O executável é compilado sem console: sem isto, uma falha na partida
+    não deixa rastro nenhum e o usuário só vê a janela de erro do WebView2,
+    que fala de proxy e firewall e não menciona o programa.
+    """
+    try:
+        DIR_DADOS.mkdir(parents=True, exist_ok=True)
+        with (DIR_DADOS / ARQUIVO_LOG).open("a", encoding="utf-8") as f:
+            f.write(f"\n=== {datetime.now():%Y-%m-%d %H:%M:%S} · v{VERSAO}\n")
+            f.write(f"{assunto}: {erro}\n")
+            f.write(traceback.format_exc())
+    except OSError:
+        pass
+
+
+def _avisar(texto, titulo="Licitarium"):
+    """Caixa do Windows — a única interface disponível antes da janela."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, texto, titulo, 0x10)
+    except Exception:
+        print(texto, file=sys.stderr)
+
+
+def _interface_no_ar(url, tentativas=25):
+    """Espera o servidor local que serve a interface responder.
+
+    O pywebview publica os arquivos da interface num servidor em
+    127.0.0.1 e manda o WebView2 buscá-los ali. Quando esse servidor não
+    sobe — firewall, antivírus, proxy sem exceção para endereço local —, a
+    janela mostra ERR_CONNECTION_REFUSED, um erro do navegador que não diz
+    nada sobre o Licitarium.
+    """
+    if not (url or "").startswith("http"):
+        return True                      # servido direto do arquivo: nada a esperar
+    for _ in range(tentativas):
+        try:
+            with urllib.request.urlopen(url, timeout=1):
+                return True
+        except urllib.error.HTTPError:
+            return True                  # respondeu, ainda que com erro HTTP
+        except (urllib.error.URLError, OSError):
+            time.sleep(0.2)
+    return False
+
+
+def _conferir_interface(janela):
+    """Roda em paralelo à janela: se a interface não subir, explica."""
+    url = getattr(janela, "original_url", None) or getattr(janela, "url", "")
+    if _interface_no_ar(url):
+        return
+    registrar_falha("interface não respondeu", url)
+    _avisar(
+        "O Licitarium não conseguiu abrir a própria interface.\n\n"
+        "Ela é publicada num servidor local (endereço 127.0.0.1) e lida pela "
+        "janela do programa. Algo nesta máquina está impedindo essa conversa "
+        "interna — normalmente um antivírus, um firewall ou um proxy sem "
+        "exceção para endereços locais.\n\n"
+        "O que costuma resolver:\n"
+        "1. Configurações do Windows > Rede > Proxy: marcar \"não usar proxy "
+        "para endereços locais\";\n"
+        "2. liberar o Licitarium no antivírus/firewall;\n"
+        "3. fechar instâncias antigas do programa e abrir de novo.\n\n"
+        f"Detalhes gravados em {DIR_DADOS / ARQUIVO_LOG}")
+
+
 def main():
     api = Api()
     db = abrir_db()
@@ -1647,9 +1719,18 @@ def main():
     api._janela = webview.create_window(
         titulo, str(DIR_APP / "ui" / "index.html"), js_api=api,
         width=1100, height=740, min_size=(900, 600), maximized=maximizar)
+    threading.Thread(target=_conferir_interface, args=(api._janela,),
+                     daemon=True).start()
     # armazenamento persistente: sem isso o WebView2 abre um perfil novo a
     # cada execução e o localStorage (usado como reserva pela splash) some
-    webview.start(private_mode=False, storage_path=str(DIR_DADOS / "webview"))
+    try:
+        webview.start(private_mode=False,
+                      storage_path=str(DIR_DADOS / "webview"))
+    except Exception as e:
+        registrar_falha("falha ao abrir a janela", e)
+        _avisar(f"O Licitarium não conseguiu abrir a janela.\n\n{e}\n\n"
+                f"Detalhes em {DIR_DADOS / ARQUIVO_LOG}")
+        raise
     # a janela fechou: consolida o -wal para a próxima abertura não achar
     # arquivo de transação nenhum pela frente
     fechar_limpo()
