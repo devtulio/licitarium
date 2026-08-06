@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.5 — 2026-08-06
+
+**Quando o programa não abre, ele passa a dizer por quê**
+
+- A interface do Licitarium é publicada num servidor local (`127.0.0.1`) e lida
+  pela janela do programa. Quando esse servidor não sobe — antivírus, firewall
+  ou proxy sem exceção para endereços locais —, aparecia a página de erro do
+  navegador falando de proxy e firewall, **sem mencionar o Licitarium**.
+- Agora o programa confere se a interface respondeu e, se não respondeu, mostra
+  uma janela própria explicando o que aconteceu e os três caminhos que costumam
+  resolver.
+- O executável é compilado **sem console**: até aqui, uma falha na partida não
+  deixava rastro nenhum. Passa a gravar `ultimo-erro.log` na pasta de dados,
+  com data, versão e detalhe técnico — é o primeiro lugar a olhar quando o
+  programa não abre.
+
 ## 1.10.4 — 2026-08-05
 
 **O Painel travava ao filtrar por órgão — e era um erro de consulta**

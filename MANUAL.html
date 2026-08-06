@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.10.4</title>
+<title>Manual Operacional — Licitarium v1.10.5</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.10.4 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.10.5 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.10.4</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.10.5</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.10.4.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.10.5.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -664,6 +664,9 @@ correto) e sai na paleta do tema escolhido nas configurações — mas a
 O banco é um <b>espelho reconstruível</b>: se for apagado ou corromper, basta
 abrir o programa e refazer o download — a fonte oficial é sempre o PNCP.
 Por isso o Licitarium não precisa de sistema de backup próprio.</p>
+<p>Na mesma pasta fica o <code>ultimo-erro.log</code>, escrito apenas quando o
+programa tropeça ao abrir. Em uso normal ele não existe; quando existir, traz a
+data, a versão e o detalhe técnico da falha.</p>
 <p>Ao lado dele podem aparecer os arquivos <code>licitarium.db-wal</code> e
 <code>licitarium.db-shm</code>: são o <b>diário de transações</b> do SQLite,
 usados enquanto o programa está aberto e consolidados no banco quando ele
@@ -698,6 +701,25 @@ na sincronização, baixando do PNCP), ou sair sem tocar em nada, para você
 cuidar do arquivo.</div>
 
 <h2>11. Perguntas frequentes</h2>
+<h3>O programa abriu com uma tela de erro dizendo que não consegue chegar a
+127.0.0.1</h3>
+<p>A interface do Licitarium é publicada num <b>servidor local</b>, dentro do
+seu próprio computador, e exibida pela janela do programa. Essa tela aparece
+quando algo impede essa conversa interna — normalmente um <b>antivírus</b>, um
+<b>firewall</b> ou um <b>proxy</b> configurado sem exceção para endereços
+locais. Não é falta de internet: o Licitarium funciona sem ela.</p>
+<p>O que costuma resolver, nesta ordem:</p>
+<ol>
+  <li>fechar o programa por completo — inclusive instâncias travadas, pelo
+      Gerenciador de Tarefas — e abrir de novo;</li>
+  <li>em <b>Configurações do Windows → Rede e Internet → Proxy</b>, marcar
+      <i>não usar o servidor proxy para endereços locais</i>;</li>
+  <li>liberar o Licitarium no antivírus ou no firewall.</li>
+</ol>
+<p>Desde a versão 1.10.5 o próprio programa reconhece a situação e mostra uma
+explicação em vez da tela do navegador, além de gravar os detalhes em
+<code>ultimo-erro.log</code>, na pasta de dados (seção 10) — esse arquivo é o
+melhor ponto de partida se precisar de ajuda.</p>
 <h3>Um processo aparece com situação diferente da plataforma de pregão
 (BLL, BNC, Compras.gov…)</h3>
 <p>O Licitarium espelha o <b>PNCP</b>. Se um processo foi suspenso na plataforma
