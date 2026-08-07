@@ -47,6 +47,26 @@ piso de visão normal e contraste contra a superfície.
   A regra que esmaece as irmãs usa `:has()` e vive **separada** da que acende a
   marca — onde o seletor não existir, ela é descartada sozinha e o realce
   continua de pé.
+- **Tooltip próprio, não o `<title>` nativo.** O navegador demora ~1s para
+  mostrar `<title>` e não segue o cursor; `mostrarTt`/`dtip` (painel.js)
+  substituem por um rótulo instantâneo, com o valor em destaque (Strong) e o
+  rótulo secundário — a hierarquia que a skill `dataviz` pede. Cada marca leva
+  `data-tip-v`/`data-tip-l`; um único listener delegado no `#painel` cobre
+  todos os gráficos de barra/célula/ponto, porque `#painel` sobrevive ao
+  redesenho — só o `innerHTML` dos cartões troca.
+- **Corte vertical nos dois gráficos de linha** (execução acumulada,
+  concentração de fornecedores): a pergunta vira "o que valia neste ponto",
+  com uma linha por série no tooltip — nunca é preciso mirar os 2px da linha,
+  o retângulo de captura cobre toda a área do gráfico. `grafSeries` e
+  `grafConcentracao` devolvem `{ html, ligar }` em vez de string pura;
+  `ligar(container)` prende os listeners ao SVG recém-inserido, reaproveitando
+  as mesmas funções de escala do desenho — sem duplicar a matemática.
+  O ponto e o rótulo do "estado padrão" (mês corrente, 10º fornecedor)
+  continuam sempre visíveis em repouso — é o direto-label que vale sem hover
+  nenhum; o corte os esconde enquanto ativo e devolve ao sair.
+  O retângulo de captura (`[data-cross-hit]`) fica **fora** das regras gerais
+  de realce — ele é invisível de propósito, "acender" a própria captura não
+  informaria nada.
 - **Vazio é vazio.** Sem dado, o cartão diz o que falta; nunca desenha zero.
 
 ### Paleta

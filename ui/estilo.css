@@ -483,18 +483,42 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
    O realce é do desenho, nunca do dado: barra não muda de tamanho, senão
    a marca deixaria de valer o número que representa. Quem cresce é o que
    é ponto (círculo e seta), onde o tamanho não codifica valor. */
-.painel svg :is(rect, circle, path) {
+/* [data-cross-hit] fica fora de tudo isso: é o retângulo invisível do
+   corte vertical (ver painel.js), existe só para capturar o ponteiro numa
+   área larga — se ele "acendesse" feito marca, a própria captura do corte
+   pareceria um aceso sem sentido, sem relação com o mês apontado. */
+.painel svg :is(rect, circle, path):not([data-cross-hit]) {
   transition:fill-opacity .15s ease, filter .15s ease, transform .15s ease;
   transform-box:fill-box; transform-origin:center; }
 /* regra própria de propósito: onde :has() faltar, ela é descartada
    sozinha e o realce abaixo continua funcionando */
-.painel svg:has(:is(rect, circle, path):hover)
-        :is(rect, circle, path):not(:hover) { fill-opacity:.38; }
-.painel svg :is(rect, circle, path):hover { filter:brightness(1.16); }
-.painel svg :is(circle, path):hover { transform:scale(1.22);
-  stroke:var(--surface); stroke-width:2; paint-order:stroke; }
+.painel svg:has(:is(rect, circle, path):hover:not([data-cross-hit]))
+        :is(rect, circle, path):not(:hover):not([data-cross-hit])
+        { fill-opacity:.38; }
+.painel svg :is(rect, circle, path):hover:not([data-cross-hit])
+  { filter:brightness(1.16); }
+.painel svg :is(circle, path):hover:not([data-cross-hit])
+  { transform:scale(1.22); stroke:var(--surface); stroke-width:2;
+    paint-order:stroke; }
 
 @media (prefers-reduced-motion: reduce) {
   .painel svg :is(rect, circle, path) { transition:none; }
   .painel svg :is(circle, path):hover { transform:none; }
 }
+
+/* ── tooltip próprio: substitui o <title> nativo, aparece na hora e segue
+   o cursor (ver painel.js: dtip/mostrarTt). "Fixed" porque a janela do
+   programa É o viewport — não há rolagem de página para acompanhar. */
+.graf-tt { position:fixed; top:0; left:0; z-index:55; pointer-events:none;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:7px 10px; font-size:12.5px; line-height:1.5; white-space:nowrap; }
+.graf-tt .cab { font-weight:600; color:var(--text); margin-bottom:4px; }
+.graf-tt .linha { display:flex; align-items:center; gap:7px; }
+.graf-tt .linha + .linha { margin-top:3px; }
+/* traço, não caixa: à densidade de um tooltip a caixa cheia é tinta a
+   mais fazendo trabalho de rótulo (dataviz: "line keys, not boxes") */
+.graf-tt i { width:10px; height:2px; border-radius:1px; flex:none; }
+.graf-tt .l { color:var(--muted); }
+.graf-tt .v { font-weight:600; font-variant-numeric:tabular-nums;
+  margin-left:auto; padding-left:12px; }

@@ -44,6 +44,91 @@ function svg(largura, altura, dentro) {
     >${dentro}</svg>`;
 }
 
+// ══ interação: um tooltip só, para todos os gráficos ═══════════════════════
+// Substitui o <title> nativo — que o navegador demora ~1s para mostrar e não
+// segue o cursor — por um rótulo próprio, instantâneo. Cada marca carrega
+// data-tip-v (o número, sempre) e data-tip-l (o resto da frase, quando há).
+// Só mouse por enquanto: nenhuma marca daqui era navegável por teclado antes
+// (o <title> também dependia de foco que elas nunca tiveram).
+const dtip = (v, l) =>
+  `data-tip-v="${esc(v)}"${l ? ` data-tip-l="${esc(l)}"` : ""}`;
+
+let ttEl;
+function tt() {
+  if (!ttEl) {
+    ttEl = document.createElement("div");
+    ttEl.className = "graf-tt";
+    ttEl.setAttribute("role", "tooltip");
+    ttEl.hidden = true;
+    document.body.appendChild(ttEl);
+  }
+  return ttEl;
+}
+
+// linhas: [{ v, l, cor }] — v é sempre mostrado; l e cor são opcionais.
+// titulo (opcional) é o cabeçalho, usado pelo corte vertical para nomear o
+// mês apontado, já que ali a mesma marca não basta — são vários pontos.
+function mostrarTt(clientX, clientY, linhas, titulo) {
+  const el = tt();
+  el.innerHTML = "";
+  if (titulo) {
+    const cab = document.createElement("div");
+    cab.className = "cab";
+    cab.textContent = titulo;
+    el.appendChild(cab);
+  }
+  linhas.forEach(({ v, l, cor }) => {
+    const linha = document.createElement("div");
+    linha.className = "linha";
+    if (cor) {
+      const chave = document.createElement("i");
+      chave.style.background = cor;
+      linha.appendChild(chave);
+    }
+    if (l) {
+      const rot = document.createElement("span");
+      rot.className = "l";
+      rot.textContent = l;         // textContent: rótulo é dado, não HTML
+      linha.appendChild(rot);
+    }
+    const val = document.createElement("span");
+    val.className = "v";
+    val.textContent = v;
+    linha.appendChild(val);
+    el.appendChild(linha);
+  });
+  el.hidden = false;
+  posicionarTt(clientX, clientY);
+}
+
+function posicionarTt(clientX, clientY) {
+  const el = tt();
+  const pad = 14;
+  let x = clientX + pad, y = clientY + pad;
+  const r = el.getBoundingClientRect();
+  if (x + r.width > innerWidth - 8) x = clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = clientY - r.height - pad;
+  el.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+function esconderTt() { if (ttEl) ttEl.hidden = true; }
+
+// Tooltip das marcas "simples" (barra, célula, ponto sem corte vertical):
+// um listener só, delegado no #painel — sobrevive a cada redesenho, que
+// troca o innerHTML dos cartões mas nunca o #painel em si. Gráficos com
+// corte vertical (grafSeries, grafConcentracao) têm seu próprio listener,
+// que dá stopPropagation para não competir com este.
+function ligarTooltips() {
+  const raiz = $("painel");
+  raiz.addEventListener("pointermove", (evt) => {
+    const marca = evt.target.closest("[data-tip-v]");
+    if (!marca) { esconderTt(); return; }
+    mostrarTt(evt.clientX, evt.clientY,
+      [{ v: marca.dataset.tipV, l: marca.dataset.tipL || null }]);
+  });
+  raiz.addEventListener("pointerleave", esconderTt);
+}
+
 // ── colunas pareadas: estimado (claro) × homologado (cheio) ────────────────
 function grafMeses(meses, larg = 660) {
   // Mês sem contratação é informação: filtrá-lo comprimia o eixo e escondia
@@ -68,12 +153,11 @@ function grafMeses(meses, larg = 660) {
     const x = 56 + i * passo, w = Math.min(34, passo / 2.6);
     const he = Math.max(2, base - y(m.estimado)), hh = Math.max(2, base - y(m.valor));
     g += `<rect x="${x}" y="${y(m.estimado)}" width="${w}" height="${he}" rx="4"
-            fill="var(--s1)" opacity=".32"><title>${MES[m.mes - 1]} · estimado ${
-              compacto(m.estimado)}</title></rect>
+            fill="var(--s1)" opacity=".32"
+            ${dtip(compacto(m.estimado), `${MES[m.mes - 1]} · estimado`)}/>
           <rect x="${x + w + 2}" y="${y(m.valor)}" width="${w}" height="${hh}" rx="4"
-            fill="var(--s1)"><title>${MES[m.mes - 1]} · homologado ${
-              compacto(m.valor)} · ${m.n} ${m.n === 1 ? "processo" : "processos"
-            }</title></rect>
+            fill="var(--s1)" ${dtip(compacto(m.valor), `${MES[m.mes - 1]
+              } · homologado · ${m.n} ${m.n === 1 ? "processo" : "processos"}`)}/>
           <text class="rot" x="${x + w + 1}" y="${base + 16}" text-anchor="middle"
             >${MES[m.mes - 1]}</text>`;
   });
@@ -93,21 +177,28 @@ function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 360) 
     g += `<text class="rot" x="0" y="${y - 6}">${esc(rotulo(it))}${
             sub ? ` · ${esc(sub(it))}` : ""}</text>
           <rect x="0" y="${y}" width="${w}" height="17" rx="4" fill="${cor}"
-            ><title>${esc(rotulo(it))} · ${compacto(valor(it))}</title></rect>
+            ${dtip(compacto(valor(it)), rotulo(it))}/>
           <text class="val" x="${w + 8}" y="${y + 14}">${compacto(valor(it))}</text>`;
   });
   return svg(larg, itens.length * linha + 6, g);
 }
 
 // ── linhas do acumulado: ano corrente em destaque, anteriores em contexto ──
+// O ponto e o rótulo do mês corrente ficam sempre visíveis — é o direto que
+// vale sem hover nenhum. Passar o mouse troca para um corte vertical: a
+// pergunta deixa de ser "quanto o ano atual acumulou" e vira "o que os três
+// anos valiam neste mês", com uma linha só no tooltip por ano.
 function grafSeries(series, anoAtual, larg = 1000) {
   const anos = Object.keys(series).sort();
   const todos = anos.flatMap(a => series[a]);
-  if (!todos.some(v => v)) return `<div class="vazio">Sem histórico para comparar.</div>`;
+  if (!todos.some(v => v))
+    return { html: `<div class="vazio">Sem histórico para comparar.</div>` };
   // 90px à direita ficam para os rótulos dos anos: fora da área do plot,
   // dentro do viewBox — senão o texto sai cortado na borda
   const base = 170, e = escala(Math.max(...todos));
-  const x = (i) => 56 + i * ((larg - 150) / 11);
+  const ultimoMesAtual = Math.min(new Date().getMonth(), 11);
+  const passoX = (larg - 150) / 11;
+  const x = (i) => 56 + i * passoX;
   const y = (v) => base - (v / e.topo) * (base - 26);
   let g = "";
   for (let v = 0; v <= e.topo + 1e-6; v += e.passo) {
@@ -119,29 +210,83 @@ function grafSeries(series, anoAtual, larg = 1000) {
   [0, 2, 4, 6, 8, 10].forEach(i =>
     g += `<text class="rot" x="${x(i)}" y="${base + 18}" text-anchor="middle"
            >${MES[i]}</text>`);
+  const cores = {};
   anos.forEach((ano, k) => {
     const atual = ano === String(anoAtual);
+    cores[ano] = atual ? "var(--s1)" : "var(--muted)";
     // o ano em curso só tem pontos até o mês corrente; os outros, o ano todo
     const pontos = series[ano]
-      .map((v, i) => (atual && i > new Date().getMonth()) ? null : `${x(i)},${y(v)}`)
+      .map((v, i) => (atual && i > ultimoMesAtual) ? null : `${x(i)},${y(v)}`)
       .filter(Boolean).join(" ");
-    g += `<polyline fill="none" points="${pontos}"
-            stroke="${atual ? "var(--s1)" : "var(--muted)"}"
+    g += `<polyline fill="none" points="${pontos}" stroke="${cores[ano]}"
             stroke-width="${atual ? 2.5 : 2}"
             opacity="${atual ? 1 : (0.4 + k * 0.18)}"/>`;
-    const ultimo = atual ? Math.min(new Date().getMonth(), 11) : 11;
     if (atual) {
-      g += `<circle cx="${x(ultimo)}" cy="${y(series[ano][ultimo])}" r="4"
-              fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>
-            <text class="val" x="${x(ultimo) + 10}" y="${y(series[ano][ultimo]) - 2}"
+      g += `<circle data-serie-padrao cx="${x(ultimoMesAtual)}"
+              cy="${y(series[ano][ultimoMesAtual])}" r="4" fill="var(--s1)"
+              stroke="var(--surface)" stroke-width="2" opacity="1"/>
+            <text data-serie-padrao class="val" opacity="1"
+              x="${x(ultimoMesAtual) + 10}" y="${y(series[ano][ultimoMesAtual]) - 2}"
               fill="var(--s1)" font-weight="600">${ano} · ${
-                compacto(series[ano][ultimo])}</text>`;
+                compacto(series[ano][ultimoMesAtual])}</text>`;
     } else {
       g += `<text class="rot" x="${x(11) + 10}" y="${y(series[ano][11]) + 4}"
               >${ano}</text>`;
     }
   });
-  return svg(larg, base + 30, g);
+  // corte vertical: começa invisível (opacity 0), a camada de interação
+  // abaixo é quem liga. O retângulo de captura vem por último — precisa
+  // estar por cima de tudo para nunca perder o ponteiro para uma linha.
+  g += `<line data-cross-guia x1="0" y1="18" x2="0" y2="${base}"
+          stroke="var(--border)" stroke-width="1" opacity="0"/>`;
+  anos.forEach(ano => g += `<circle data-cross-pt="${esc(ano)}" r="4"
+    fill="${cores[ano]}" stroke="var(--surface)" stroke-width="2" opacity="0"/>`);
+  g += `<rect data-cross-hit x="46" y="14" width="${larg - 66}"
+          height="${base - 8}" fill="none" pointer-events="all"/>`;
+  const html = svg(larg, base + 30, g);
+  return { html, ligar(container) {
+    const raiz = container.querySelector("svg");
+    const hit = raiz.querySelector("[data-cross-hit]");
+    const guia = raiz.querySelector("[data-cross-guia]");
+    const pontosPadrao = raiz.querySelectorAll("[data-serie-padrao]");
+    const pontosCorte = {};
+    raiz.querySelectorAll("[data-cross-pt]").forEach(c =>
+      pontosCorte[c.dataset.crossPt] = c);
+    function mover(evt) {
+      evt.stopPropagation();
+      const r = raiz.getBoundingClientRect();
+      const px = (evt.clientX - r.left) * (larg / r.width);
+      const i = Math.max(0, Math.min(11, Math.round((px - 56) / passoX)));
+      guia.setAttribute("x1", x(i));
+      guia.setAttribute("x2", x(i));
+      guia.setAttribute("opacity", "1");
+      pontosPadrao.forEach(el => el.setAttribute("opacity", "0"));
+      const linhas = [];
+      anos.forEach(ano => {
+        const ponto = pontosCorte[ano];
+        if (ano === String(anoAtual) && i > ultimoMesAtual) {
+          ponto.setAttribute("opacity", "0");
+          return;
+        }
+        const v = series[ano][i];
+        ponto.setAttribute("cx", x(i));
+        ponto.setAttribute("cy", y(v));
+        ponto.setAttribute("opacity", "1");
+        linhas.push({ v: compacto(v), l: ano, cor: cores[ano] });
+      });
+      // ano corrente primeiro: é o que o leitor veio comparar
+      linhas.sort((a, b) => (b.l === String(anoAtual)) - (a.l === String(anoAtual)));
+      mostrarTt(evt.clientX, evt.clientY, linhas, MES[i]);
+    }
+    hit.addEventListener("pointermove", mover);
+    hit.addEventListener("pointerleave", (evt) => {
+      evt.stopPropagation();
+      guia.setAttribute("opacity", "0");
+      Object.values(pontosCorte).forEach(el => el.setAttribute("opacity", "0"));
+      pontosPadrao.forEach(el => el.setAttribute("opacity", "1"));
+      esconderTt();
+    });
+  } };
 }
 
 // ── deságio: economia à direita, estouro à esquerda do zero ───────────────
@@ -159,9 +304,9 @@ function grafDesagio(desagios, larg = 500) {
     const economia = d.pct >= 0;
     g += `<rect x="${economia ? meio : meio - w}" y="${y}" width="${w}" height="17"
             rx="4" fill="${economia ? "var(--s3)" : "var(--s2)"}"
-            ><title>${esc(d.modalidade)} · ${pct(d.pct)} ${
+            ${dtip(pct(d.pct), `${d.modalidade} · ${
               economia ? "de deságio" : "acima do estimado"} · ${d.n} ${
-              d.n === 1 ? "processo" : "processos"}</title></rect>
+              d.n === 1 ? "processo" : "processos"}`)}/>
           <text class="val" x="${economia ? meio + w + 8 : meio - w - 8}"
             y="${y + 14}" text-anchor="${economia ? "start" : "end"}"
             >${pct(d.pct)}</text>
@@ -180,9 +325,12 @@ function grafDesagio(desagios, larg = 500) {
 }
 
 // ── concentração: curva do valor acumulado por fornecedor ─────────────────
+// O ponto e o rótulo padrão (10º fornecedor) valem em repouso; passar o
+// mouse troca para o fornecedor apontado, em qualquer posição da curva.
 function grafConcentracao(curva, total, larg = 500) {
   if (curva.length < 3)
-    return `<div class="vazio">Poucos fornecedores para medir concentração.</div>`;
+    return { html: `<div class="vazio">Poucos fornecedores para medir
+             concentração.</div>` };
   const alto = 190, x0 = 40, y0 = 160;
   const px = (i) => x0 + (i / (curva.length - 1)) * (larg - 60);
   const py = (v) => y0 - (v / 100) * (y0 - 20);
@@ -191,16 +339,17 @@ function grafConcentracao(curva, total, larg = 500) {
   // não informa nada — e o rótulo cairia em cima do fim da curva
   const dez = Math.min(9, Math.max(0, curva.length - 2));
   const aDireita = px(dez) < larg - 260;
-  return svg(larg, alto, `
+  const html = svg(larg, alto, `
     <line class="eixo" x1="${x0}" y1="${y0}" x2="${larg - 20}" y2="${y0}"/>
     <line class="eixo" x1="${x0}" y1="20" x2="${x0}" y2="${y0}"/>
     <polyline fill="none" points="${px(0)},${y0} ${px(curva.length - 1)},${py(100)}"
       stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>
     <polyline fill="none" points="${px(0)},${y0} ${pontos}" stroke="var(--s1)"
       stroke-width="2.5"/>
-    <circle cx="${px(dez)}" cy="${py(curva[dez])}" r="4" fill="var(--s1)"
-      stroke="var(--surface)" stroke-width="2"/>
-    <text class="val" x="${px(dez) + (aDireita ? 10 : -10)}"
+    <circle data-serie-padrao cx="${px(dez)}" cy="${py(curva[dez])}" r="4"
+      fill="var(--s1)" stroke="var(--surface)" stroke-width="2" opacity="1"/>
+    <text data-serie-padrao class="val" opacity="1"
+      x="${px(dez) + (aDireita ? 10 : -10)}"
       y="${py(curva[dez]) + 20}"
       text-anchor="${aDireita ? "start" : "end"}"
       >${dez + 1} ${dez ? "fornecedores" : "fornecedor"} = ${
@@ -208,7 +357,45 @@ function grafConcentracao(curva, total, larg = 500) {
     <text class="rot" x="${x0}" y="${y0 + 16}">1</text>
     <text class="rot" x="${larg - 24}" y="${y0 + 16}" text-anchor="end">${total}</text>
     <text class="rot" x="${larg / 2}" y="${y0 + 16}" text-anchor="middle"
-      >fornecedores, do maior para o menor</text>`);
+      >fornecedores, do maior para o menor</text>
+    <line data-cross-guia x1="0" y1="20" x2="0" y2="${y0}"
+      stroke="var(--border)" stroke-width="1" opacity="0"/>
+    <circle data-cross-pt r="4" fill="var(--s1)" stroke="var(--surface)"
+      stroke-width="2" opacity="0"/>
+    <rect data-cross-hit x="${x0}" y="14" width="${larg - 60}"
+      height="${y0 - 8}" fill="none" pointer-events="all"/>`);
+  return { html, ligar(container) {
+    const raiz = container.querySelector("svg");
+    const hit = raiz.querySelector("[data-cross-hit]");
+    const guia = raiz.querySelector("[data-cross-guia]");
+    const ponto = raiz.querySelector("[data-cross-pt]");
+    const padrao = raiz.querySelectorAll("[data-serie-padrao]");
+    function mover(evt) {
+      evt.stopPropagation();
+      const r = raiz.getBoundingClientRect();
+      const pxCursor = (evt.clientX - r.left) * (larg / r.width);
+      const i = Math.max(0, Math.min(curva.length - 1, Math.round(
+        (pxCursor - x0) / (larg - 60) * (curva.length - 1))));
+      guia.setAttribute("x1", px(i));
+      guia.setAttribute("x2", px(i));
+      guia.setAttribute("opacity", "1");
+      ponto.setAttribute("cx", px(i));
+      ponto.setAttribute("cy", py(curva[i]));
+      ponto.setAttribute("opacity", "1");
+      padrao.forEach(el => el.setAttribute("opacity", "0"));
+      mostrarTt(evt.clientX, evt.clientY, [{
+        v: `${pct(curva[i], 0)} do valor`,
+        l: `${i + 1} ${i ? "fornecedores" : "fornecedor"}` }]);
+    }
+    hit.addEventListener("pointermove", mover);
+    hit.addEventListener("pointerleave", (evt) => {
+      evt.stopPropagation();
+      guia.setAttribute("opacity", "0");
+      ponto.setAttribute("opacity", "0");
+      padrao.forEach(el => el.setAttribute("opacity", "1"));
+      esconderTt();
+    });
+  } };
 }
 
 // ── calor: processos por mês e modalidade, rampa de uma cor só ────────────
@@ -227,8 +414,8 @@ function grafCalor(calor, meses, larg = 1000) {
       const nivel = !v ? 1 : Math.min(5, 1 + Math.ceil((v / max) * 4));
       g += `<rect x="${160 + m * (passo + 4)}" y="${y}" width="${passo}"
               height="${alt}" rx="3" fill="var(--seq${nivel})"
-              ><title>${MES[m]} · ${esc(nome)} · ${v} ${
-                v === 1 ? "processo" : "processos"}</title></rect>`;
+              ${dtip(`${v} ${v === 1 ? "processo" : "processos"}`,
+                `${MES[m]} · ${nome}`)}/>`;
     });
   });
   meses.forEach((m, i) =>
@@ -266,10 +453,10 @@ function grafLimites(objetos, limite, larg = 500) {
           <rect x="0" y="${y}" width="${cheio}" height="14" rx="4"
             fill="var(--surface2)"/>
           <rect x="0" y="${y}" width="${Math.max(3, w)}" height="14" rx="4"
-            fill="${cor}"><title>${esc(o.objeto)} · ${dinheiro(o.total)} de ${
-              dinheiro(limite)}</title></rect>${estourou ? `
+            fill="${cor}" ${dtip(dinheiro(o.total),
+              `${o.objeto} · de ${dinheiro(limite)}`)}/>${estourou ? `
           <path d="M${cheio - 1},${y - 3} l10,10 l-10,10 z" fill="var(--erro)"
-            ><title>acima do limite</title></path>` : ""}
+            ${dtip("Acima do limite", o.objeto)}/>` : ""}
           <text class="val" x="0" y="${y + 30}">${dinheiro(o.total)} · <tspan
             fill="${cor}" font-weight="600">${estourou
               ? `${vezes}× o limite` : `${pct(o.pct, 0)} do limite`}</tspan></text>`;
@@ -286,7 +473,7 @@ function grafFunil(f, larg = 500) {
   etapas.forEach(([nome, v], i) => {
     const y = i * 40 + 14, w = Math.max(6, (v / max) * (larg - 70));
     g += `<rect x="0" y="${y}" width="${w}" height="26" rx="4" fill="var(--s1)"
-            opacity="${0.85 - i * 0.15}"><title>${nome}: ${v}</title></rect>
+            opacity="${0.85 - i * 0.15}" ${dtip(v, nome)}/>
           <text class="val" x="${w + 10}" y="${y + 18}">${v}</text>
           <text class="val" x="10" y="${y + 18}"
             fill="${i < 2 ? "var(--accent-fg)" : "var(--text)"}">${nome}</text>`;
@@ -321,9 +508,9 @@ function grafAgenda(itens, larg = 1000) {
     const raio = Math.min(11, 6 + grupo.length);
     const lista = grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ");
     g += `<circle cx="${x(d)}" cy="${y}" r="${raio}" fill="${cor}"
-            ><title>${esc(lista)} — vence${grupo.length > 1 ? "m" : ""} em ${d}
-             ${d === 1 ? "dia" : "dias"} (${dataBr(grupo[0].vigencia_fim)})</title>
-          </circle>`;
+            ${dtip(`vence${grupo.length > 1 ? "m" : ""} em ${d} ${
+              d === 1 ? "dia" : "dias"}`,
+              `${lista} · ${dataBr(grupo[0].vigencia_fim)}`)}/>`;
     if (grupo.length > 1)
       g += `<text class="val" x="${x(d)}" y="${y + 4}" text-anchor="middle"
               fill="var(--accent-fg)" font-weight="600">${grupo.length}</text>`;
@@ -379,7 +566,16 @@ function desenharGraficos(raiz) {
     if (!largura) return;               // vista oculta: desenha ao aparecer
     if (el.dataset.largura === String(largura)) return;
     el.dataset.largura = String(largura);
-    el.innerHTML = DESENHO[el.dataset.graf](largura);
+    // a maioria dos gráficos devolve HTML puro; os que têm corte vertical
+    // (grafSeries, grafConcentracao) devolvem { html, ligar } — ligar()
+    // prende os listeners do corte ao SVG recém-inserido
+    const saida = DESENHO[el.dataset.graf](largura);
+    if (typeof saida === "string") {
+      el.innerHTML = saida;
+    } else {
+      el.innerHTML = saida.html;
+      saida.ligar?.(el);
+    }
   });
 }
 
@@ -576,6 +772,8 @@ function mostrarChips(a) {
 
 
 // ── ligações da tela ──────────────────────────────────────────────────────
+ligarTooltips();
+
 $("painel").querySelectorAll(".subabas button").forEach(b =>
   b.addEventListener("click", () => {
     P.vista = b.dataset.vista;

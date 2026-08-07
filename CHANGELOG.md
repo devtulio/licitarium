@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.11.2 — 2026-08-07
+
+**Tooltip próprio e corte vertical nos gráficos de linha**
+
+- O `<title>` nativo do navegador saiu: demorava ~1s para aparecer e não
+  seguia o cursor. No lugar, um **rótulo próprio, instantâneo**, com o valor
+  em destaque e o rótulo secundário — em todos os nove gráficos do Painel.
+- **Passar o mouse sobre o gráfico de acumulado do exercício ou o de
+  concentração de fornecedores** traz uma **linha vertical** que segue o
+  cursor: em vez de mirar os 2px da linha, qualquer ponto do gráfico serve, e
+  o rótulo passa a listar o valor de **cada série** naquele ponto — os três
+  anos lado a lado, não um de cada vez. Tirando o mouse, o gráfico volta ao
+  ponto de referência que segue sempre visível (mês corrente, 10º
+  fornecedor).
+- Mudança de interface, sem efeito em número, cálculo ou relatório algum.
+  245 pytest + 91 E2E; os quatro testes novos conferidos falhando com a
+  camada de interação desligada.
+
 ## 1.11.1 — 2026-08-06
 
 **Os gráficos do Painel respondem ao cursor**

@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.11.1</title>
+<title>Manual Operacional — Licitarium v1.11.2</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.11.1 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.11.2 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.11.1</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.11.2</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.11.1.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.11.2.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -221,9 +221,16 @@ tem três visões, escolhidas nos botões redondos logo abaixo dos alertas:</p>
 </table>
 <p>Ao <b>passar o mouse</b> sobre uma barra, um ponto ou uma célula, ela acende
 e as demais recuam — é o modo de saber qual marca você está lendo num gráfico
-de doze meses. O rótulo com os números aparece junto, como em toda a tela. A
-barra não muda de tamanho de propósito: ela vale o valor que representa, e
-crescer ao ser apontada faria a marca mentir.</p>
+de doze meses. Um rótulo aparece na hora, junto do cursor, com o número em
+destaque. A barra não muda de tamanho de propósito: ela vale o valor que
+representa, e crescer ao ser apontada faria a marca mentir.</p>
+<p>Nos dois gráficos de linha — <b>acumulado do exercício</b> e
+<b>concentração de fornecedores</b> — passar o mouse sobre qualquer ponto do
+gráfico (não precisa acertar a linha) traz uma <b>linha vertical</b> que
+segue o cursor; o rótulo passa a listar o valor de <b>cada série</b> naquele
+ponto, para comparar os anos ou ver a posição exata na curva. Tirando o
+mouse, o gráfico volta ao ponto de referência que fica sempre visível: o mês
+corrente na execução, o 10º fornecedor na concentração.</p>
 <div class="caixa"><b>Como os números comparam.</b> No exercício em curso, a
 variação sobre o ano anterior usa o <b>mesmo período</b> (janeiro até hoje
 contra janeiro até a mesma data do ano passado); comparar oito meses com doze

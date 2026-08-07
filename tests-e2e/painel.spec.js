@@ -49,6 +49,90 @@ test("barra não muda de tamanho ao ser realçada", async ({ page }) => {
   expect(depois.height).toBeCloseTo(antes.height, 1);
 });
 
+test("o tooltip próprio aparece na hora, com o valor em destaque",
+    async ({ page }) => {
+  const barra = page.locator("#p-execucao svg rect[data-tip-v]").first();
+  const tt = page.locator(".graf-tt");
+  await expect(tt).toBeHidden();
+
+  await barra.hover();
+  await expect(tt).toBeVisible();
+  // o valor é o elemento forte; o rótulo (mês/série) é secundário — a
+  // hierarquia que a skill dataviz pede para tooltip (valor lidera)
+  await expect(tt.locator(".v")).toHaveText(/R\$/);
+  await expect(tt.locator(".l")).not.toHaveCount(0);
+
+  // sai do gráfico, some — não é um painel que fica aberto
+  await page.locator(".painel-topo").hover();
+  await expect(tt).toBeHidden();
+});
+
+test("o corte vertical lê todos os anos no mês apontado", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const cartao = page.locator('#p-analise .card:has([data-graf="series"])');
+  const hit = cartao.locator("svg [data-cross-hit]");
+  const guia = cartao.locator("svg [data-cross-guia]");
+  const padrao = cartao.locator("svg [data-serie-padrao]").first();
+
+  // em repouso, só o ponto do mês corrente aparece — é o direto-label que
+  // vale sem hover nenhum
+  await expect(guia).toHaveAttribute("opacity", "0");
+  await expect(padrao).toHaveAttribute("opacity", "1");
+
+  const box = await hit.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+
+  await expect(guia).toHaveAttribute("opacity", "1");
+  await expect(padrao).toHaveAttribute("opacity", "0");
+  // três anos no acervo de exemplo: o tooltip lista os três, um por linha
+  const tt = page.locator(".graf-tt");
+  await expect(tt.locator(".cab")).toBeVisible();
+  await expect(tt.locator(".linha")).toHaveCount(3);
+  await expect(tt).toContainText("2026");
+  await expect(tt).toContainText("2025");
+  await expect(tt).toContainText("2024");
+
+  // sai da área do gráfico: o corte some, o padrão volta
+  await page.mouse.move(10, 10);
+  await expect(guia).toHaveAttribute("opacity", "0");
+  await expect(padrao).toHaveAttribute("opacity", "1");
+  await expect(tt).toBeHidden();
+});
+
+test("mudar o mês apontado muda os valores mostrados", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const hit = page.locator(
+    '#p-analise .card:has([data-graf="series"]) svg [data-cross-hit]');
+  const box = await hit.boundingBox();
+  const tt = page.locator(".graf-tt");
+
+  await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
+  const cedo = await tt.locator(".cab").textContent();
+  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height / 2);
+  const tarde = await tt.locator(".cab").textContent();
+  expect(cedo).not.toBe(tarde);
+});
+
+test("o corte vertical da concentração segue o cursor pela curva",
+    async ({ page }) => {
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const cartao = page.locator(
+    '#p-analise .card:has([data-graf="concentracao"])');
+  const hit = cartao.locator("svg [data-cross-hit]");
+  const ponto = cartao.locator("svg [data-cross-pt]");
+  const padrao = cartao.locator("svg [data-serie-padrao]").first();
+
+  await expect(ponto).toHaveAttribute("opacity", "0");
+  const box = await hit.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.15, box.y + box.height / 2);
+
+  await expect(ponto).toHaveAttribute("opacity", "1");
+  await expect(padrao).toHaveAttribute("opacity", "0");
+  const tt = page.locator(".graf-tt");
+  await expect(tt).toContainText("do valor");
+  await expect(tt).toContainText("fornecedor");
+});
+
 test("as três vistas trocam e ficam lembradas", async ({ page }) => {
   await expect(page.locator("#p-execucao")).toBeVisible();
   await expect(page.locator("#p-analise")).toBeHidden();
