@@ -357,6 +357,31 @@ test("chips ficam com a mesma altura mesmo quando o texto quebra linha",
   for (const h of alturas) expect(h).toBeCloseTo(primeira, 0);
 });
 
+test("os 5 alertas possíveis cabem numa linha só até a largura mínima da janela",
+    async ({ page }) => {
+  // achado real (usuário, 2026-08-08): com os 5 alertas ativos ao mesmo
+  // tempo (limite + contratos + atas + propostas + parado) e o piso de
+  // 200px por coluna, o 5º chip não cabia e quebrava sozinho pra uma
+  // segunda linha — 3 células vazias ao lado dele. 900px é o min_size da
+  // janela no pywebview (licitarium.py); abaixo disso o usuário não
+  // consegue redimensionar de qualquer forma.
+  await page.evaluate(() => {
+    window.__painel = { ...window.PAINEL_DADOS,
+      alertas: { perto_do_limite: 5, acima_do_limite: 5,
+                 vencendo_contratos: 9, vencendo_atas: 16,
+                 propostas: 1, paradas: 1 } };
+  });
+  await page.locator("#p-ano").selectOption({ index: 0 });
+  await page.setViewportSize({ width: 900, height: 700 });
+  const chips = page.locator("#painel-chips .chip");
+  await expect(chips).toHaveCount(5);
+  const ys = await chips.evaluateAll(
+    els => els.map(el => Math.round(el.getBoundingClientRect().y)));
+  // mesma linha: nenhum chip pode estar mais de 1-2px abaixo do primeiro
+  // (variação de borda entre .chip.grave/.chip.aviso e o resto)
+  for (const y of ys) expect(Math.abs(y - ys[0])).toBeLessThan(10);
+});
+
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {
   const antes = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "painel").length);

@@ -459,7 +459,14 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
    linha estica todo mundo pra mesma altura por padrão — flex com wrap
    não estava esticando os chips de uma linha só (align-items:stretch
    forçado não teve efeito nenhum, medido); grid resolve isso de graça */
-.chips { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+/* 160px: cabem os 5 alertas possíveis (limite, vencendo_contratos,
+   vencendo_atas, propostas, parada) numa linha só até a largura mínima
+   da janela (min_size 900px no pywebview, ~856px de área útil depois do
+   max-width:1000px + padding do <main>). Achado real: com 200px, esses
+   5 num acervo com todos os alertas ativos derrubavam o 5º pra uma
+   segunda linha sozinho, com três células vazias ao lado — griderror,
+   não largura desigual. */
+.chips { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
          gap:8px; margin:2px 0 10px; }
 /* <button> resiste a esticar em flex/grid por padrão (é elemento de
    formulário — herda min-height:min-content da UA stylesheet e ignora

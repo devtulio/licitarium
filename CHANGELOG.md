@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.13.2 — 2026-08-08
+
+**5º alerta quebrava pra uma linha sozinho**
+
+- Com os 5 alertas possíveis ativos ao mesmo tempo (limite anual,
+  contratos vencendo, atas vencendo, propostas abertas, processo parado),
+  o piso de 200px por card não cabia mais na largura padrão da tela — o
+  5º card ("processo sem resultado") caía sozinho numa segunda linha,
+  com espaço vazio ao lado dele. Achado pelo usuário sobre um print real
+  com todos os alertas ativos.
+- Piso baixado para 160px, calculado para caber os 5 numa linha só até a
+  largura mínima da janela (900px).
+
+253 pytest + 100 E2E.
+
 ## 1.13.1 — 2026-08-08
 
 **Altura dos cards do Painel também padronizada**

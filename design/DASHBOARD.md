@@ -59,6 +59,22 @@ vence o `stretch` do pai. Correção: `height:100%` explícito no `.chip`.
 Teste em `painel.spec.js` ("chips ficam com a mesma altura...") mede a
 `getBoundingClientRect().height` dos quatro chips.
 
+**O piso de 200px não sobrevive aos 5 alertas ao mesmo tempo** (achado
+seguinte, ainda 2026-08-08, sobre print real com todos os alertas
+ativos). `<main>` tem `max-width:1000px`; com o padding do conteúdo, a
+área útil do `.chips` é ~956px na largura padrão. Cinco colunas de 200px
++ gap precisam de 1032px — não cabe. `auto-fit` respondeu do jeito certo
+para o algoritmo (não é bug do grid): computou o máximo de colunas de
+≥200px que cabem (4), e o 5º chip (o de "sem resultado", por ser o
+último a entrar no HTML) quebrou sozinho pra uma segunda linha, com três
+células vazias ao lado dele — mais estranho visualmente do que a
+diferença de altura que motivou o post anterior. Piso baixado para
+**160px**: `5×160 + 4×8(gap) = 832px`, cabe até a largura mínima da
+janela (`min_size=(900,600)` no `webview.create_window`, `licitarium.py`
+— abaixo disso o usuário não redimensiona de jeito nenhum). Teste em
+`painel.spec.js` ("os 5 alertas possíveis cabem numa linha só...") monta
+os 5 alertas via `window.__painel` e mede a viewport no mínimo absoluto.
+
 ## Regras dos gráficos
 
 Seguem o método de `dataviz` (skill), com a paleta validada pelo script de seis
