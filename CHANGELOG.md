@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.13.1 — 2026-08-08
+
+**Altura dos cards do Painel também padronizada**
+
+- A 1.13.0 igualou a largura, mas a altura ficou torta: o card do limite
+  anual (frase longa) quebra em duas linhas e ficava mais alto que os
+  demais. `align-items:stretch` — que deveria igualar sozinho — não
+  igualava porque o card é um `<button>`, e elementos de formulário
+  resistem a esticar em layout flex/grid por padrão. `height:100%`
+  explícito resolve.
+
+253 pytest + 99 E2E.
+
 ## 1.13.0 — 2026-08-07
 
 **Contrato e ata deixam de dividir o mesmo alerta**

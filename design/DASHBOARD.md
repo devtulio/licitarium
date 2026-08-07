@@ -42,10 +42,22 @@ soma as duas tabelas, mas a lista é de uma tabela só, então metade da
 contagem nunca tinha como aparecer. Viraram dois chips, um por tabela, cada
 um com sua contagem (`alertas.vencendo_contratos`/`vencendo_atas`,
 `_kpis.vencendo_60_contratos`/`vencendo_60_atas`). Os cards do Painel
-também passaram a ter **largura padronizada** (`.chip { flex:1 1 200px }`):
-antes cada um só media o próprio texto, e o card do limite anual (frase
-longa) ficava bem mais largo que o de propostas abertas (frase curta) na
-mesma fileira.
+também passaram a ter **largura padronizada** (`grid-template-columns:
+repeat(auto-fit, minmax(200px, 1fr))`): antes cada um só media o próprio
+texto, e o card do limite anual (frase longa) ficava bem mais largo que o
+de propostas abertas (frase curta) na mesma fileira.
+
+**Altura também precisou de ajuste à parte** (mesmo dia, achado pelo
+usuário sobre a captura da correção acima): largura ficou igual, mas
+altura não — o card do limite anual quebra em duas linhas dentro de
+200px e ficava mais alto que os de uma linha só. `align-items:stretch`
+é o padrão do grid e deveria igualar sozinho; **não igualou**, medido
+duas vezes (inclusive forçando a propriedade). Causa: `.chip` é
+`<button>`, elemento de formulário, e form controls resistem a esticar
+em flex/grid — a UA stylesheet dá `min-height:min-content` implícito que
+vence o `stretch` do pai. Correção: `height:100%` explícito no `.chip`.
+Teste em `painel.spec.js` ("chips ficam com a mesma altura...") mede a
+`getBoundingClientRect().height` dos quatro chips.
 
 ## Regras dos gráficos
 

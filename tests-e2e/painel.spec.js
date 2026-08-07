@@ -342,6 +342,21 @@ test("chips concordam em número", async ({ page }) => {
   await expect(chips.nth(4)).toContainText("processo sem resultado");
 });
 
+test("chips ficam com a mesma altura mesmo quando o texto quebra linha",
+    async ({ page }) => {
+  // "5 objetos acima do limite anual de dispensa" quebra em duas linhas
+  // dentro da largura de 200px; "1 processo com proposta aberta" cabe numa
+  // só. .chip é <button> — elemento de formulário, resiste a esticar em
+  // flex/grid por padrão (min-height:min-content da UA stylesheet ignora
+  // align-items:stretch do pai); sem height:100% explícito, os chips de
+  // uma linha ficavam mais baixos que os de duas.
+  const chips = page.locator("#painel-chips .chip");
+  const alturas = await chips.evaluateAll(
+    els => els.map(el => el.getBoundingClientRect().height));
+  const [primeira] = alturas;
+  for (const h of alturas) expect(h).toBeCloseTo(primeira, 0);
+});
+
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {
   const antes = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "painel").length);
