@@ -452,8 +452,14 @@ def dados_painel(db, ano, orgao=None, limites=None):
                                                 for o in perto_do_limite],
                     "acima_do_limite": sum(1 for o in objetos
                                            if o["pct"] > 100),
-                    "vencendo": len([v for v in executivo["vencendo"]
-                                     if (v["dias"] or 0) <= 60]),
+                    # contrato e ata vivem em telas diferentes — um alerta só
+                    # não dá pra clicar e ir aos dois ao mesmo tempo
+                    "vencendo_contratos": sum(
+                        1 for v in executivo["vencendo"]
+                        if v["tipo"] == "Contrato" and (v["dias"] or 0) <= 60),
+                    "vencendo_atas": sum(
+                        1 for v in executivo["vencendo"]
+                        if v["tipo"] == "Ata" and (v["dias"] or 0) <= 60),
                     "propostas": propostas, "paradas": paradas},
         "execucao": {"cards": executivo["cards"], "meses": meses,
                      "modalidades": executivo["modalidades"],

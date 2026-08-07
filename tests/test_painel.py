@@ -179,7 +179,9 @@ def test_medidor_de_limite_agrupa_por_objeto(api):
 
 def test_alertas_contam_o_que_exige_acao(api):
     a = api.painel(ANO)["alertas"]
-    assert a["vencendo"] == 2                  # contrato em 20 dias e ata em 45
+    # contrato e ata não somam mais num alerta só: cada um vai a uma tela
+    assert a["vencendo_contratos"] == 1        # K1, em 20 dias
+    assert a["vencendo_atas"] == 1             # A1, em 45 dias
     assert a["paradas"] == 1                   # P2, publicada em janeiro
     # o objeto das duas dispensas soma R$ 52.000 dos R$ 62.639,92 do
     # art. 75, II — 83% do limite, sem estourar
@@ -318,6 +320,36 @@ def test_vencendo_tambem_vale_para_atas(api):
 
     r = licitarium.Api().listar("atas", {"vencendo": True})
     assert r["total"] == 1 and r["itens"][0]["numero_controle"] == "A1"
+
+
+def test_kpi_do_topo_tambem_separa_contrato_de_ata(tmp_path, monkeypatch):
+    """Mesma métrica, call site irmão de dados_painel (Api._kpis).
+
+    O chip do topo das listas usa uma consulta separada da do Painel — os
+    dois calculam a mesma coisa, então os dois tinham o bug de somar
+    contrato com ata, e os dois precisam da mesma correção.
+    """
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "k.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO contratacoes (numero_controle, ano, objeto)"
+               " VALUES ('K',2026,'x')")
+    venc = (date.today() + timedelta(days=10)).isoformat()
+    db.execute("INSERT INTO contratos (numero_controle, contratacao_controle,"
+               " orgao_cnpj, vigencia_fim, raw) VALUES ('C1','K','111',?,"
+               " '{}')", (venc,))
+    db.execute("INSERT INTO atas (numero_controle, contratacao_controle,"
+               " orgao_cnpj, numero_ata, ano_ata, vigencia_fim, raw)"
+               " VALUES ('A1','K','111','1',2026,?,'{}')", (venc,))
+    db.execute("INSERT INTO atas (numero_controle, contratacao_controle,"
+               " orgao_cnpj, numero_ata, ano_ata, vigencia_fim, raw)"
+               " VALUES ('A2','K','111','2',2026,?,'{}')", (venc,))
+    db.commit()
+    db.close()
+
+    k = licitarium.Api()._kpis(licitarium.abrir_db())
+    assert k["vencendo_60_contratos"] == 1
+    assert k["vencendo_60_atas"] == 2
 
 
 def test_comparacao_com_o_ano_anterior_usa_o_mesmo_periodo(api):

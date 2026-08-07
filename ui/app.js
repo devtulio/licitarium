@@ -293,16 +293,22 @@ function renderKpis(k) {
     `homologado em ${new Date().getFullYear()}`;
   $("kpi-vigentes").textContent = k.vigentes;
   const alertas = [];
-  if (k.vencendo_60 > 0)
-    alertas.push(`<button class="chip" id="chip-vencendo">⚠ ${k.vencendo_60}
-      contrato(s)/ata(s) vencem nos próximos 60 dias</button>`);
+  if (k.vencendo_60_contratos > 0)
+    alertas.push(`<button class="chip" id="chip-vencendo-contratos">⚠
+      ${k.vencendo_60_contratos} contrato(s) vence(m) nos próximos 60 dias
+      </button>`);
+  if (k.vencendo_60_atas > 0)
+    alertas.push(`<button class="chip" id="chip-vencendo-atas">⚠
+      ${k.vencendo_60_atas} ata(s) vence(m) nos próximos 60 dias</button>`);
   if (k.propostas_abertas > 0)
     alertas.push(`<button class="chip info" id="chip-propostas">⏱
       ${k.propostas_abertas} processo(s) com propostas abertas</button>`);
   $("alertas").innerHTML = alertas.join("");
   $("alertas").classList.toggle("oculto", alertas.length === 0);
-  $("chip-vencendo")?.addEventListener("click",
+  $("chip-vencendo-contratos")?.addEventListener("click",
     () => irPara("contratos", {vencendo: true, ord: "vigencia", dir: "asc"}));
+  $("chip-vencendo-atas")?.addEventListener("click",
+    () => irPara("atas", {vencendo: true, ord: "vigencia", dir: "asc"}));
   $("chip-propostas")?.addEventListener("click",
     () => irPara("contratacoes", {propostas: true}));
 }

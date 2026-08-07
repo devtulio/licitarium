@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.13.0 — 2026-08-07
+
+**Contrato e ata deixam de dividir o mesmo alerta**
+
+- O card "contratos/atas vencem em 60 dias" virou **dois**: um para
+  contratos, outro para atas — cada um leva à sua própria aba já filtrada.
+  Antes o alerta somava os dois e o clique só conseguia abrir uma das duas
+  telas, então metade da contagem nunca aparecia na lista.
+- Mesma separação no chip que aparece no topo das listas (`chip-vencendo`).
+- **Cards do Painel com tamanho padronizado.** Antes cada card só media o
+  próprio texto — "5 objetos acima do limite anual de dispensa" ficava bem
+  mais largo que "1 processo com proposta aberta" na mesma fileira. Agora
+  todos dividem a largura da fileira igualmente.
+
+253 pytest + 98 E2E.
+
 ## 1.12.1 — 2026-08-07
 
 **"25 contratos vencem" abria lista de 50 — o filtro era "vigentes", não

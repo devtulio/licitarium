@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.12.1"
+VERSAO = "1.13.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -567,11 +567,12 @@ class Api:
         vigentes = db.execute(
             "SELECT COUNT(*) FROM contratos WHERE substr(vigencia_fim,1,10)>=?",
             (hoje,)).fetchone()[0]
-        vencendo_60 = db.execute(
-            "SELECT (SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)"
-            " BETWEEN date('now') AND date('now','+60 day')) +"
-            " (SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)"
-            " BETWEEN date('now') AND date('now','+60 day'))").fetchone()[0]
+        vencendo_contratos = db.execute(
+            "SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)"
+            " BETWEEN date('now') AND date('now','+60 day')").fetchone()[0]
+        vencendo_atas = db.execute(
+            "SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)"
+            " BETWEEN date('now') AND date('now','+60 day')").fetchone()[0]
         propostas_abertas = db.execute(
             "SELECT COUNT(*) FROM contratacoes"
             " WHERE referencia=0"
@@ -579,7 +580,8 @@ class Api:
         ).fetchone()[0]
         return {"contratacoes": n_contratacoes,
                 "homologado_ano": homologado_ano, "vigentes": vigentes,
-                "vencendo_60": vencendo_60,
+                "vencendo_60_contratos": vencendo_contratos,
+                "vencendo_60_atas": vencendo_atas,
                 "propostas_abertas": propostas_abertas}
 
     def set_titulo(self, texto):

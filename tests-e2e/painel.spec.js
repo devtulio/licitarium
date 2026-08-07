@@ -190,16 +190,31 @@ test("os alertas viram chips clicáveis acima das subabas",
   expect(ultima.tipo).toBe("contratos");
 });
 
-test("chip de vencimento do Painel também filtra pela janela de 60 dias",
+test("chip de vencimento de contratos do Painel filtra pela janela de 60 dias",
     async ({ page }) => {
-  await page.locator("#painel-chips .chip", { hasText: "vencem em 60 dias" })
+  await page.locator("#painel-chips .chip", { hasText: "contratos vencem" })
     .click();
+  await expect(page.locator('nav.abas button[data-tipo="contratos"]'))
+    .toHaveClass(/on/);
   await expect(page.locator("#f-vence60")).toBeChecked();
   await expect(page.locator("#f-vigentes")).not.toBeChecked();
   const chamada = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "listar").pop());
+  expect(chamada.tipo).toBe("contratos");
   expect(chamada.filtros.vencendo).toBe(true);
   expect(chamada.filtros.vigentes).toBeNull();
+});
+
+test("chip de vencimento de atas do Painel leva à aba de atas",
+    async ({ page }) => {
+  await page.locator("#painel-chips .chip", { hasText: "atas vencem" })
+    .click();
+  await expect(page.locator('nav.abas button[data-tipo="atas"]'))
+    .toHaveClass(/on/);
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(chamada.tipo).toBe("atas");
+  expect(chamada.filtros.vencendo).toBe(true);
 });
 
 test("chip de limite filtra por modalidade, exercício e os objetos exatos",
@@ -314,15 +329,17 @@ test("vista oculta desenha ao aparecer", async ({ page }) => {
 test("chips concordam em número", async ({ page }) => {
   await page.evaluate(() => {
     window.__painel = { ...window.PAINEL_DADOS,
-      alertas: { perto_do_limite: 1, acima_do_limite: 0, vencendo: 1,
+      alertas: { perto_do_limite: 1, acima_do_limite: 0,
+                 vencendo_contratos: 1, vencendo_atas: 1,
                  propostas: 1, paradas: 1 } };
   });
   await page.locator("#p-ano").selectOption({ index: 0 });
   const chips = page.locator("#painel-chips .chip");
   await expect(chips.nth(0)).toContainText("objeto perto do limite");
-  await expect(chips.nth(1)).toContainText("contrato ou ata vence");
-  await expect(chips.nth(2)).toContainText("processo com proposta aberta");
-  await expect(chips.nth(3)).toContainText("processo sem resultado");
+  await expect(chips.nth(1)).toContainText("contrato vence");
+  await expect(chips.nth(2)).toContainText("ata vence");
+  await expect(chips.nth(3)).toContainText("processo com proposta aberta");
+  await expect(chips.nth(4)).toContainText("processo sem resultado");
 });
 
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {

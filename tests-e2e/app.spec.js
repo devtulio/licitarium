@@ -57,7 +57,9 @@ test("boot: app abre com município, KPIs e alertas", async ({ page }) => {
   await expect(page.locator("#sub-municipio"))
     .toContainText("Orindiúva · SP");
   await expect(page.locator("#kpi-contratacoes")).toHaveText("131");
-  await expect(page.locator("#chip-vencendo")).toContainText("9");
+  // contrato e ata são alertas separados — cada um vai a uma tela diferente
+  await expect(page.locator("#chip-vencendo-contratos")).toContainText("7");
+  await expect(page.locator("#chip-vencendo-atas")).toContainText("2");
   await expect(page.locator("#chip-propostas")).toContainText("2");
 });
 
@@ -417,20 +419,35 @@ test("limites de dispensa usam máscara de dinheiro e salvam número puro",
   expect(parseFloat(salvo.v)).toBe(75000);            // persiste numérico
 });
 
-test("chip de vencimento filtra pela janela de 60 dias, não por vigentes",
+test("chip de vencimento de contratos filtra pela janela de 60 dias, não por vigentes",
     async ({ page }) => {
   // "vigentes" não tem teto — todo contrato ativo entrava, e o alerta de
   // 25 virava lista de 50. O chip tem de ligar a caixa da janela fechada.
   await abrirLista(page);   // a tela inicial agora é o Painel
-  await page.locator("#chip-vencendo").click();
+  await page.locator("#chip-vencendo-contratos").click();
   await expect(page.locator('nav.abas button[data-tipo="contratos"]'))
     .toHaveClass(/on/);
   await expect(page.locator("#f-vence60")).toBeChecked();
   await expect(page.locator("#f-vigentes")).not.toBeChecked();
   const chamada = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "listar").pop());
+  expect(chamada.tipo).toBe("contratos");
   expect(chamada.filtros.vencendo).toBe(true);
   expect(chamada.filtros.vigentes).toBeNull();
+});
+
+test("chip de vencimento de atas leva à aba de atas, não à de contratos",
+    async ({ page }) => {
+  // Um alerta que soma contrato e ata não tem como abrir as duas telas de
+  // uma vez — por isso são dois chips, cada um levando à tela certa.
+  await abrirLista(page);
+  await page.locator("#chip-vencendo-atas").click();
+  await expect(page.locator('nav.abas button[data-tipo="atas"]'))
+    .toHaveClass(/on/);
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(chamada.tipo).toBe("atas");
+  expect(chamada.filtros.vencendo).toBe(true);
 });
 
 test("contratos e atas mostram a situação da vigência por cor e texto",

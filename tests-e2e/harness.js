@@ -140,7 +140,8 @@ function scriptPonte(temaBanco = "portal") {
         limite_dispensa_compras: "62639.92", limite_dispensa_obras: "125279.84",
         last_sync: "2026-07-29", sincronizado_em: "2026-07-29T14:32:00",
         kpis: { contratacoes: 131, homologado_ano: 10828702.73, vigentes: 47,
-                vencendo_60: 9, propostas_abertas: 2 } }),
+                vencendo_60_contratos: 7, vencendo_60_atas: 2,
+                propostas_abertas: 2 } }),
       painel: async (ano, orgao) => {
         window.__chamadas.push({ metodo: "painel", ano, orgao });
         return window.__painel ?? PAINEL_DADOS;

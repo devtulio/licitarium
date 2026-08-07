@@ -754,10 +754,14 @@ function mostrarChips(a) {
       ? "acima do" : "perto do"} limite anual de dispensa`,
     () => irPara("contratacoes", {ano: P.dados.ano, orgao, modalidade: "8",
                                   objetos: a.objetos_perto_do_limite})]);
-  if (a.vencendo) chips.push(["aviso", "⏱", a.vencendo,
-    a.vencendo === 1 ? "contrato ou ata vence em 60 dias"
-                     : "contratos/atas vencem em 60 dias",
+  if (a.vencendo_contratos) chips.push(["aviso", "⏱", a.vencendo_contratos,
+    a.vencendo_contratos === 1 ? "contrato vence em 60 dias"
+                               : "contratos vencem em 60 dias",
     () => irPara("contratos",
+                {orgao, vencendo: true, ord: "vigencia", dir: "asc"})]);
+  if (a.vencendo_atas) chips.push(["aviso", "⏱", a.vencendo_atas,
+    a.vencendo_atas === 1 ? "ata vence em 60 dias" : "atas vencem em 60 dias",
+    () => irPara("atas",
                 {orgao, vencendo: true, ord: "vigencia", dir: "asc"})]);
   if (a.propostas) chips.push(["", "📄", a.propostas,
     a.propostas === 1 ? "processo com proposta aberta"

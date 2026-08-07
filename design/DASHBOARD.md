@@ -36,6 +36,17 @@ inclusive um vencendo daqui a um ano. O chip agora liga uma caixa própria
 dois lugares (chip do Painel e chip no topo das listas, calculado por
 `Api._kpis`) — os dois usavam o filtro errado, os dois foram corrigidos.
 
+**Contrato e ata não dividem mais o mesmo chip** (achado logo em seguida,
+mesmo dia). "25 contratos/atas vencem" levava só a uma tela — a query já
+soma as duas tabelas, mas a lista é de uma tabela só, então metade da
+contagem nunca tinha como aparecer. Viraram dois chips, um por tabela, cada
+um com sua contagem (`alertas.vencendo_contratos`/`vencendo_atas`,
+`_kpis.vencendo_60_contratos`/`vencendo_60_atas`). Os cards do Painel
+também passaram a ter **largura padronizada** (`.chip { flex:1 1 200px }`):
+antes cada um só media o próprio texto, e o card do limite anual (frase
+longa) ficava bem mais largo que o de propostas abertas (frase curta) na
+mesma fileira.
+
 ## Regras dos gráficos
 
 Seguem o método de `dataviz` (skill), com a paleta validada pelo script de seis
