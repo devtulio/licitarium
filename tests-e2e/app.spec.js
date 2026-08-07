@@ -417,12 +417,20 @@ test("limites de dispensa usam máscara de dinheiro e salvam número puro",
   expect(parseFloat(salvo.v)).toBe(75000);            // persiste numérico
 });
 
-test("chip de vencimento navega para contratos vigentes", async ({ page }) => {
+test("chip de vencimento filtra pela janela de 60 dias, não por vigentes",
+    async ({ page }) => {
+  // "vigentes" não tem teto — todo contrato ativo entrava, e o alerta de
+  // 25 virava lista de 50. O chip tem de ligar a caixa da janela fechada.
   await abrirLista(page);   // a tela inicial agora é o Painel
   await page.locator("#chip-vencendo").click();
   await expect(page.locator('nav.abas button[data-tipo="contratos"]'))
     .toHaveClass(/on/);
-  await expect(page.locator("#f-vigentes")).toBeChecked();
+  await expect(page.locator("#f-vence60")).toBeChecked();
+  await expect(page.locator("#f-vigentes")).not.toBeChecked();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(chamada.filtros.vencendo).toBe(true);
+  expect(chamada.filtros.vigentes).toBeNull();
 });
 
 test("contratos e atas mostram a situação da vigência por cor e texto",

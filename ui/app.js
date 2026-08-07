@@ -302,7 +302,7 @@ function renderKpis(k) {
   $("alertas").innerHTML = alertas.join("");
   $("alertas").classList.toggle("oculto", alertas.length === 0);
   $("chip-vencendo")?.addEventListener("click",
-    () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
+    () => irPara("contratos", {vencendo: true, ord: "vigencia", dir: "asc"}));
   $("chip-propostas")?.addEventListener("click",
     () => irPara("contratacoes", {propostas: true}));
 }
@@ -334,6 +334,7 @@ function filtrosAtuais() {
            orgao: $("f-orgao").value || null,
            propostas: $("f-propostas").checked || null,
            vigentes: $("f-vigentes").checked || null,
+           vencendo: $("f-vence60").checked || null,
            parada: $("f-parada").checked || null,
            so_homologados: $("f-homologados").checked || null,
            origem: $("f-so-meu").checked ? "proprio" : null,
@@ -348,7 +349,7 @@ function filtrosAtuais() {
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const CAMPOS_FILTRO = ["f-ano", "f-modalidade", "f-situacao", "f-orgao",
                        "f-unidade", "f-busca"];
-const CAIXAS_FILTRO = ["f-propostas", "f-vigentes", "f-parada"];
+const CAIXAS_FILTRO = ["f-propostas", "f-vigentes", "f-vence60", "f-parada"];
 // f-homologados é padrão ligado na aba Preços, não conta como "filtro ativo"
 
 function temFiltroAtivo() {
@@ -892,8 +893,9 @@ function mudarAba(tipo) {
   $("f-situacao").classList.toggle("oculto", !soContratacoes);
   $("cx-propostas").classList.toggle("oculto", !soContratacoes);
   $("cx-parada").classList.toggle("oculto", !soContratacoes);
-  $("cx-vigentes").classList.toggle("oculto",
-    !["contratos", "atas"].includes(tipo));
+  const ehVigencia = ["contratos", "atas"].includes(tipo);
+  $("cx-vigentes").classList.toggle("oculto", !ehVigencia);
+  $("cx-vence60").classList.toggle("oculto", !ehVigencia);
   const ehItens = tipo === "itens";
   $("cx-homologados").classList.toggle("oculto", !ehItens);
   $("f-unidade").classList.toggle("oculto", !ehItens);
@@ -907,6 +909,7 @@ function mudarAba(tipo) {
     : "Buscar no objeto…";
   $("f-propostas").checked = false;
   $("f-vigentes").checked = false;
+  $("f-vence60").checked = false;
   $("f-parada").checked = false;
 }
 
@@ -925,8 +928,8 @@ $("f-corrigir").addEventListener("change", () => {
   estado.pagina = 1;
   carregarLista();
 });
-["f-propostas", "f-vigentes", "f-parada", "f-homologados", "f-so-meu"]
-  .forEach(id => $(id).addEventListener("change",
+["f-propostas", "f-vigentes", "f-vence60", "f-parada", "f-homologados",
+ "f-so-meu"].forEach(id => $(id).addEventListener("change",
     () => { estado.pagina = 1; carregarLista(); }));
 
 // navegação programática (KPIs e alertas). Cada campo é sempre escrito, não
@@ -942,6 +945,7 @@ function irPara(tipo, ajustes = {}) {
   $("f-orgao").value = ajustes.orgao ?? "";
   $("f-propostas").checked = !!ajustes.propostas;
   $("f-vigentes").checked = !!ajustes.vigentes;
+  $("f-vence60").checked = !!ajustes.vencendo;
   $("f-parada").checked = !!ajustes.parada;
   estado.objetosAlvo = ajustes.objetos || null;
   if (ajustes.ord) { estado.ord = ajustes.ord; estado.dir = ajustes.dir || "asc"; }

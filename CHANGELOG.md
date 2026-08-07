@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.12.1 — 2026-08-07
+
+**"25 contratos vencem" abria lista de 50 — o filtro era "vigentes", não
+"vence em 60 dias"**
+
+- O alerta conta contratos e atas com vigência terminando dentro de uma
+  **janela fechada de 60 dias**. O clique aplicava o filtro **Vigentes**,
+  que não tem limite superior — todo contrato ainda ativo entrava, mesmo um
+  vencendo daqui a um ano. Achado reportado pelo usuário: 25 no alerta, 50
+  na lista.
+- Ganhou filtro e caixa próprios (**Vence em 60 dias**), distintos de
+  **Vigentes**: a caixa antiga continua útil sozinha (ver tudo que ainda
+  não venceu, sem prazo), e agora as duas podem ser ligadas ou desligadas
+  independentemente, na mão ou pelo alerta.
+- Mesma correção nos **dois lugares** que levam a esse alerta: o chip do
+  Painel e o chip de vencimento que aparece no topo das listas.
+
+252 pytest + 96 E2E.
+
 ## 1.12.0 — 2026-08-07
 
 **Clicar num alerta do Painel agora filtra a lista de verdade**

@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.12.0"
+VERSAO = "1.12.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -777,6 +777,13 @@ class Api:
             args.append(f["orgao"])
         if f.get("vigentes") and tipo in ("contratos", "atas"):
             where.append("date(vigencia_fim) >= date('now')")
+        if f.get("vencendo") and tipo in ("contratos", "atas"):
+            # mesmo critério do alerta (Api._kpis/relatorios.dados_executivo):
+            # janela FECHADA de 60 dias, não "vigente" sem limite superior —
+            # era essa a diferença entre o alerta contar 25 e a lista trazer
+            # tudo que ainda não venceu (ex.: 50)
+            where.append("date(vigencia_fim)"
+                         " BETWEEN date('now') AND date('now','+60 day')")
         if f.get("propostas") and tipo == "contratacoes":
             where.append(
                 "datetime(data_encerramento_proposta) >= datetime('now')")

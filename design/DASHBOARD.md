@@ -27,6 +27,15 @@ filtra pelos **objetos exatos** que estouraram (`agrupamento_objeto`, mesma
 função SQL do agrupamento do medidor — ver `licitarium.py`), não pela
 modalidade Dispensa inteira.
 
+**"Vigentes" e "vence em 60 dias" são filtros diferentes** (achado em
+2026-08-07, o mesmo usuário que pegou o item acima: 25 no alerta, 50 na
+lista). O alerta conta contratos/atas com vigência numa janela **fechada**
+de 60 dias; "Vigentes" não tem teto — mostra todo contrato ainda ativo,
+inclusive um vencendo daqui a um ano. O chip agora liga uma caixa própria
+(**Vence em 60 dias**), independente de Vigentes. O mesmo alerta aparece em
+dois lugares (chip do Painel e chip no topo das listas, calculado por
+`Api._kpis`) — os dois usavam o filtro errado, os dois foram corrigidos.
+
 ## Regras dos gráficos
 
 Seguem o método de `dataviz` (skill), com a paleta validada pelo script de seis

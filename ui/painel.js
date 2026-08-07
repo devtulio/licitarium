@@ -758,7 +758,7 @@ function mostrarChips(a) {
     a.vencendo === 1 ? "contrato ou ata vence em 60 dias"
                      : "contratos/atas vencem em 60 dias",
     () => irPara("contratos",
-                {orgao, vigentes: true, ord: "vigencia", dir: "asc"})]);
+                {orgao, vencendo: true, ord: "vigencia", dir: "asc"})]);
   if (a.propostas) chips.push(["", "📄", a.propostas,
     a.propostas === 1 ? "processo com proposta aberta"
                       : "processos com proposta aberta",

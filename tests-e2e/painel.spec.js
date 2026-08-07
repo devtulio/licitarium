@@ -190,6 +190,18 @@ test("os alertas viram chips clicáveis acima das subabas",
   expect(ultima.tipo).toBe("contratos");
 });
 
+test("chip de vencimento do Painel também filtra pela janela de 60 dias",
+    async ({ page }) => {
+  await page.locator("#painel-chips .chip", { hasText: "vencem em 60 dias" })
+    .click();
+  await expect(page.locator("#f-vence60")).toBeChecked();
+  await expect(page.locator("#f-vigentes")).not.toBeChecked();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(chamada.filtros.vencendo).toBe(true);
+  expect(chamada.filtros.vigentes).toBeNull();
+});
+
 test("chip de limite filtra por modalidade, exercício e os objetos exatos",
     async ({ page }) => {
   await page.locator("#painel-chips .chip").first().click();

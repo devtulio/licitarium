@@ -272,6 +272,54 @@ def test_parada_nao_reaparece_apos_homologar(api):
     assert r["total"] == 0
 
 
+def test_clique_no_alerta_de_vencimento_nao_traz_o_vigente_distante(api):
+    """"Vigentes" (sem teto) não é "vence em 60 dias" (janela fechada).
+
+    K1 vence em 20 dias — entra nos dois filtros. Um contrato vigente com
+    vigência a 200 dias só pode aparecer em "vigentes"; em "vencendo" ele
+    infla a lista sem ter nada a ver com o alerta que o usuário clicou —
+    foi assim que "25 vencem em 60 dias" virava lista de 50.
+    """
+    db = _db()
+    try:
+        venc_longe = (date.today() + timedelta(days=200)).isoformat()
+        db.execute("INSERT INTO contratos (numero_controle,"
+                   " contratacao_controle, orgao_cnpj, fornecedor_ni,"
+                   " fornecedor_nome, objeto, valor_global, vigencia_inicio,"
+                   " vigencia_fim, data_publicacao, raw) VALUES ('K2','D1',"
+                   " '111','9','FORNECEDOR UM LTDA','Obj',10000.0,"
+                   f" '{ANO}-01-01', ?, '{ANO}-02-15', '{{}}')", (venc_longe,))
+        db.commit()
+    finally:
+        db.close()
+
+    todos_vigentes = licitarium.Api().listar("contratos", {"vigentes": True})
+    assert todos_vigentes["total"] == 2                # K1 e K2
+
+    so_vencendo = licitarium.Api().listar("contratos", {"vencendo": True})
+    assert so_vencendo["total"] == 1
+    assert so_vencendo["itens"][0]["numero_controle"] == "K1"
+
+
+def test_vencendo_tambem_vale_para_atas(api):
+    db = _db()
+    try:
+        # A1 (fixture base) vence em 45 dias; esta vence em 200 — só a
+        # primeira pode sobrar se o filtro estiver aplicado de verdade
+        db.execute("INSERT INTO atas (numero_controle, contratacao_controle,"
+                   " orgao_cnpj, numero_ata, ano_ata, objeto, vigencia_inicio,"
+                   " vigencia_fim, raw) VALUES ('A2','P1','111','6',?,'Obj',"
+                   f" '{ANO}-01-01', ?,"
+                   " '{\"numeroAtaRegistroPreco\":\"6\",\"anoAta\":2026}')",
+                   (ANO, (date.today() + timedelta(days=200)).isoformat()))
+        db.commit()
+    finally:
+        db.close()
+
+    r = licitarium.Api().listar("atas", {"vencendo": True})
+    assert r["total"] == 1 and r["itens"][0]["numero_controle"] == "A1"
+
+
 def test_comparacao_com_o_ano_anterior_usa_o_mesmo_periodo(api):
     """Comparar oito meses com doze é aritmética do calendário.
 
