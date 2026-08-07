@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.13.3 — 2026-08-08
+
+**Chips de vencimento 8px mais baixos que os irmãos**
+
+- Mesmo print do usuário, terceira rodada: os cards tinham a mesma altura
+  mas ficavam visivelmente desalinhados verticalmente. Causa: colisão de
+  nome de classe. Uma classe `.aviso` genérica do CSS (texto de aviso sob
+  campo de formulário) tem `margin-top:8px`; os dois chips de vencimento
+  são `class="chip aviso"` e herdavam essa margem sem relação nenhuma
+  com o alerta do Painel.
+- `.chip.aviso { margin-top:0 }` resolve. Como altura já era igual, o
+  teste de altura anterior não detectava — precisou de um teste novo
+  medindo posição, não só tamanho.
+
+253 pytest + 101 E2E.
+
 ## 1.13.2 — 2026-08-08
 
 **5º alerta quebrava pra uma linha sozinho**

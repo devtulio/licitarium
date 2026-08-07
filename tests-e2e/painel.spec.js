@@ -377,9 +377,33 @@ test("os 5 alertas possíveis cabem numa linha só até a largura mínima da jan
   await expect(chips).toHaveCount(5);
   const ys = await chips.evaluateAll(
     els => els.map(el => Math.round(el.getBoundingClientRect().y)));
-  // mesma linha: nenhum chip pode estar mais de 1-2px abaixo do primeiro
-  // (variação de borda entre .chip.grave/.chip.aviso e o resto)
+  // mesma linha: <10 aceita ruído de sub-pixel, mas NÃO os 8px do bug de
+  // .chip.aviso abaixo (esse limiar frouxo já deixou o bug passar batido
+  // uma vez — se voltar, este teste tem de morder de novo)
   for (const y of ys) expect(Math.abs(y - ys[0])).toBeLessThan(10);
+});
+
+test("chip.aviso não herda margin-top da classe .aviso genérica",
+    async ({ page }) => {
+  // achado real (usuário, 2026-08-08, segunda rodada sobre o mesmo print):
+  // existe uma classe .aviso solta no CSS (texto de aviso sob campo de
+  // formulário) com margin-top:8px. Os dois chips de vencimento têm
+  // class="chip aviso" e herdavam essa margem por colisão de nome — 8px
+  // mais baixos que os irmãos "grave"/plano, com a MESMA altura (por
+  // isso o teste de altura, sozinho, não pegava isto).
+  await page.evaluate(() => {
+    window.__painel = { ...window.PAINEL_DADOS,
+      alertas: { perto_do_limite: 1, acima_do_limite: 0,
+                 vencendo_contratos: 1, vencendo_atas: 1,
+                 propostas: 1, paradas: 0 } };
+  });
+  await page.locator("#p-ano").selectOption({ index: 0 });
+  const chips = page.locator("#painel-chips .chip");
+  await expect(chips).toHaveCount(4);
+  const ys = await chips.evaluateAll(
+    els => els.map(el => Math.round(el.getBoundingClientRect().y)));
+  // todos exatamente na mesma linha — sem a folga de 10px do teste acima
+  for (const y of ys) expect(y).toBe(ys[0]);
 });
 
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {

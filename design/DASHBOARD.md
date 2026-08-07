@@ -75,6 +75,20 @@ janela (`min_size=(900,600)` no `webview.create_window`, `licitarium.py`
 `painel.spec.js` ("os 5 alertas possíveis cabem numa linha só...") monta
 os 5 alertas via `window.__painel` e mede a viewport no mínimo absoluto.
 
+**Terceiro round, mesmo print do usuário: `.chip.aviso` ficava 8px mais
+baixo que os irmãos, com a MESMA altura** (por isso o teste de altura
+não pegava — height igual, position diferente). Causa: colisão de
+nome de classe. Existe uma `.aviso` genérica no CSS (texto de aviso sob
+campo de formulário) com `margin-top:8px`; os dois chips de vencimento
+têm `class="chip aviso"` e herdavam essa margem sem eu perceber, porque
+nunca é óbvio que duas seções bem distantes do arquivo compartilham uma
+classe. `.chip.aviso { margin-top:0 }` resolve — a especificidade do
+composto (duas classes) já venceria a `.aviso` sozinha de qualquer jeito,
+o problema era só a declaração faltando. **Lição**: `height` igual não
+prova alinhamento; teste teria de medir `y`, não só `height` — o de
+altura ficou como está (pega quebra de linha), o de posição é novo
+("chip.aviso não herda margin-top...").
+
 ## Regras dos gráficos
 
 Seguem o método de `dataviz` (skill), com a paleta validada pelo script de seis
