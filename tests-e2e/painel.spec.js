@@ -190,6 +190,66 @@ test("os alertas viram chips clicáveis acima das subabas",
   expect(ultima.tipo).toBe("contratos");
 });
 
+test("chip de limite filtra por modalidade, exercício e os objetos exatos",
+    async ({ page }) => {
+  await page.locator("#painel-chips .chip").first().click();
+  const chamadas = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar"));
+  // um clique, uma consulta — não a corrida entre o reset da aba e o filtro
+  expect(chamadas.length).toBe(1);
+  const [c] = chamadas;
+  expect(c.tipo).toBe("contratacoes");
+  expect(c.filtros.modalidade).toBe("8");
+  expect(c.filtros.ano).toBe("2026");
+  // não é "toda dispensa do ano": é só o que o alerta apontou
+  expect(c.filtros.objetos).toEqual(
+    ["MATERIAL LIMPEZA", "MEDICAMENTOS BÁSICOS", "SERVIÇOS TRANSPORTE",
+     "PNEUS CÂMARAS", "MATERIAL ESCRITÓRIO", "COMBUSTÍVEL"]);
+  await expect(page.locator("#f-modalidade")).toHaveValue("8");
+  // sem caixa própria — o aviso é o que diz que o filtro está ativo
+  await expect(page.locator("#filtro-alerta")).toBeVisible();
+  await expect(page.locator("#filtro-alerta")).toContainText("limite anual");
+});
+
+test("chip de processo parado liga o filtro dedicado, sem corrida",
+    async ({ page }) => {
+  // não é nth(3): "propostas" está zerado neste acervo de exemplo e o chip
+  // some da lista, deslocando os índices — pega pelo texto, não pela posição
+  await page.locator("#painel-chips .chip", { hasText: "sem resultado" })
+    .click();
+  const chamadas = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar"));
+  expect(chamadas.length).toBe(1);
+  const [c] = chamadas;
+  expect(c.tipo).toBe("contratacoes");
+  expect(c.filtros.parada).toBe(true);
+  expect(c.filtros.ano).toBe("2026");
+  await expect(page.locator("#f-parada")).toBeChecked();
+});
+
+test("limpar filtros também derruba o filtro de objetos do alerta",
+    async ({ page }) => {
+  await page.locator("#painel-chips .chip").first().click();
+  await expect(page.locator("#btn-limpar")).toBeVisible();
+  await page.locator("#btn-limpar").click();
+  await expect(page.locator("#filtro-alerta")).toBeHidden();
+  await expect(page.locator("#f-modalidade")).toHaveValue("");
+  const ultima = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(ultima.filtros.objetos).toBeNull();
+  expect(ultima.filtros.modalidade).toBeNull();
+});
+
+test("trocar de aba depois do alerta não carrega o filtro do alerta junto",
+    async ({ page }) => {
+  await page.locator("#painel-chips .chip").first().click();
+  await page.locator('nav.abas button[data-tipo="contratos"]').click();
+  await expect(page.locator("#filtro-alerta")).toBeHidden();
+  const ultima = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "listar").pop());
+  expect(ultima.filtros.objetos).toBeNull();
+});
+
 test("trocar o exercício recarrega o painel inteiro", async ({ page }) => {
   await page.locator("#p-ano").selectOption("2025");
   const chamada = await page.evaluate(() => window.__chamadas

@@ -112,6 +112,9 @@
         <option value="">Todas as unidades</option></select>
       <label class="check-filtro" id="cx-propostas">
         <input type="checkbox" id="f-propostas"> Propostas abertas</label>
+      <label class="check-filtro" id="cx-parada"
+             title="Publicado há mais de 90 dias e sem nenhum valor homologado">
+        <input type="checkbox" id="f-parada"> Sem resultado (90+ dias)</label>
       <label class="check-filtro oculto" id="cx-vigentes">
         <input type="checkbox" id="f-vigentes"> Vigentes</label>
       <label class="check-filtro oculto" id="cx-homologados">
@@ -128,6 +131,8 @@
         <input type="checkbox" id="f-so-meu"> Só do meu município</label>
       <input type="search" id="f-busca" placeholder="Buscar no objeto…"
              aria-label="Buscar">
+      <span class="filtro-alerta oculto" id="filtro-alerta">🔔 Só os objetos
+        do alerta de limite anual</span>
       <button class="btn ghost oculto" id="btn-limpar">✕ Limpar filtros</button>
       <button class="btn ghost" id="btn-csv">Exportar CSV</button>
     </div>

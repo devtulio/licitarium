@@ -17,7 +17,15 @@ Amontoar as três numa página só produziria a tela que ninguém lê.
 
 **Os alertas ficam acima das subabas**, sempre visíveis: alerta que só aparece
 depois de escolher a subaba certa não alerta ninguém. Cada chip leva à lista
-já filtrada.
+já filtrada — pelo exercício e órgão do Painel, e pelo que o alerta contou,
+não por "toda a modalidade" ou por nada (achado em 2026-08-07: dois dos
+quatro chips não filtravam nada — o parâmetro de modalidade nunca era lido, e
+o de "processo parado" nunca existiu; os outros dois filtravam por corrida
+entre o reset da troca de aba e o religamento do filtro, que só "funcionava"
+porque a segunda consulta costumava vencer a primeira). O de limite anual
+filtra pelos **objetos exatos** que estouraram (`agrupamento_objeto`, mesma
+função SQL do agrupamento do medidor — ver `licitarium.py`), não pela
+modalidade Dispensa inteira.
 
 ## Regras dos gráficos
 

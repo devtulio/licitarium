@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.11.2"
+VERSAO = "1.12.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -374,6 +374,12 @@ def abrir_db():
     # o filtro por unidade agrupa sinônimos, e o agrupamento é o mesmo em
     # Python e em SQL — daí a função viajar para dentro do banco
     db.create_function("unidade_canonica", 1, _unidade_canonica,
+                       deterministic=True)
+    # mesmo raciocínio: o medidor de limite do Painel agrupa dispensa por
+    # objeto (relatorios.dados_painel), e o clique no alerta precisa filtrar
+    # a lista exatamente pelos mesmos objetos — a função tem de ser uma só
+    db.create_function("agrupamento_objeto", 1,
+                       lambda o: pca_builder.chave_agrupamento(o, 2),
                        deterministic=True)
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA busy_timeout=10000")
@@ -774,6 +780,20 @@ class Api:
         if f.get("propostas") and tipo == "contratacoes":
             where.append(
                 "datetime(data_encerramento_proposta) >= datetime('now')")
+        if f.get("parada") and tipo == "contratacoes":
+            # mesmo critério do alerta "sem resultado" do Painel
+            # (relatorios.dados_painel): publicado há mais de 90 dias e sem
+            # nenhum valor homologado ainda
+            where.append("valor_homologado IS NULL"
+                         " AND date(data_publicacao) < date('now','-90 day')")
+        if f.get("objetos") and tipo == "contratacoes":
+            # clique no alerta de limite anual: só os objetos que o Painel
+            # apontou como perto/acima do limite, não a modalidade inteira
+            grupo = [str(o) for o in f["objetos"] if o]
+            if grupo:
+                where.append("modalidade_id=8 AND agrupamento_objeto(objeto)"
+                             f" IN ({','.join('?' * len(grupo))})")
+                args += grupo
         if f.get("so_homologados") and tipo == "itens":
             where.append("valor_unitario_homologado IS NOT NULL")
         if f.get("origem") == "proprio" and tipo == "itens":

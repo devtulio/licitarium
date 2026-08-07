@@ -199,6 +199,79 @@ def test_alerta_distingue_perto_de_acima_do_limite(api):
     assert a["acima_do_limite"] == 1
 
 
+# ── o clique no alerta tem de filtrar a lista, não só levar até ela ────────
+# Esta seção fecha o círculo: cada alerta carrega junto os dados que o
+# clique precisa para filtrar a lista exatamente pelo que ele contou —
+# nunca "a modalidade inteira" nem "nada".
+
+def test_alerta_de_limite_expoe_os_objetos_que_contou(api):
+    """O clique filtra por estes objetos, não por toda dispensa do ano.
+
+    D1 e D2 nascem com objeto genérico ("Objeto") no fixture — a chave
+    agrupada é "OBJETO"; o teste seguinte usa objetos de verdade.
+    """
+    a = api.painel(ANO)["alertas"]
+    assert a["objetos_perto_do_limite"] == ["OBJETO"]
+
+
+def test_clique_no_alerta_de_limite_traz_so_esses_objetos(api):
+    """De ponta a ponta: o que o alerta contou é o que a lista mostra.
+
+    D1 e D2 (papel A4) somam 83% do limite e disparam o alerta; D3 é
+    dispensa do exercício anterior e P1/P2 não são dispensa — nenhum dos
+    três pode aparecer na lista filtrada.
+    """
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET objeto='AQUISIÇÃO DE PAPEL A4'"
+                   " WHERE numero_controle='D1'")
+        db.execute("UPDATE contratacoes SET objeto='AQUISICAO DE PAPEL A4"
+                   " SULFITE' WHERE numero_controle='D2'")
+        db.execute("UPDATE contratacoes SET objeto='CONTRATAÇÃO DE"
+                   " MANUTENÇÃO PREDIAL' WHERE numero_controle='D3'")
+        db.commit()
+    finally:
+        db.close()
+
+    objetos = api.painel(ANO)["alertas"]["objetos_perto_do_limite"]
+    r = api.listar("contratacoes", {"objetos": objetos})
+    assert {i["numero_controle"] for i in r["itens"]} == {"D1", "D2"}
+    assert r["total"] == 2
+
+
+def test_lista_sem_objetos_no_filtro_nao_aplica_nada(api):
+    """Filtro vazio ou ausente não pode virar `IN ()`, que zeraria a lista."""
+    r = api.listar("contratacoes", {"objetos": []})
+    assert r["total"] > 0
+    r2 = api.listar("contratacoes", {})
+    assert r2["total"] == r["total"]
+
+
+def test_clique_no_alerta_de_parada_traz_so_o_processo_parado(api):
+    """P2: publicada em janeiro, sem homologação — é a única pendência.
+
+    Mesmo critério do alerta (relatorios.dados_painel): mais de 90 dias
+    desde a publicação e nenhum valor homologado ainda.
+    """
+    a = api.painel(ANO)["alertas"]
+    assert a["paradas"] == 1
+
+    r = api.listar("contratacoes", {"parada": True})
+    assert r["total"] == 1 and r["itens"][0]["numero_controle"] == "P2"
+
+
+def test_parada_nao_reaparece_apos_homologar(api):
+    db = _db()
+    try:
+        db.execute("UPDATE contratacoes SET valor_homologado=90000"
+                   " WHERE numero_controle='P2'")
+        db.commit()
+    finally:
+        db.close()
+    r = licitarium.Api().listar("contratacoes", {"parada": True})
+    assert r["total"] == 0
+
+
 def test_comparacao_com_o_ano_anterior_usa_o_mesmo_periodo(api):
     """Comparar oito meses com doze é aritmética do calendário.
 

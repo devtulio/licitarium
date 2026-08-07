@@ -45,7 +45,7 @@ const SELO = `
         font-size="21" fill="#f5efe2" text-anchor="middle">L</text>`;
 
 const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
-                 ord:null, dir:"desc" };
+                 ord:null, dir:"desc", objetosAlvo:null };
 // há município de referência? decide se a aba Preços mostra a origem
 let temReferencia = false;
 // comparar por conteúdo muda a grade e o resumo inteiros
@@ -334,28 +334,33 @@ function filtrosAtuais() {
            orgao: $("f-orgao").value || null,
            propostas: $("f-propostas").checked || null,
            vigentes: $("f-vigentes").checked || null,
+           parada: $("f-parada").checked || null,
            so_homologados: $("f-homologados").checked || null,
            origem: $("f-so-meu").checked ? "proprio" : null,
            unidade: $("f-unidade").value || null,
            corrigir: corrigirIpca || null,
            busca: $("f-busca").value.trim() || null,
+           // vindo de um alerta do Painel: quais objetos, não qual caixa
+           objetos: estado.objetosAlvo || null,
            ord: estado.ord, dir: estado.dir };
 }
 
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const CAMPOS_FILTRO = ["f-ano", "f-modalidade", "f-situacao", "f-orgao",
                        "f-unidade", "f-busca"];
-const CAIXAS_FILTRO = ["f-propostas", "f-vigentes"];  // f-homologados é
-// padrão ligado na aba Preços, então não conta como "filtro ativo"
+const CAIXAS_FILTRO = ["f-propostas", "f-vigentes", "f-parada"];
+// f-homologados é padrão ligado na aba Preços, não conta como "filtro ativo"
 
 function temFiltroAtivo() {
   return CAMPOS_FILTRO.some(id => $(id).value)
-      || CAIXAS_FILTRO.some(id => $(id).checked);
+      || CAIXAS_FILTRO.some(id => $(id).checked)
+      || !!estado.objetosAlvo;
 }
 
 function limparFiltros() {
   CAMPOS_FILTRO.forEach(id => $(id).value = "");
   CAIXAS_FILTRO.forEach(id => $(id).checked = false);
+  estado.objetosAlvo = null;
   estado.pagina = 1;
   carregarLista();
 }
@@ -801,6 +806,7 @@ async function carregarLista() {
   }).join("");
   const comFiltro = temFiltroAtivo();
   $("btn-limpar").classList.toggle("oculto", !comFiltro);
+  $("filtro-alerta").classList.toggle("oculto", !estado.objetosAlvo);
   const vazio = comFiltro
     ? `<div class="vazio"><svg viewBox="0 0 64 64" aria-hidden="true">${SELO}</svg>
         <p>Nenhum registro para estes filtros.</p>
@@ -859,43 +865,55 @@ async function carregarLista() {
   $("pag-prox").disabled = estado.pagina >= paginas;
 }
 
+// Estado de aba/visibilidade só, sem consultar o banco — quem chama decide
+// se busca a lista ou o painel. Existir separado é o que permite ao clique
+// num alerta do Painel montar o filtro inteiro ANTES da única consulta, em
+// vez de duas chamadas concorrentes disputando qual pinta a tela por último
+// (a de trás, sem filtro nenhum, ganhava a corrida às vezes).
+function mudarAba(tipo) {
+  document.querySelectorAll("nav.abas button").forEach(x =>
+    x.classList.toggle("on", x.dataset.tipo === tipo));
+  estado.tipo = tipo;
+  estado.pagina = 1;
+  // o Painel não é uma lista: troca a tela em vez de trocar as colunas
+  const ehPainel = tipo === "painel";
+  $("painel").classList.toggle("oculto", !ehPainel);
+  for (const id of ["filtros-lista", "lista", "rodape-lista", "kpis-topo"])
+    $(id)?.classList.toggle("oculto", ehPainel);
+  // os alertas do topo pertencem às listas: no painel eles viram chips
+  if (ehPainel) $("alertas").classList.add("oculto");
+  else if ($("alertas").innerHTML.trim()) $("alertas").classList.remove("oculto");
+  if (api.set_config) api.set_config("aba", tipo);
+  if (ehPainel) return;
+  estado.ord = null; estado.dir = "desc";
+  estado.objetosAlvo = null;
+  const soContratacoes = tipo === "contratacoes";
+  $("f-modalidade").classList.toggle("oculto", !soContratacoes);
+  $("f-situacao").classList.toggle("oculto", !soContratacoes);
+  $("cx-propostas").classList.toggle("oculto", !soContratacoes);
+  $("cx-parada").classList.toggle("oculto", !soContratacoes);
+  $("cx-vigentes").classList.toggle("oculto",
+    !["contratos", "atas"].includes(tipo));
+  const ehItens = tipo === "itens";
+  $("cx-homologados").classList.toggle("oculto", !ehItens);
+  $("f-unidade").classList.toggle("oculto", !ehItens);
+  if (!ehItens) $("f-unidade").value = "";
+  $("cx-conteudo").classList.toggle("oculto", !ehItens);
+  $("cx-corrigir").classList.toggle("oculto", !ehItens);
+  // o filtro de origem só faz sentido havendo município de referência
+  $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
+  $("f-busca").placeholder = ehItens
+    ? "Buscar item — ex.: papel A4, óleo, pneu…"
+    : "Buscar no objeto…";
+  $("f-propostas").checked = false;
+  $("f-vigentes").checked = false;
+  $("f-parada").checked = false;
+}
+
 document.querySelectorAll("nav.abas button").forEach(b =>
   b.addEventListener("click", () => {
-    document.querySelectorAll("nav.abas button").forEach(x =>
-      x.classList.toggle("on", x === b));
-    estado.tipo = b.dataset.tipo;
-    estado.pagina = 1;
-    // o Painel não é uma lista: troca a tela em vez de trocar as colunas
-    const ehPainel = estado.tipo === "painel";
-    $("painel").classList.toggle("oculto", !ehPainel);
-    for (const id of ["filtros-lista", "lista", "rodape-lista", "kpis-topo"])
-      $(id)?.classList.toggle("oculto", ehPainel);
-    // os alertas do topo pertencem às listas: no painel eles viram chips
-    if (ehPainel) $("alertas").classList.add("oculto");
-    else if ($("alertas").innerHTML.trim()) $("alertas").classList.remove("oculto");
-    if (api.set_config) api.set_config("aba", estado.tipo);
-    if (ehPainel) { carregarPainel(); return; }
-    estado.ord = null; estado.dir = "desc";
-    const soContratacoes = estado.tipo === "contratacoes";
-    $("f-modalidade").classList.toggle("oculto", !soContratacoes);
-    $("f-situacao").classList.toggle("oculto", !soContratacoes);
-    $("cx-propostas").classList.toggle("oculto", !soContratacoes);
-    $("cx-vigentes").classList.toggle("oculto",
-      !["contratos", "atas"].includes(estado.tipo));
-    const ehItens = estado.tipo === "itens";
-    $("cx-homologados").classList.toggle("oculto", !ehItens);
-    $("f-unidade").classList.toggle("oculto", !ehItens);
-    if (!ehItens) $("f-unidade").value = "";
-    $("cx-conteudo").classList.toggle("oculto", !ehItens);
-    $("cx-corrigir").classList.toggle("oculto", !ehItens);
-    // o filtro de origem só faz sentido havendo município de referência
-    $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
-    $("f-busca").placeholder = ehItens
-      ? "Buscar item — ex.: papel A4, óleo, pneu…"
-      : "Buscar no objeto…";
-    $("f-propostas").checked = false;
-    $("f-vigentes").checked = false;
-    carregarLista();
+    mudarAba(b.dataset.tipo);
+    estado.tipo === "painel" ? carregarPainel() : carregarLista();
   }));
 $("f-conteudo").addEventListener("change", () => {
   porConteudo = $("f-conteudo").checked;
@@ -907,15 +925,25 @@ $("f-corrigir").addEventListener("change", () => {
   estado.pagina = 1;
   carregarLista();
 });
-["f-propostas", "f-vigentes", "f-homologados", "f-so-meu"].forEach(id =>
-  $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
+["f-propostas", "f-vigentes", "f-parada", "f-homologados", "f-so-meu"]
+  .forEach(id => $(id).addEventListener("change",
+    () => { estado.pagina = 1; carregarLista(); }));
 
-// navegação programática (KPIs e alertas)
+// navegação programática (KPIs e alertas). Cada campo é sempre escrito, não
+// só quando presente em `ajustes` — meio-termo já rendeu bug: o alerta de
+// limite mandava a modalidade e ela nunca chegava a ser lida, porque o
+// clique na aba resetava só propostas/vigentes e o resto ficava do jeito
+// que a navegação anterior tinha deixado.
 function irPara(tipo, ajustes = {}) {
-  document.querySelector(`nav.abas button[data-tipo="${tipo}"]`).click();
-  if (ajustes.ano !== undefined) $("f-ano").value = ajustes.ano ?? "";
-  if (ajustes.vigentes) $("f-vigentes").checked = true;
-  if (ajustes.propostas) $("f-propostas").checked = true;
+  mudarAba(tipo);
+  $("f-ano").value = ajustes.ano ?? "";
+  $("f-modalidade").value = ajustes.modalidade ?? "";
+  $("f-situacao").value = ajustes.situacao ?? "";
+  $("f-orgao").value = ajustes.orgao ?? "";
+  $("f-propostas").checked = !!ajustes.propostas;
+  $("f-vigentes").checked = !!ajustes.vigentes;
+  $("f-parada").checked = !!ajustes.parada;
+  estado.objetosAlvo = ajustes.objetos || null;
   if (ajustes.ord) { estado.ord = ajustes.ord; estado.dir = ajustes.dir || "asc"; }
   carregarLista();
 }

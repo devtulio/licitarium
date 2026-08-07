@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.12.0 — 2026-08-07
+
+**Clicar num alerta do Painel agora filtra a lista de verdade**
+
+- **Objetos acima do limite anual**: até aqui o clique não fazia nada além de
+  trocar de aba — o filtro de modalidade nunca era aplicado. Agora abre a
+  lista já com **Dispensa**, o **exercício** e os **objetos exatos** que o
+  alerta apontou (não todas as dispensas do ano); um aviso acima da lista
+  diz que o filtro veio do alerta, com botão para tirá-lo.
+- **Processo sem resultado há mais de 90 dias**: esse alerta nunca teve
+  filtro nenhum — o critério só existia dentro da contagem. Ganhou filtro
+  próprio, com caixa dedicada (**Sem resultado (90+ dias)**) que também pode
+  ser ligada na mão, sem passar pelo alerta.
+- **Contratos/atas vencendo e propostas abertas** já filtravam, mas por uma
+  corrida: o clique na aba resetava os filtros e recarregava a lista sem
+  filtro nenhum, e o clique no alerta religava o filtro e recarregava de
+  novo — duas consultas disputando qual pintava a tela por último. Virou
+  uma consulta só, sem corrida.
+- Os quatro alertas passaram a levar também o **órgão** selecionado no
+  Painel — antes a lista abria sempre com "todos os órgãos", mesmo quando o
+  alerta foi contado com um órgão específico filtrado.
+
+Mudança de comportamento, sem efeito em nenhum número já publicado — os
+alertas sempre contaram certo; só o clique não levava até o que foi contado.
+250 pytest + 95 E2E.
+
 ## 1.11.2 — 2026-08-07
 
 **Tooltip próprio e corte vertical nos gráficos de linha**

@@ -744,23 +744,29 @@ new ResizeObserver(() => {
 // Os alertas ficam acima das subabas de propósito: alerta que só aparece
 // depois de escolher a subaba certa não alerta ninguém.
 function mostrarChips(a) {
+  // o alerta é calculado sobre o exercício e o órgão do Painel — o clique
+  // tem de levar os dois, senão a lista mostra "todos os anos/órgãos" e
+  // deixa de bater com o número que o usuário acabou de ver
+  const orgao = $("p-orgao").value || undefined;
   const chips = [];
   if (a.perto_do_limite) chips.push(["grave", "⚠", a.perto_do_limite,
     `objeto${a.perto_do_limite > 1 ? "s" : ""} ${a.acima_do_limite
       ? "acima do" : "perto do"} limite anual de dispensa`,
-    () => irPara("contratacoes", {modalidade: "8"})]);
+    () => irPara("contratacoes", {ano: P.dados.ano, orgao, modalidade: "8",
+                                  objetos: a.objetos_perto_do_limite})]);
   if (a.vencendo) chips.push(["aviso", "⏱", a.vencendo,
     a.vencendo === 1 ? "contrato ou ata vence em 60 dias"
                      : "contratos/atas vencem em 60 dias",
-    () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"})]);
+    () => irPara("contratos",
+                {orgao, vigentes: true, ord: "vigencia", dir: "asc"})]);
   if (a.propostas) chips.push(["", "📄", a.propostas,
     a.propostas === 1 ? "processo com proposta aberta"
                       : "processos com proposta aberta",
-    () => irPara("contratacoes", {propostas: true})]);
+    () => irPara("contratacoes", {orgao, propostas: true})]);
   if (a.paradas) chips.push(["", "⏳", a.paradas,
     a.paradas === 1 ? "processo sem resultado há mais de 90 dias"
                     : "processos sem resultado há mais de 90 dias",
-    () => irPara("contratacoes", {})]);
+    () => irPara("contratacoes", {ano: P.dados.ano, orgao, parada: true})]);
   const caixa = $("painel-chips");
   caixa.classList.toggle("oculto", !chips.length);
   caixa.innerHTML = chips.map(([cls, icone, n, texto], i) =>

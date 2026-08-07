@@ -446,6 +446,10 @@ def dados_painel(db, ano, orgao=None, limites=None):
         "ano": ano,
         "comparacao_parcial": parcial,
         "alertas": {"perto_do_limite": len(perto_do_limite),
+                    # o clique no chip filtra a lista por estes mesmos
+                    # objetos — não por "toda dispensa do ano"
+                    "objetos_perto_do_limite": [o["objeto"]
+                                                for o in perto_do_limite],
                     "acima_do_limite": sum(1 for o in objetos
                                            if o["pct"] > 100),
                     "vencendo": len([v for v in executivo["vencendo"]
