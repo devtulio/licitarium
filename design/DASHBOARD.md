@@ -386,3 +386,45 @@ telas, não um número de pixels escolhido por medição.
   O vão depois do texto do Objeto que o achado m2 apontou volta a existir
   em monitor muito largo — decisão que passou a ser explícita do usuário
   (largura = tela toda), não escondida atrás de um teto arbitrário.
+
+## Pesquisa de preços: seleção opt-in em vez de opt-out (2026-08-08)
+
+Pedido do usuário, três achados: (1) a busca abria com tudo marcado —
+comparar por um subconjunto (ex.: só "maço") exigia desmarcar item por
+item; (2) faltava um jeito rápido de marcar tudo de volta; (3) MAÇO e MÇ
+eram grupos de unidade diferentes (faltava "Maço" em
+`UNIDADES_SINONIMAS`, `licitarium.py`).
+
+**Modelo novo**: nova tabela `precos_selecionados` (termo, item_id — sem
+motivo). Um item nunca marcado não aparece em lugar nenhum; um item
+marcado e depois tirado vira `precos_descartes` (aí sim com motivo — foi
+visto e recusado, não só nunca escolhido). As duas tabelas ficam
+mutuamente exclusivas por construção: marcar sempre limpa um descarte
+anterior do mesmo item (`Api.selecionar_preco`), e "Restaurar todos"
+agora **seleciona** de novo cada item descartado, não só apaga o registro
+(o antigo `restaurar_preco` sozinho deixava o item fora da conta mesmo
+"restaurado" — achado ao migrar o modelo).
+
+`estatisticas_preco` ganhou `incluidos` (lista vazia explícita ≠ `None` —
+vazia é "nada selecionado ainda", `None` é "sem filtro", útil pra chamada
+legada/testes). `relatorios.dados_precos` lê `precos_selecionados` direto
+do banco pelo termo (mesmo padrão que já usava pra `precos_descartes`) —
+o relatório sai sobre o que a tela mostrava, sem precisar que a UI passe
+a lista.
+
+`classificar_por_unidade` (v1.15.2) foi revisado: antes escrevia descarte
+com motivo "embalagem" pra tudo que não batia com a unidade escolhida —
+sob o modelo antigo (tudo dentro por padrão) fazia sentido, mas sob o
+novo vira barulho no relatório (centenas de "sem justificativa" pra itens
+que nunca foram considerados). Agora só popula a seleção com quem bate.
+
+**Corrida real, achada rodando os testes**: `carregarLista()` chamava
+`mostrarResumoPrecos()` sem `await`, que por sua vez recarregava a
+seleção do banco — a lista podia desenhar as linhas ANTES do Set de
+seleção estar populado, lendo tudo como não-marcado até o próximo
+redesenho. Benigno no modelo antigo (Set vazio = "nada excluído" = tudo
+marcado, coincidia com o padrão certo na maioria dos casos); maligno no
+novo (Set vazio = "nada selecionado" = tudo desmarcado, mascarando
+justamente os testes que verificavam seleção pré-carregada). Corrigido
+movendo o carregamento de descartes/seleção pra dentro de
+`carregarLista()`, com `await`, antes de desenhar qualquer linha.

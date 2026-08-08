@@ -189,6 +189,9 @@ def test_item_descartado_sai_da_conta_e_refaz_a_analise(api):
     ("CAIXAS", "Caixa"), ("UN", "Unidade"), ("Unidade ", "Unidade"),
     ("UND", "Unidade"), ("KG", "Quilograma"), ("Quilograma", "Quilograma"),
     ("SERVIÇO", "Serviço"), ("SV", "Serviço"), ("PÇ", "Peça"),
+    # achado do usuário (2026-08-08): MAÇO e MÇ eram grupos diferentes —
+    # "Maço" não estava no mapa de sinônimos
+    ("MAÇO", "Maço"), ("MÇ", "Maço"), ("Maço", "Maço"), ("MACOS", "Maço"),
     # o PNCP cola a quantidade na unidade; o grupo é a palavra
     ("Embalagem 1,00 KG", "Embalagem"), ("Pacote 400,00 G", "Pacote"),
     ("Frasco 10,00 ML", "Frasco"),
@@ -217,19 +220,18 @@ def test_lista_de_unidades_vem_agrupada_e_pela_frequencia(api):
 
 def test_classificar_por_unidade_marca_so_a_escolhida(api):
     """Pedido do usuário (2026-08-08): buscar "alface" mistura maço, quilo
-    e unidade — escolher uma unidade tem de marcar só os itens dela e
-    descartar o resto com a justificativa pronta, sobre a pesquisa inteira
-    (não só a página que a tela mostra no momento)."""
+    e unidade — escolher uma unidade tem de marcar só os itens dela, sobre
+    a pesquisa inteira (não só a página que a tela mostra no momento). A
+    busca já abre com tudo desmarcado (mesmo pedido), então "os outros" só
+    precisam ficar de fora — não precisam mais de justificativa."""
     r = api.classificar_por_unidade("papel a4", "Caixa")
-    assert r == {"ok": True, "n": 7}
+    assert r == {"ok": True, "n": 4}       # só I1-I4 (Caixa)
 
-    descartados = {d["item_id"]: d["motivo"] for d in api.descartes("papel a4")}
-    # I1-I4 (Caixa) ficam dentro; I5/I6 (Pacote) e I7 (Serviço) saem
-    assert descartados.keys() == {"I5", "I6", "I7"}
-    assert set(descartados.values()) == {"embalagem"}
+    assert set(api.selecionados("papel a4")) == {"I1", "I2", "I3", "I4"}
+    assert api.descartes("papel a4") == []  # nada precisou de justificativa
 
     s = api.estatisticas_preco("papel a4",
-                               excluidos=list(descartados.keys()))
+                               incluidos=api.selecionados("papel a4"))
     assert s["n"] == 4
 
 
@@ -237,9 +239,75 @@ def test_classificar_por_unidade_reclassifica_quem_ja_estava_marcado(api):
     """Trocar de unidade não pode deixar sobra de uma escolha anterior."""
     api.classificar_por_unidade("papel a4", "Caixa")
     api.classificar_por_unidade("papel a4", "Pacote")
-    descartados = {d["item_id"] for d in api.descartes("papel a4")}
-    # agora Caixa (4 itens) e Serviço (1) saem; Pacote (I5, I6) volta
-    assert descartados == {"I1", "I2", "I3", "I4", "I7"}
+    # Pacote (I5, I6) é quem fica selecionado agora — Caixa saiu inteiro
+    assert set(api.selecionados("papel a4")) == {"I5", "I6"}
+    assert api.descartes("papel a4") == []
+
+
+# ── seleção da pesquisa de preços ───────────────────────────────────────
+# Pedido do usuário (2026-08-08): a busca abria com tudo marcado; agora
+# abre com tudo desmarcado — marcar é ato positivo, sem justificativa.
+
+def test_busca_nova_nao_tem_nada_selecionado(api):
+    assert api.selecionados("papel a4") == []
+    s = api.estatisticas_preco("papel a4", incluidos=[])
+    assert s == {"n": 0, "nada_selecionado": True}
+
+
+def test_selecionar_e_desselecionar_um_item(api):
+    api.selecionar_preco("papel a4", "I1")
+    assert api.selecionados("papel a4") == ["I1"]
+    s = api.estatisticas_preco("papel a4", incluidos=["I1"])
+    assert s["n"] == 1 and s["maximo"] == 219.90
+
+    api.desselecionar_preco("papel a4", "I1")
+    assert api.selecionados("papel a4") == []
+
+
+def test_selecionar_desfaz_descarte_anterior(api):
+    """Reconsiderar depois de ter tirado é o caminho normal — não deve
+    sobrar um descarte fantasma pra um item que voltou a ser escolhido."""
+    api.descartar_preco("papel a4", "I1", "nao_comparavel")
+    api.selecionar_preco("papel a4", "I1")
+    assert api.selecionados("papel a4") == ["I1"]
+    assert api.descartes("papel a4") == []
+
+
+def test_selecionar_todos_marca_a_pesquisa_inteira(api):
+    r = api.selecionar_todos_precos("papel a4")
+    assert r == {"ok": True, "n": 7}
+    assert set(api.selecionados("papel a4")) == {f"I{i}" for i in range(1, 8)}
+    assert api.descartes("papel a4") == []
+    s = api.estatisticas_preco("papel a4",
+                               incluidos=api.selecionados("papel a4"))
+    assert s["n"] == 7
+
+
+def test_selecionar_todos_limpa_descartes_anteriores(api):
+    api.descartar_preco("papel a4", "I1", "nao_comparavel")
+    api.selecionar_todos_precos("papel a4")
+    assert api.descartes("papel a4") == []
+    assert "I1" in api.selecionados("papel a4")
+
+
+def test_desselecionar_todos_zera_a_selecao(api):
+    api.selecionar_todos_precos("papel a4")
+    api.desselecionar_preco("papel a4")
+    assert api.selecionados("papel a4") == []
+
+
+def test_relatorio_de_precos_segue_a_selecao_da_tela(api, tmp_path):
+    """O documento tem de sair sobre a mesma seleção que a tela mostrava —
+    não sobre tudo que a busca trouxe (achado do usuário, 2026-08-08)."""
+    api.classificar_por_unidade("papel a4", "Caixa")
+    db = licitarium.abrir_db()
+    r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
+                         "T", "SP", tmp_path)
+    db.close()
+    from pathlib import Path as _Path
+    html = _Path(r["html"]).read_text(encoding="utf-8")
+    assert "5000 FLS" in html                       # I3 (Caixa), presente
+    assert "TIMBRADO" not in html                   # I7 (Serviço), fora
 
 
 # ── ordenação ───────────────────────────────────────────────────────────

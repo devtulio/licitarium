@@ -1048,6 +1048,19 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
     for grupo in _blocos(list(motivos)):
         where.append("id NOT IN (%s)" % ",".join("?" * len(grupo)))
         args += grupo
+    # a busca abre com tudo desmarcado (pedido do usuário, 2026-08-08); o
+    # documento tem de sair sobre a mesma seleção que a tela mostrava, não
+    # sobre tudo que a busca trouxe. Seleção vazia = chamada antiga/direta
+    # (testes, uso de antes desta tabela existir) — sem filtro extra
+    selecionados = [r[0] for r in db.execute(
+        "SELECT item_id FROM precos_selecionados WHERE termo=?",
+        (chave_termo(termo),))]
+    if selecionados:
+        grupos_sel = _blocos(selecionados)
+        where.append("(" + " OR ".join(
+            "id IN (%s)" % ",".join("?" * len(g)) for g in grupos_sel) + ")")
+        for g in grupos_sel:
+            args += g
     sql_where = " WHERE " + " AND ".join(where)
     linhas = [dict(r) for r in db.execute(
         f"""SELECT descricao, unidade, quantidade_homologada, unidade,

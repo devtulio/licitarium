@@ -35,7 +35,7 @@ test("preço fora da curva é apontado e só sai se o usuário mandar",
   await expect(page.locator("#precos-selecao")).toContainText("1 item descartado");
   const ultima = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "estatisticas_preco").pop());
-  expect(ultima.excluidos).toEqual(["X-3#10"]);
+  expect(ultima.incluidos).not.toContain("X-3#10");
   // some do cálculo, mas continua na lista com a caixa desmarcada — dá para
   // voltar atrás sem refazer a pesquisa
   await expect(page.locator('.linha input[data-item="X-3#10"]'))

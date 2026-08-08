@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.16.0 — 2026-08-08
+
+**Pesquisa de preços: seleção passa a ser opt-in, não opt-out**
+
+Pedido do usuário, três achados na aba Preços:
+
+- **A busca abre com tudo desmarcado** — antes vinha tudo marcado e
+  comparar por um subconjunto (ex.: só os itens em "maço") exigia
+  desmarcar item por item na mão. Agora marcar é ato positivo: o resumo
+  só conta o que foi selecionado.
+- **Botão "Selecionar todos"**, ao lado da busca — marca a pesquisa
+  inteira de uma vez (não só a página visível), para quem quer partir de
+  tudo e ir tirando o que não serve, do jeito que era antes.
+- **MAÇO e MÇ eram grupos de unidade diferentes** — faltava "Maço" no
+  mapa de sinônimos (`UNIDADES_SINONIMAS`). Corrigido; escolher uma
+  unidade no filtro agora também **seleciona** os itens dela direto
+  (antes só filtrava a lista visível — a estatística sempre rodou sobre o
+  que foi selecionado, não sobre o filtro da tela).
+
+Por baixo: nova tabela `precos_selecionados` (sem motivo — selecionar não
+precisa de justificativa; motivo continua existindo só para
+`precos_descartes`, quando um item que chegou a ser selecionado é tirado
+depois). O relatório de pesquisa de preços passa a sair sobre a mesma
+seleção que a tela mostrava, não sobre tudo que a busca trouxe.
+
+275 pytest + 116 E2E. Achado no caminho: uma corrida real entre desenhar
+as linhas da lista e carregar a seleção do banco — a lista podia nascer
+com a caixa errada até o próximo redesenho. Corrigida junto.
+
 ## 1.15.4 — 2026-08-08
 
 **Rótulos do gráfico de dispersão ainda coladas em duas fileiras**

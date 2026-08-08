@@ -172,10 +172,13 @@ function scriptPonte(temaBanco = "portal") {
         return { itens, total: itens.length };
       },
       estatisticas_preco: async (busca, ano, origem, excluidos,
-                                 porConteudo, corrigir) => {
+                                 porConteudo, corrigir, incluidos) => {
         window.__chamadas.push({ metodo: "estatisticas_preco", busca, ano,
-                                 origem, excluidos, porConteudo, corrigir });
+                                 origem, excluidos, porConteudo, corrigir,
+                                 incluidos });
         if (!/papel/i.test(busca || "")) return null;
+        if (incluidos && !incluidos.length)
+          return { n: 0, nada_selecionado: true };
         if (corrigir && !porConteudo) return {
           n: 4, minimo: 20.6, maximo: 700000, media: 175030, mediana: 30.2,
           fornecedores: 3, desvio: 349985, cv: 2.0, q1: 25.1, q3: 175015,
@@ -193,8 +196,9 @@ function scriptPonte(temaBanco = "portal") {
               fora_da_curva: [], proprios: 2, referencia: 1,
               por_conteudo: true, base: "un", rotulo_base: "unidade",
               sem_conversao: 2 };
-        const fora = (excluidos || []).includes("X-3#10") ? []
-                                                : ["X-3#10"];
+        const foraSaiu = (excluidos || []).includes("X-3#10")
+          || (incluidos && !incluidos.includes("X-3#10"));
+        const fora = foraSaiu ? [] : ["X-3#10"];
         return { n: 7, minimo: 15.4, maximo: 249.8, media: 53.63,
                  mediana: 18.75, fornecedores: 2,
                  desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
@@ -221,6 +225,32 @@ function scriptPonte(temaBanco = "portal") {
         window.__chamadas.push({ metodo: "classificar_por_unidade", busca,
                                  unidade, ano, origem });
         return { ok: true, n: 0 };
+      },
+      selecionados: async (busca) => {
+        window.__chamadas.push({ metodo: "selecionados", busca });
+        // sem override explícito do teste, a busca já vem com tudo
+        // selecionado — poupa reescrever todo teste que não é sobre a
+        // seleção em si (IPCA, conteúdo, ordenação...). Testes que
+        // exercitam o padrão novo (tudo desmarcado) setam
+        // window.__selecionados = {} (ou um subconjunto) explicitamente.
+        if (window.__selecionados)
+          return window.__selecionados[String(busca).toLowerCase().trim()]
+            ?? [];
+        return (DADOS.itens || []).map(i => i.id);
+      },
+      selecionar_preco: async (busca, item_id) => {
+        window.__chamadas.push({ metodo: "selecionar_preco", busca, item_id });
+        return { ok: true };
+      },
+      desselecionar_preco: async (busca, item_id) => {
+        window.__chamadas.push({ metodo: "desselecionar_preco", busca,
+                                 item_id });
+        return { ok: true };
+      },
+      selecionar_todos_precos: async (busca, ano, origem) => {
+        window.__chamadas.push({ metodo: "selecionar_todos_precos", busca,
+                                 ano, origem });
+        return { ok: true, n: (DADOS.itens || []).length };
       },
       motivos_descarte: async () => ([
         { id: "nao_comparavel", texto: "Item não comparável ao objeto pesquisado" },

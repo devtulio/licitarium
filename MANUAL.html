@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.15.4</title>
+<title>Manual Operacional — Licitarium v1.16.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.15.4 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.16.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.15.4</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.16.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.15.4.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.16.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -384,14 +384,18 @@ central seria praticamente o menor e o maior valor, e apontar um deles como
 fora da curva seria opinião com aparência de estatística. A pesquisa continua
 válida — só não ganha essa camada.</p>
 <h3>Escolher quais preços entram</h3>
-<p>Cada linha da lista tem uma <b>caixa de seleção</b>, marcada por padrão.
-Desmarque o que não for comparável e o resumo se refaz na hora — o item sai do
-cálculo, mas continua na tela, para você poder voltar atrás.</p>
+<p>Cada linha da lista tem uma <b>caixa de seleção</b>, <b>desmarcada por
+padrão</b>: a busca traz tudo, mas o resumo só considera o que você marcar —
+escolher é ato positivo, não sobra de uma lista maior. Marque o que for
+comparável e o resumo aparece na hora; o botão <b>Selecionar todos</b>, ao
+lado da busca, marca a pesquisa inteira de uma vez (não só a página visível
+na tela), para quem quer partir de tudo e ir tirando o que não serve.</p>
 <p>Serve para o caso mais comum de distorção: buscar <i>papel higiênico</i>
 traz também <i>suporte de papel higiênico</i> e <i>locação de banheiro
-químico com porta papel higiênico</i>. No acervo do piloto, descartar esses
-dois derruba a média de R$ 53,63 para R$ 30,74 e o maior preço de R$ 249,80
-para R$ 33,90.</p>
+químico com porta papel higiênico</i>. Marcando só os itens de papel
+higiênico em si, esses dois ficam de fora — no acervo do piloto, incluí-los
+puxava a média de R$ 30,74 para R$ 53,63 e o maior preço de R$ 33,90 para
+R$ 249,80.</p>
 <p>Abaixo do resumo aparece a <b>lista do que foi descartado</b>: o item, o
 preço que ele tinha e um seletor com a <b>razão</b>. Os motivos mais comuns
 estão prontos — item não comparável, embalagem ou unidade diferente, preço
@@ -501,9 +505,15 @@ distintas. O filtro <b>Todas as unidades</b>, na aba Preços, já vem com essas
 variações <b>agrupadas</b> — escolher <i>Caixa</i> traz os itens em caixa
 independentemente de como o órgão escreveu. O número entre parênteses é a
 quantidade de itens em cada unidade, e a lista começa pelas mais comuns.</p>
+<p>Escolher uma unidade aqui já <b>seleciona</b> os itens dela — marca só os
+que batem e desmarca o resto, sobre a pesquisa inteira, não só a página
+visível. Buscar <i>alface</i>, por exemplo, mistura maço, quilo e unidade;
+escolher <i>Maço</i> marca de uma vez só os itens vendidos em maço,
+poupando marcar item por item.</p>
 <p>A coluna da lista continua mostrando o texto original publicado no PNCP: o
-agrupamento serve para filtrar, não substitui o dado da fonte. Unidade que não
-esteja na lista de equivalências aparece como foi publicada.</p>
+agrupamento serve para filtrar e selecionar, não substitui o dado da fonte.
+Unidade que não esteja na lista de equivalências aparece como foi
+publicada.</p>
 <div class="caixa"><b>Confira a aderência.</b> Preço só é comparável entre
 itens equivalentes: verifique especificação, unidade de medida e quantidade
 antes de usar um valor do histórico como referência. Atenção à embalagem —

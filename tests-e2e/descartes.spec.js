@@ -53,6 +53,10 @@ test("voltar ao mesmo termo traz os descartes gravados", async ({ page }) => {
     window.__descartes = { "papel": [
       { item_id: "X-3#10", motivo: "inexequivel",
         descricao: "CADEIRA DE RODAS REFORÇADA DOBRÁVEL", valor: 635000 }] };
+    // um item descartado não pode estar também selecionado — mesma
+    // invariante que o backend garante (ver licitarium.py)
+    window.__selecionados = { "papel": ["X-3#1", "X-3#9", "X-3#11",
+                                        "REF#1", "X-3#2"] };
   });
   await abrirPrecos(page);
 
@@ -66,18 +70,23 @@ test("voltar ao mesmo termo traz os descartes gravados", async ({ page }) => {
     .not.toBeChecked();
   const stats = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "estatisticas_preco").pop());
-  expect(stats.excluidos).toEqual(["X-3#10"]);
+  expect(stats.incluidos).not.toContain("X-3#10");
 });
 
-test("restaurar todos apaga o registro da pesquisa", async ({ page }) => {
+test("restaurar todos reconsidera cada item — volta a valer no resumo",
+    async ({ page }) => {
   await abrirPrecos(page);
   await page.locator('.linha input[data-item="X-3#10"]').uncheck();
   await page.locator("#precos-restaurar").click();
 
-  const apagou = await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "restaurar_preco").pop());
-  expect([apagou.busca, apagou.item_id]).toEqual(["papel", undefined]);
+  // "restaurar" não só apaga o descarte — tem de selecionar de novo,
+  // senão o item volta a ficar fora da conta (achado ao migrar para o
+  // modelo de seleção: o antigo restaurar_preco sozinho não bastava)
+  const selecionou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_preco").pop());
+  expect([selecionou.busca, selecionou.item_id]).toEqual(["papel", "X-3#10"]);
   await expect(page.locator("#precos-selecao")).toBeHidden();
+  await expect(page.locator('.linha input[data-item="X-3#10"]')).toBeChecked();
 });
 
 test("remarcar o item devolve ele à pesquisa", async ({ page }) => {
@@ -87,7 +96,7 @@ test("remarcar o item devolve ele à pesquisa", async ({ page }) => {
   await caixa.check();
 
   const devolveu = await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "restaurar_preco").pop());
+    .filter(c => c.metodo === "selecionar_preco").pop());
   expect([devolveu.busca, devolveu.item_id]).toEqual(["papel", "X-3#10"]);
   await expect(page.locator("#precos-selecao")).toBeHidden();
 });

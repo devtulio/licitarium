@@ -52,12 +52,14 @@ let temReferencia = false;
 let porConteudo = false;
 // corrigir pelo IPCA: preço de 2022 não se compara com preço de 2026
 let corrigirIpca = false;
-// itens que o usuário tirou da pesquisa de preços. Guarda os DESCARTADOS
-// (e não os escolhidos) para que item novo, vindo de uma sincronização ou
-// de outra página, entre marcado por padrão.
+// pedido do usuário (2026-08-08): a busca abre com tudo desmarcado — marcar
+// é ato positivo, sem justificativa. precosIncluidos é a seleção (ids); um
+// item que chega a ser marcado e depois é tirado vira precosDescartados,
+// aí sim com motivo — item nunca marcado não passa por lá.
 // id do item -> { motivo, descricao, valor }. Gravado no banco por termo:
 // a pesquisa é peça de processo e precisa poder ser refeita amanhã.
 let precosDescartados = new Map();
+let precosIncluidos = new Set();
 let api = null;
 
 // ── splash ────────────────────────────────────────────────────────────────
@@ -489,7 +491,7 @@ function renderLinha(tipo, d) {
       : `<span class="est" title="Sem resultado homologado: valor de referência
           do edital">${dinheiro(d.valor_unitario_estimado)} <small>est.</small></span>`;
     return `<span class="sel"><input type="checkbox" data-item="${esc(d.id)}"
-        ${precosDescartados.has(String(d.id)) ? "" : "checked"}
+        ${precosIncluidos.has(String(d.id)) ? "checked" : ""}
         aria-label="Usar este preço na pesquisa"></span>
       <span class="obj">${esc(d.descricao ?? "–")}</span>
       <span class="dim">${esc(d.unidade ?? "–")}</span>
@@ -618,15 +620,23 @@ async function recarregarDescartes(termo) {
   atualizarSelecaoPrecos();
 }
 
+// pedido do usuário (2026-08-08): a seleção é persistida por termo — releitura
+// completa (não mescla no Set local) pelo mesmo motivo de recarregarDescartes:
+// depois de "Selecionar todos" ou de classificar por unidade, vários itens
+// mudam de estado no servidor de uma vez.
+async function recarregarSelecao(termo) {
+  precosIncluidos = new Set();
+  if (api.selecionados && termo)
+    for (const id of await api.selecionados(termo))
+      precosIncluidos.add(String(id));
+}
+
 async function mostrarResumoPrecos() {
+  // carregarLista já garante descartes/seleção carregados antes de chamar
+  // esta função (a corrida entre desenhar as linhas e ler o Set de
+  // seleção era real — ver comentário lá); aqui só falta ler o termo atual
   const caixa = $("precos-resumo");
   const termo = $("f-busca").value.trim();
-  // cada pesquisa tem os seus descartes, gravados: voltar a "papel a4"
-  // amanhã traz de volta o que foi desconsiderado e por quê
-  if (termo !== ultimoTermoPrecos) {
-    ultimoTermoPrecos = termo;
-    await recarregarDescartes(termo);
-  }
   if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
     caixa.classList.add("oculto");
     return;
@@ -634,8 +644,18 @@ async function mostrarResumoPrecos() {
   const s = await api.estatisticas_preco(termo,
     $("f-ano").value ? +$("f-ano").value : null,
     $("f-so-meu").checked ? "proprio" : null,
-    [...precosDescartados.keys()], porConteudo, corrigirIpca);
+    null, porConteudo, corrigirIpca, [...precosIncluidos]);
   if (!s) { caixa.classList.add("oculto"); return; }
+  if (s.nada_selecionado) {
+    caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
+      <div class="disp">Nenhum item selecionado ainda. Marque os que quer
+        comparar na lista abaixo, ou
+        <button class="btn ghost" id="btn-selecionar-todos-resumo"
+          style="margin-left:4px">Selecionar todos</button></div>`;
+    caixa.classList.remove("oculto");
+    $("btn-selecionar-todos-resumo").addEventListener("click", selecionarTodosPrecos);
+    return;
+  }
   if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
     caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
       <div class="disp">Nenhum dos ${s.sem_conversao} itens desta pesquisa diz
@@ -671,8 +691,14 @@ async function mostrarResumoPrecos() {
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
   $("btn-descartar-fora")?.addEventListener("click", async () => {
-    for (const id of s.fora_da_curva ?? []) await descartar(String(id));
+    for (const id of s.fora_da_curva ?? []) {
+      const idStr = String(id);
+      precosIncluidos.delete(idStr);
+      await api.desselecionar_preco?.(ultimoTermoPrecos ?? "", idStr);
+      await descartar(idStr);
+    }
     carregarLista();
+    mostrarResumoPrecos();
     atualizarSelecaoPrecos();
   });
 }
@@ -798,6 +824,17 @@ function restaurarLarguras() {
 }
 
 async function carregarLista() {
+  // a seleção/descartes têm de estar carregados ANTES de desenhar as
+  // linhas — senão a caixa nasce lendo o Set vazio e some marcada errado
+  // até o próximo redesenho (corrida real, achada rodando os testes)
+  if (estado.tipo === "itens") {
+    const termo = $("f-busca").value.trim();
+    if (termo !== ultimoTermoPrecos) {
+      ultimoTermoPrecos = termo;
+      await recarregarDescartes(termo);
+      await recarregarSelecao(termo);
+    }
+  }
   mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
   estado.total = r.total;
@@ -855,9 +892,14 @@ async function carregarLista() {
     c.addEventListener("change", async () => {
       const id = String(c.dataset.item);
       if (c.checked) {
+        // marcar é seleção pura, sem motivo — reconsiderar um item que
+        // tinha sido tirado (com razão) limpa o descarte dele também
+        precosIncluidos.add(id);
         precosDescartados.delete(id);
-        await api.restaurar_preco?.(ultimoTermoPrecos ?? "", id);
+        await api.selecionar_preco?.(ultimoTermoPrecos ?? "", id);
       } else {
+        precosIncluidos.delete(id);
+        await api.desselecionar_preco?.(ultimoTermoPrecos ?? "", id);
         await descartar(id, c.closest(".linha"));
       }
       mostrarResumoPrecos();          // o resumo reflete só o que ficou
@@ -920,6 +962,7 @@ function mudarAba(tipo) {
   $("cx-corrigir").classList.toggle("oculto", !ehItens);
   // o filtro de origem só faz sentido havendo município de referência
   $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
+  $("btn-selecionar-todos").classList.toggle("oculto", !ehItens);
   $("f-busca").placeholder = ehItens
     ? "Buscar item — ex.: papel A4, óleo, pneu…"
     : "Buscar no objeto…";
@@ -976,9 +1019,8 @@ $("kpi-card-vigentes").addEventListener("click",
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
 // achado do usuário (2026-08-08): escolher uma unidade aqui já filtrava a
 // lista, mas não classificava a pesquisa de preços — buscar "alface" mistura
-// maço, quilo e unidade, e comparar por uma só exigia desmarcar item por
-// item na mão. Agora a escolha já marca só os da unidade e descarta o resto
-// com a justificativa pronta ("embalagem ou unidade de medida diferente").
+// maço, quilo e unidade, e comparar por uma só exigia marcar item por item
+// na mão. Agora a escolha já seleciona só os da unidade.
 $("f-unidade").addEventListener("change", async () => {
   estado.pagina = 1;
   const unidade = $("f-unidade").value;
@@ -988,10 +1030,27 @@ $("f-unidade").addEventListener("change", async () => {
       $("f-ano").value ? +$("f-ano").value : null,
       $("f-so-meu").checked ? "proprio" : null);
     await recarregarDescartes(termo);
+    await recarregarSelecao(termo);
   }
   carregarLista();
   mostrarResumoPrecos();
 });
+
+// pedido do usuário (2026-08-08): opção de marcar tudo que a busca trouxe de
+// uma vez — sobre a pesquisa inteira, não só a página visível na tela.
+async function selecionarTodosPrecos() {
+  const termo = $("f-busca").value.trim();
+  if (!termo || !api.selecionar_todos_precos) return;
+  await api.selecionar_todos_precos(termo,
+    $("f-ano").value ? +$("f-ano").value : null,
+    $("f-so-meu").checked ? "proprio" : null);
+  await recarregarDescartes(termo);
+  await recarregarSelecao(termo);
+  carregarLista();
+  mostrarResumoPrecos();
+  atualizarSelecaoPrecos();
+}
+$("btn-selecionar-todos")?.addEventListener("click", selecionarTodosPrecos);
 let buscaTimer;
 $("f-busca").addEventListener("input", () => {
   clearTimeout(buscaTimer);
@@ -1424,9 +1483,15 @@ async function atualizarSelecaoPrecos() {
        <button class="btn ghost" id="precos-restaurar">Restaurar todos</button>
      </div>${linhas}`;
   $("precos-restaurar").addEventListener("click", async () => {
-    await api.restaurar_preco?.(ultimoTermoPrecos ?? "");
+    // "restaurar" reconsidera — cada item volta a ser selecionado, não só
+    // sai da lista de descartados (senão ficaria fora da conta de novo)
+    for (const id of precosDescartados.keys()) {
+      precosIncluidos.add(id);
+      await api.selecionar_preco?.(ultimoTermoPrecos ?? "", id);
+    }
     precosDescartados.clear();
     carregarLista();
+    mostrarResumoPrecos();
     atualizarSelecaoPrecos();
   });
   caixa.querySelectorAll("select[data-motivo]").forEach(sel =>

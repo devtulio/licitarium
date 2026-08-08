@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.15.4"
+VERSAO = "1.16.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -92,6 +92,15 @@ CREATE TABLE IF NOT EXISTS pca_minuta_itens (
 -- não na tela.
 CREATE TABLE IF NOT EXISTS precos_descartes (
   termo TEXT, item_id TEXT, motivo TEXT, criado_em TEXT,
+  PRIMARY KEY (termo, item_id));
+-- Itens que o usuário escolheu incluir numa pesquisa de preços. Pedido do
+-- usuário (2026-08-08): a busca abre com tudo desmarcado (não mais tudo
+-- marcado) — escolher é ato positivo, não sobra a acompanhar de motivo.
+-- Item nunca marcado não aparece em lugar nenhum, nem entra na conta; item
+-- marcado e depois desmarcado vira precos_descartes (aí sim justificável —
+-- foi visto e recusado, não só nunca escolhido).
+CREATE TABLE IF NOT EXISTS precos_selecionados (
+  termo TEXT, item_id TEXT, criado_em TEXT,
   PRIMARY KEY (termo, item_id));
 -- IPCA mensal do Banco Central (série 433), para trazer preço antigo a
 -- valor de hoje. Competência no formato AAAA-MM; variação em % do mês.
@@ -425,6 +434,7 @@ UNIDADES_SINONIMAS = {
     "Dúzia": ("DZ", "DUZIA", "DUZIAS"),
     "Kit": ("KIT", "KITS", "CONJUNTO", "CJ"),
     "Lata": ("LT.", "LATA", "LATAS"),
+    "Maço": ("MC", "MACO", "MACOS"),
     "Saco": ("SC", "SACO", "SACOS"),
     "Bloco": ("BL", "BLOCO", "BLOCOS"),
     "Resma": ("RM", "RESMA", "RESMAS"),
@@ -985,13 +995,16 @@ class Api:
             db.close()
 
     def classificar_por_unidade(self, busca, unidade, ano=None, origem=None):
-        """Marca só os itens da unidade escolhida; os outros saem da
-        pesquisa com a justificativa "embalagem" já registrada.
+        """Seleciona só os itens da unidade escolhida — substitui a seleção
+        atual desta busca pelos que batem.
 
         Pedido do usuário (2026-08-08): buscar "alface" mistura maço, quilo
-        e unidade — sem isso, comparar por uma unidade só exigia desmarcar
+        e unidade — sem isso, comparar por uma unidade só exigia marcar
         item por item na mão. Roda numa transação só, sobre o mesmo recorte
-        (termo/ano/origem) de `estatisticas_preco` — não só a página visível.
+        (termo/ano/origem) de `estatisticas_preco` — não só a página
+        visível. Desde que a busca passou a abrir com tudo desmarcado
+        (2026-08-08), "os outros" não precisam mais de justificativa: eles
+        já nascem fora, só entram os que batem com a unidade.
         """
         termo = relatorios.chave_termo(busca)
         if not termo or not unidade:
@@ -1003,18 +1016,104 @@ class Api:
                 "SELECT id, unidade_canonica(unidade) FROM itens WHERE "
                 + " AND ".join(where), args).fetchall()
             agora = datetime.now().isoformat()
+            db.execute("DELETE FROM precos_selecionados WHERE termo=?",
+                       (termo,))
+            n = 0
             for item_id, uc in linhas:
                 if uc == unidade:
+                    db.execute(
+                        "INSERT INTO precos_selecionados (termo, item_id,"
+                        " criado_em) VALUES (?,?,?)"
+                        " ON CONFLICT(termo, item_id) DO NOTHING",
+                        (termo, str(item_id), agora))
                     db.execute("DELETE FROM precos_descartes"
                                " WHERE termo=? AND item_id=?",
                                (termo, str(item_id)))
-                else:
-                    db.execute(
-                        "INSERT INTO precos_descartes (termo, item_id,"
-                        " motivo, criado_em) VALUES (?,?,?,?)"
-                        " ON CONFLICT(termo, item_id)"
-                        " DO UPDATE SET motivo=excluded.motivo",
-                        (termo, str(item_id), "embalagem", agora))
+                    n += 1
+            db.commit()
+            return {"ok": True, "n": n}
+        finally:
+            db.close()
+
+    # ── seleção da pesquisa de preços ───────────────────────────────────
+    # Pedido do usuário (2026-08-08): a busca abria com tudo marcado; agora
+    # abre com tudo desmarcado, e marcar é ato positivo, sem justificativa
+    # — o motivo continua existindo só para precos_descartes (item que
+    # chegou a ser selecionado e depois foi tirado, ver `descartar_preco`).
+
+    def selecionados(self, busca):
+        """Ids já selecionados nesta pesquisa — para a tela restaurar as
+        caixas marcadas ao reabrir a mesma busca."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return []
+        db = abrir_db()
+        try:
+            return [r[0] for r in db.execute(
+                "SELECT item_id FROM precos_selecionados WHERE termo=?",
+                (termo,))]
+        finally:
+            db.close()
+
+    def selecionar_preco(self, busca, item_id):
+        """Marca um item — e desfaz um descarte anterior dele, se houver
+        (reconsiderar depois de ter tirado é o caminho normal)."""
+        termo = relatorios.chave_termo(busca)
+        if not termo or not item_id:
+            return {"ok": False}
+        db = abrir_db()
+        try:
+            db.execute(
+                "INSERT INTO precos_selecionados (termo, item_id, criado_em)"
+                " VALUES (?,?,?) ON CONFLICT(termo, item_id) DO NOTHING",
+                (termo, str(item_id), datetime.now().isoformat()))
+            db.execute("DELETE FROM precos_descartes"
+                       " WHERE termo=? AND item_id=?", (termo, str(item_id)))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def desselecionar_preco(self, busca, item_id=None):
+        """Tira um item da seleção — ou todos, se não vier item."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return {"ok": False}
+        db = abrir_db()
+        try:
+            if item_id:
+                db.execute("DELETE FROM precos_selecionados"
+                           " WHERE termo=? AND item_id=?",
+                           (termo, str(item_id)))
+            else:
+                db.execute("DELETE FROM precos_selecionados WHERE termo=?",
+                           (termo,))
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def selecionar_todos_precos(self, busca, ano=None, origem=None):
+        """Marca tudo que a busca traz — sobre o recorte inteiro
+        (termo/ano/origem), não só a página visível."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return {"ok": False}
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        db = abrir_db()
+        try:
+            linhas = db.execute(
+                "SELECT id FROM itens WHERE " + " AND ".join(where),
+                args).fetchall()
+            agora = datetime.now().isoformat()
+            db.execute("DELETE FROM precos_descartes WHERE termo=?",
+                       (termo,))
+            for (item_id,) in linhas:
+                db.execute(
+                    "INSERT INTO precos_selecionados (termo, item_id,"
+                    " criado_em) VALUES (?,?,?)"
+                    " ON CONFLICT(termo, item_id) DO NOTHING",
+                    (termo, str(item_id), agora))
             db.commit()
             return {"ok": True, "n": len(linhas)}
         finally:
@@ -1026,9 +1125,17 @@ class Api:
 
     def estatisticas_preco(self, busca, ano=None, origem=None,
                            excluidos=None, por_conteudo=False,
-                           corrigir=False):
+                           corrigir=False, incluidos=None):
         """Resumo do valor unitário homologado para um termo — a resposta de
         'quanto pagamos por isso?' que instrui a pesquisa de preços.
+
+        `incluidos`: lista de ids selecionados (opt-in — a busca abre com
+        tudo desmarcado desde 2026-08-08, pedido do usuário). `None` faz a
+        consulta sem restrição de seleção (uso legado/testes); lista vazia
+        é "nada selecionado ainda", não "sem filtro" — diferença que
+        importa: uma cláusula IN vazia devolveria zero itens do mesmo jeito,
+        mas a tela precisa saber que é "escolha algo", não "esta busca não
+        tem resultado".
 
         Com `por_conteudo`, o resumo passa a ser sobre o preço da
         unidade-base (R$/folha, R$/quilo): a caixa com 5.000 folhas e o
@@ -1038,12 +1145,21 @@ class Api:
         """
         if not (busca or "").strip():
             return None
+        if incluidos is not None and not incluidos:
+            return {"n": 0, "nada_selecionado": True}
         where, args = _where_pesquisa_precos(busca, ano, origem)
         # itens que o usuário desmarcou na lista: a pesquisa de preços do
         # art. 23 só vale sobre itens comparáveis, e é ele quem julga isso
         for grupo in _blocos(excluidos):
             where.append("id NOT IN (%s)" % ",".join("?" * len(grupo)))
             args += grupo
+        if incluidos:
+            grupos_inc = _blocos(incluidos)
+            where.append("(" + " OR ".join(
+                "id IN (%s)" % ",".join("?" * len(g)) for g in grupos_inc)
+                + ")")
+            for g in grupos_inc:
+                args += g
         db = abrir_db()
         try:
             linhas = db.execute(
