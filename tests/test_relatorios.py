@@ -177,6 +177,33 @@ def test_relatorio_imprime_no_mesmo_tema_da_tela(db, tmp_path):
     assert "#faf6ec" not in html           # zebra também não força claro
 
 
+def test_todos_os_relatorios_saem_em_paisagem(db, tmp_path):
+    """Pedido do usuário (2026-08-08): melhor uso da largura da página —
+    executivo e fracionamento eram os dois únicos ainda em retrato."""
+    db.execute("UPDATE contratacoes SET modalidade_id=8 WHERE ano=2026")
+    db.commit()
+    for tipo, params in (("executivo", {"ano": 2026}),
+                         ("fracionamento", {"ano": 2026}),
+                         ("contratacoes", {"ano": 2026}),
+                         ("contratos", {}), ("atas", {})):
+        r = relatorios.gerar(db, tipo, params, "T", "SP", tmp_path)
+        html = Path(r["html"]).read_text(encoding="utf-8")
+        assert "landscape" in html, f"{tipo} não saiu em paisagem"
+        assert "portrait" not in html, f"{tipo} ainda tem @page portrait"
+
+
+def test_executivo_usa_os_graficos_do_painel(db, tmp_path):
+    """Pedido do usuário (2026-08-08): o resumo executivo reaproveita os
+    gráficos do Painel (mesma consulta, dados_painel) em vez de só tabelas
+    com uma barra de largura fixa via CSS."""
+    r = relatorios.gerar(db, "executivo", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert html.count("<svg") >= 2       # sparkline do hero + colunas do mês
+    assert 'class="card hero"' in html
+    assert 'class="card kpiv"' in html
+    assert "Por modalidade — valor homologado" in html
+
+
 def test_tipo_desconhecido(db, tmp_path):
     with pytest.raises(ValueError):
         relatorios.gerar(db, "xxx", {}, "T", "SP", tmp_path)

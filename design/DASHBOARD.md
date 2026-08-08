@@ -255,6 +255,37 @@ pontos agora derivam do `tema` passado (`_css_painel(tema)` substituiu a
 constante `CSS_PAINEL`); a impressão acompanha o que está na tela, inclusive
 o Observatório escuro, se for essa a escolha do usuário.
 
+## Resumo Executivo: os mesmos gráficos do Painel (2026-08-08)
+
+Pedido do usuário: o relatório "Resumo Executivo" (`gerar(tipo="executivo")`)
+tinha cartões e tabelas, sem gráfico nenhum — a evolução mensal era uma
+`<span>` com `width` calculado à mão dentro de uma célula de tabela, um
+truque de antes do Painel existir. Reformulado para reaproveitar:
+
+- **A mesma consulta.** `gerar()` chamava `dados_executivo` (achatada);
+  agora chama `dados_painel`, cujo campo `execucao` já é exatamente o
+  `d.execucao` que `ui/painel.js:vistaExecucao` usa na tela — mesmos
+  números, uma consulta a mais que o relatório não paga em lugar nenhum
+  crítico de latência.
+- **O mesmo layout.** Hero com sparkline + 3 cartões KPI (`.f-4`), duas
+  colunas de gráfico (`.f-21`: mês × modalidade), tabelas de detalhe
+  abaixo — é a estrutura de `vistaExecucao`, só que impressa de uma vez em
+  vez de desenhada por JS.
+- **Os mesmos gráficos, portados para Python.** `grafMeses` e `grafBarras`
+  de `ui/painel.js` viraram `_grafico_meses`/`_grafico_barras` em
+  `relatorios.py` — SVG escrito à mão dos dois lados, sem depender de JS
+  no documento impresso (o HTML do relatório precisa se bastar sozinho, e
+  não carrega `painel.js`). `_escala()` é a mesma régua de eixo redondo
+  (1/2/2,5/5×10ⁿ) dos dois lados.
+- **CSS reaproveitado.** `_css_painel(tema)` (a mesma função do painel
+  impresso em A3) também virou o `estilo_extra` do executivo — `.hero`,
+  `.kpiv`, `.rot`, `.val`, `.eixo`, `.leg` já existiam, prontos.
+
+As tabelas de detalhe (modalidade completa, evolução mês a mês, maiores
+fornecedores, vigências a vencer) continuam abaixo dos gráficos, sem corte —
+um documento oficial precisa do número exato, o gráfico é para o primeiro
+olhar.
+
 ## Auditoria de design (2026-08-08)
 
 Primeira auditoria completa, nível profissional: 21+ screenshots (6 abas × 3

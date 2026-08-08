@@ -6,6 +6,7 @@ PDF) e CSV para as relações. Só stdlib.
 import csv
 import html
 import json
+import math
 import re
 import unicodedata
 from collections import Counter
@@ -81,6 +82,99 @@ def moeda_fina(v):
         return moeda(v)
     inteiro, decimal = f"{v:,.4f}".split(".")
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
+
+
+def compacto(v):
+    """Número curto pra rótulo de gráfico — mesma régua de ui/painel.js."""
+    if v is None:
+        return "–"
+    av = abs(v)
+    if av >= 1e6:
+        return f"R$ {v / 1e6:.1f}".replace(".", ",") + " mi"
+    if av >= 1e3:
+        return f"R$ {v / 1e3:.0f} mil"
+    return moeda(v)
+
+
+def _escala(maximo):
+    """Eixo com números redondos (1/2/2,5/5×10^n) — nunca '1,7 mi' e '3,3 mi'."""
+    if not maximo or maximo <= 0:
+        return 1, 0.25
+    p = 10 ** math.floor(math.log10(maximo / 3))
+    for m in (1, 2, 2.5, 5, 10):
+        passo = m * p
+        if maximo / passo <= 4.2:
+            return math.ceil(maximo / passo) * passo, passo
+    return maximo, maximo / 4
+
+
+def _svg(largura, altura, dentro):
+    return (f'<svg viewBox="0 0 {largura} {altura}" width="100%"'
+            f' height="{altura}" role="img"'
+            f' preserveAspectRatio="xMidYMid meet">{dentro}</svg>')
+
+
+def _grafico_meses(meses, cor, larg=900):
+    """Colunas pareadas estimado (claro) × homologado (cheio) — porta de
+    ui/painel.js:grafMeses, mesma leitura na tela e no papel."""
+    if not any(m["valor"] or m["estimado"] for m in meses):
+        return '<div class="vazio">Sem contratações no exercício.</div>'
+    ultimo = 0
+    for i, m in enumerate(meses):
+        if m["valor"] or m["estimado"]:
+            ultimo = i
+    dados = meses[:max(ultimo + 1, date.today().month)]
+    alto = base = 170
+    topo, passo = _escala(max((max(m["valor"], m["estimado"]) for m in dados),
+                              default=0))
+
+    def y(v):
+        return base - (v / topo) * (base - 30) if topo else base
+
+    passo_x = (larg - 60) / len(dados)
+    g = ""
+    v = 0.0
+    while v <= topo + 1e-6:
+        g += (f'<line class="eixo" x1="48" y1="{y(v):.1f}" x2="{larg - 8}"'
+              f' y2="{y(v):.1f}" opacity="{1 if not v else .55}"/>'
+              f'<text class="rot" x="44" y="{y(v) + 4:.1f}" text-anchor="end">'
+              f'{"0" if not v else compacto(v).replace("R$ ", "")}</text>')
+        v += passo
+    for i, m in enumerate(dados):
+        x = 56 + i * passo_x
+        w = min(34, passo_x / 2.6)
+        he = max(2, base - y(m["estimado"]))
+        hh = max(2, base - y(m["valor"]))
+        g += (f'<rect x="{x:.1f}" y="{y(m["estimado"]):.1f}" width="{w:.1f}"'
+              f' height="{he:.1f}" rx="4" fill="{cor}" opacity=".32"/>'
+              f'<rect x="{x + w + 2:.1f}" y="{y(m["valor"]):.1f}" width="{w:.1f}"'
+              f' height="{hh:.1f}" rx="4" fill="{cor}"/>'
+              f'<text class="rot" x="{x + w + 1:.1f}" y="{base + 16}"'
+              f' text-anchor="middle">{MESES_NOME[m["mes"] - 1]}</text>')
+    legenda = (f'<div class="leg"><span><i style="background:{cor};'
+              f'opacity:.32"></i>Estimado</span>'
+              f'<span><i style="background:{cor}"></i>Homologado</span></div>')
+    return _svg(larg, alto + 26, g) + legenda
+
+
+def _grafico_barras(itens, valor, rotulo, cor, larg=900, sub=None):
+    """Barras horizontais, uma série, rótulo direto — porta de
+    ui/painel.js:grafBarras."""
+    if not itens:
+        return '<div class="vazio">Sem dados no exercício.</div>'
+    maximo = max(valor(it) for it in itens) or 1
+    linha = 40
+    g = ""
+    for i, it in enumerate(itens):
+        y = i * linha + 18
+        w = max(3, (valor(it) / maximo) * (larg - 110))
+        extra = f" · {_e(sub(it))}" if sub else ""
+        g += (f'<text class="rot" x="0" y="{y - 6}">{_e(rotulo(it))}{extra}</text>'
+              f'<rect x="0" y="{y}" width="{w:.1f}" height="17" rx="4"'
+              f' fill="{cor}"/>'
+              f'<text class="val" x="{w + 8:.1f}" y="{y + 14}">'
+              f'{compacto(valor(it))}</text>')
+    return _svg(larg, len(itens) * linha + 6, g)
 
 
 def url_pncp(cnpj, ano, sequencial):
@@ -1161,7 +1255,7 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
 <tbody>{disp or '<tr><td colspan="5">Nenhuma dispensa no exercício.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
-                   f"Exercício {d['ano']} · uso interno", paisagem=False,
+                   f"Exercício {d['ano']} · uso interno", paisagem=True,
                    tema=tema)
 
 
@@ -1347,45 +1441,111 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 
 
 def render_executivo(d, municipio, uf, tema="pergaminho"):
-    c = d["cards"]
+    """Reformulado (2026-08-08, pedido do usuário) para usar os mesmos
+    gráficos do Painel — hero com sparkline, colunas mensais pareadas e
+    barras por modalidade — em vez de só tabelas. `d` é o retorno de
+    `dados_painel`: mesma consulta, mesmos números do que está na tela."""
+    ano = d["ano"]
+    ex = d["execucao"]
+    c = ex["cards"]
     desagio = f"{c['desagio']:.1f}%".replace(".", ",") \
         if c["desagio"] is not None else "–"
-    cards = f"""<div class="cards">
-<div class="card"><div class="n">{c['n']}</div><div class="l">contratações</div></div>
-<div class="card"><div class="n">{moeda(c['homologado'])}</div><div class="l">homologado</div></div>
-<div class="card"><div class="n">{desagio}</div><div class="l">deságio médio</div></div>
-<div class="card"><div class="n">{c['contratos_vigentes']}</div><div class="l">contratos vigentes</div></div>
-<div class="card"><div class="n">{c['atas_vigentes']}</div><div class="l">atas vigentes</div></div>
+    ate_hoje = " até hoje" if d["comparacao_parcial"] else ""
+
+    var_valor = None
+    if c["homologado"] and ex["homologado_anterior"]:
+        var_valor = (c["homologado"] / ex["homologado_anterior"] - 1) * 100
+    if var_valor is None:
+        linha_valor = f"sem {ano - 1} para comparar"
+    else:
+        seta = "▲" if var_valor >= 0 else "▼"
+        classe = "up" if var_valor >= 0 else "down"
+        pct_txt = f"{abs(var_valor):.1f}%".replace(".", ",")
+        linha_valor = (f'<span class="{classe}">{seta} {pct_txt}</span>'
+                       f' sobre {ano - 1}{ate_hoje}')
+    var_n = c["n"] - (ex["n_anterior"] or 0)
+    seta_n = "▲" if var_n >= 0 else "▼"
+
+    economia = ""
+    if c.get("estimado") and c.get("homologado"):
+        economia = f"{compacto(c['estimado'] - c['homologado'])} economizados"
+
+    # sparkline do hero: mesmo traçado de ui/painel.js:vistaExecucao
+    pontos_spark = [m["valor"] for m in ex["meses"] if m["valor"]]
+    spark = ""
+    if len(pontos_spark) > 1:
+        maxs = max(pontos_spark) or 1
+        n = len(pontos_spark)
+        linha_pts = ",".join(
+            f"{8 + i * (224 / max(1, n - 1)):.1f},{38 - (v / maxs) * 32:.1f}"
+            for i, v in enumerate(pontos_spark))
+        spark = _svg(240, 44, f'<polyline fill="none" stroke="var(--s1)"'
+                              f' stroke-width="2" stroke-linejoin="round"'
+                              f' points="{linha_pts}"/>')
+
+    hero = f"""<div class="faixa f-4">
+<div class="card hero">
+  <h3>Homologado em {ano}</h3>
+  <div class="n">{compacto(c['homologado'])}</div>
+  <div class="r">{linha_valor}</div>
+  {spark}
+</div>
+<div class="card kpiv"><div class="v">{c['n']}</div>
+  <div class="r">contratações</div>
+  <div class="r" style="margin-top:8px">{seta_n} {abs(var_n)} vs.
+    {ano - 1}{ate_hoje}</div></div>
+<div class="card kpiv"><div class="v">{desagio}</div>
+  <div class="r">deságio médio</div>
+  <div class="r" style="margin-top:8px">{economia}</div></div>
+<div class="card kpiv"><div class="v">{c['contratos_vigentes']}</div>
+  <div class="r">contratos vigentes</div>
+  <div class="r" style="margin-top:8px">{c['atas_vigentes']} atas vigentes</div>
+</div>
 </div>"""
+
+    graf_meses = _grafico_meses(ex["meses"], "var(--s1)", larg=580)
+    graf_mod = _grafico_barras(
+        ex["modalidades"][:6],
+        valor=lambda m: m["homologado"] or m["estimado"] or 0,
+        rotulo=lambda m: m["modalidade_nome"] or "–",
+        sub=lambda m: f"{m['n']} {'processo' if m['n'] == 1 else 'processos'}",
+        cor="var(--s1)", larg=340)
+    charts = f"""<div class="faixa f-21">
+<div class="card"><h3>Contratações por mês — estimado × homologado</h3>
+{graf_meses}</div>
+<div class="card"><h3>Por modalidade — valor homologado</h3>
+{graf_mod}</div>
+</div>"""
+
     mod = "".join(f"""<tr><td>{_e(m['modalidade_nome'])}</td>
       <td class="num">{m['n']}</td>
       <td class="num">{moeda(m['estimado'])}</td>
       <td class="num">{moeda(m['homologado'])}</td></tr>"""
-      for m in d["modalidades"])
-    maior = max((v["valor"] for v in d["meses"].values()), default=0) or 1
+      for m in ex["modalidades"])
+    meses_por_n = {m["mes"]: m for m in ex["meses"]}
     meses = "".join(f"""<tr><td class="ctr">{MESES_NOME[i-1]}</td>
-      <td class="num">{d['meses'].get(f'{i:02d}', {}).get('n', 0)}</td>
-      <td class="num">{moeda(d['meses'].get(f'{i:02d}', {}).get('valor')) if f'{i:02d}' in d['meses'] else '–'}</td>
-      <td><span class="barra" style="width:{round(d['meses'].get(f'{i:02d}', {}).get('valor', 0) / maior * 220)}px"></span></td></tr>"""
+      <td class="num">{meses_por_n.get(i, {}).get('n', 0)}</td>
+      <td class="num">{moeda(meses_por_n[i]['valor']) if meses_por_n.get(i, {}).get('valor') else '–'}</td></tr>"""
       for i in range(1, 13))
     forn = "".join(f"""<tr><td>{_e(f['fornecedor_nome'])}<br>
       <small>{_e(documento(f['fornecedor_ni']))}</small></td>
       <td class="num">{f['n']}</td><td class="num">{moeda(f['total'])}</td></tr>"""
-      for f in d["fornecedores"])
+      for f in ex["fornecedores"])
     venc = "".join(f"""<tr><td class="ctr">{_e(v['tipo'])}</td>
       <td class="ctr">{_e(v['nome'])}</td>
       <td class="obj">{_e(v['objeto'])}</td>
       <td class="num">{data_br(v['vigencia_fim'])}</td>
       <td class="num">{v['dias']} dias</td></tr>"""
-      for v in d["vencendo"])
-    corpo = f"""{cards}
+      for v in ex["vencendo"])
+    corpo = f"""{hero}
+{charts}
 <h2>Contratações por modalidade</h2>
 <table><thead><tr><th>Modalidade</th><th class="num">Qtde</th>
 <th class="num">Estimado</th><th class="num">Homologado</th></tr></thead>
 <tbody>{mod or '<tr><td colspan="4">Sem dados.</td></tr>'}</tbody></table>
 <h2>Evolução mensal (valor homologado/estimado publicado)</h2>
 <table><thead><tr><th class="ctr">Mês</th><th class="num">Processos</th>
-<th class="num">Valor</th><th></th></tr></thead><tbody>{meses}</tbody></table>
+<th class="num">Valor</th></tr></thead><tbody>{meses}</tbody></table>
 <h2>Maiores fornecedores contratados no ano</h2>
 <table><thead><tr><th>Fornecedor</th><th class="num">Contratos</th>
 <th class="num">Valor</th></tr></thead>
@@ -1394,9 +1554,9 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
 <table><thead><tr><th class="ctr">Tipo</th><th class="ctr">Contrato/Ata</th><th>Objeto</th>
 <th class="num">Fim</th><th class="num">Prazo</th></tr></thead>
 <tbody>{venc or '<tr><td colspan="5">Nada vence nos próximos 90 dias.</td></tr>'}</tbody></table>"""
-    titulo = f"{TITULOS['executivo']} {d['ano']} — {municipio}"
-    return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
-                   paisagem=False, tema=tema)
+    titulo = f"{TITULOS['executivo']} {ano} — {municipio}"
+    return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
+                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema))
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
@@ -1512,7 +1672,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
     if tipo == "executivo":
         if not ano:
             ano = date.today().year
-        d = dados_executivo(db, ano, orgao)
+        d = dados_painel(db, ano, orgao, params.get("limites"))
         conteudo = render_executivo(d, municipio, uf, tema)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None

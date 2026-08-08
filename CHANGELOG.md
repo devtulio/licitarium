@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.15.0 — 2026-08-08
+
+**Relatórios em paisagem por padrão; resumo executivo reformulado com os gráficos do Painel**
+
+- Todos os relatórios agora saem em paisagem — Executivo e Alerta de
+  Fracionamento eram os dois últimos ainda em retrato, desperdiçando a
+  largura da página.
+- **Resumo Executivo reformulado**: em vez de só cartões e tabelas, agora
+  abre com o mesmo hero com sparkline do Painel (Homologado no ano,
+  variação sobre o exercício anterior), cartões de KPI (contratações,
+  deságio médio, contratos/atas vigentes) e dois gráficos — colunas
+  mensais pareadas (estimado × homologado) e barras por modalidade. É a
+  mesma consulta do Painel (`dados_painel`), então os números nunca
+  divergem do que está na tela. As tabelas de detalhe (modalidade,
+  evolução mensal, fornecedores, vigências a vencer) continuam abaixo,
+  intactas.
+
+257 pytest + 111 E2E.
+
 ## 1.14.4 — 2026-08-08
 
 **Relatórios e painel impresso saíam sempre em pergaminho**
