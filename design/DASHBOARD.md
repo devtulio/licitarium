@@ -341,7 +341,11 @@ passa) — não só passa com a correção presente.
   da outra): mesma família do C1 acima, resolvida do mesmo jeito — quando
   não cabem lado a lado, empilha em duas fileiras (`_grafico_dispersao`,
   `relatorios.py`) em vez de cortar texto (aqui não sobra caractere pra
-  cortar, diferente da agenda).
+  cortar, diferente da agenda). **Correção do passo em 1.15.4**: as
+  fileiras usavam 22px de distância, que cabe só a linha do nome — o
+  bloco nome+valor inteiro (14px entre as duas linhas) ainda vazava pra
+  fileira vizinha (print real: "média" quase colado em "mediana"). Passo
+  virou 28px, igual ao vão já usado dentro da mesma fileira.
 - **Unidade de medida agora classifica a pesquisa inteira**
   (`Api.classificar_por_unidade`, `licitarium.py`): antes o seletor só
   filtrava a lista visível — a estatística (`estatisticas_preco`) sempre

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.15.4 — 2026-08-08
+
+**Rótulos do gráfico de dispersão ainda coladas em duas fileiras**
+
+- O fix anterior (v1.15.2) empilhava mediana/média em duas fileiras
+  quando colidiam, mas o passo entre elas (22px) só cabia o nome sozinho
+  — o bloco nome+valor inteiro precisa de mais espaço, e as duas
+  fileiras ainda quase se sobrescreviam ("média" encostando em
+  "mediana", print real do usuário). Passo subiu para 28px, mesmo vão já
+  usado entre nome e valor dentro da mesma fileira.
+
+264 pytest + 113 E2E.
+
 ## 1.15.3 — 2026-08-08
 
 **Largura da página: regra global, não mais teto fixo em pixels**

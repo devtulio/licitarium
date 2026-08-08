@@ -152,6 +152,28 @@ def test_grafico_de_dispersao_empilha_rotulos_que_colidem():
     assert len(set(ys2)) == 1   # bem espaçados, cabem numa fileira só
 
 
+def test_grafico_de_dispersao_fileiras_nao_se_encostam():
+    """Print real do usuário (2026-08-08): com passo de 22px entre
+    fileiras, "média" (R$ 6,93) e "mediana" (R$ 6,96) ainda quase se
+    sobrescreviam — 22px cabe o nome sozinho, mas não o bloco nome+valor
+    inteiro (14px de vão entre as duas linhas). O vão entre o valor de uma
+    fileira e o nome da próxima tem de ser pelo menos o mesmo das duas
+    linhas dentro da mesma fileira, senão a segunda fileira não resolve
+    nada."""
+    base = {"limite_inf": -100, "limite_sup": 200}
+    r = {**base, "minimo": 5.0, "q1": 6.40, "mediana": 6.96,
+         "media": 6.93, "q3": 7.50, "maximo": 9.0}
+    svg = relatorios._grafico_dispersao(r, relatorios.moeda)
+    import re
+    linhas = {(m.group(1), m.group(3)): float(m.group(2)) for m in re.finditer(
+        r'<text class="(rot|val)" x="[\d.]+" y="([\d.]+)"[^>]*>([^<]+)</text>',
+        svg)}
+    vao_intra = linhas[("val", "R$ 6,93")] - linhas[("rot", "média")]
+    vao_entre_fileiras = (linhas[("rot", "mediana")]
+                          - linhas[("val", "R$ 6,93")])
+    assert vao_entre_fileiras >= vao_intra
+
+
 def test_item_descartado_sai_da_conta_e_refaz_a_analise(api):
     antes = api.estatisticas_preco("papel a4")
     depois = api.estatisticas_preco("papel a4", excluidos=["I7"])

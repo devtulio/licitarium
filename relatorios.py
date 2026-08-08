@@ -271,7 +271,11 @@ def _grafico_dispersao(r, fmt, larg=800):
         f = 0 if cx - largura_rotulo / 2 > borda_direita[0] + margem_rotulo else 1
         fileira[i] = f
         borda_direita[f] = cx + largura_rotulo / 2
-    passo_fileira = 22
+    # 28, não 22: precisa caber o bloco nome+valor inteiro (14px entre as
+    # duas linhas já funciona sem colidir) — com 22 a "média" de uma
+    # fileira ainda encostava no "mediana" da outra (achado do usuário,
+    # print real com os dois textos quase se sobrescrevendo)
+    passo_fileira = 28
     duas_fileiras = any(fileira.values())
     for i, (v, nome, cor) in enumerate(pontos):
         deslc = fileira[i] * passo_fileira
