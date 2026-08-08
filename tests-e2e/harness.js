@@ -217,6 +217,11 @@ function scriptPonte(temaBanco = "portal") {
         window.__chamadas.push({ metodo: "restaurar_preco", busca, item_id });
         return { ok: true };
       },
+      classificar_por_unidade: async (busca, unidade, ano, origem) => {
+        window.__chamadas.push({ metodo: "classificar_por_unidade", busca,
+                                 unidade, ano, origem });
+        return { ok: true, n: 0 };
+      },
       motivos_descarte: async () => ([
         { id: "nao_comparavel", texto: "Item não comparável ao objeto pesquisado" },
         { id: "embalagem", texto: "Embalagem ou unidade de medida diferente" },

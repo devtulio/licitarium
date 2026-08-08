@@ -194,8 +194,16 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 /* achado da auditoria (m2, 2026-08-08): Expandida solta o teto do <main>
    inteiro, mas numa lista a coluna elástica (Objeto/Descrição) é quem
    herda toda a sobra — em telas largas ela vira um vão vazio depois do
-   texto em vez de ajudar em algo. Cabo só a lista, não o resto do main. */
-[data-largura="expandida"] .lista { max-width:1400px; margin:0 auto; }
+   texto em vez de ajudar em algo. Cabo só a lista, não o resto do main.
+   Achado do usuário (2026-08-08): com 1400px a tabela sobrava margem
+   visível demais em monitor comum (1920px: ~260px de cada lado) e parecia
+   não estar usando a tela. Não tem número que zere as duas sobras ao mesmo
+   tempo — toda coluna elástica de largura fixa em quantidade tem essa
+   troca (mais teto = menos margem fora, mais vão depois do texto dentro);
+   1600px foi escolhido medindo as duas pontas: ainda deixa folga visível
+   em monitor comum, sem o vão interno virar o problema que o achado m2
+   corrigiu. */
+[data-largura="expandida"] .lista { max-width:1600px; margin:0 auto; }
 .linha { display:grid; gap:12px; padding:11px 16px; align-items:center;
          font-size:13px; cursor:pointer; border:none; background:none;
          width:100%; text-align:left; color:var(--text); }

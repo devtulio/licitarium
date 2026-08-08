@@ -91,3 +91,33 @@ test("remarcar o item devolve ele à pesquisa", async ({ page }) => {
   expect([devolveu.busca, devolveu.item_id]).toEqual(["papel", "X-3#10"]);
   await expect(page.locator("#precos-selecao")).toBeHidden();
 });
+
+test("escolher unidade classifica a pesquisa inteira, não só a página",
+    async ({ page }) => {
+  // achado do usuário (2026-08-08): buscar "alface" mistura maço, quilo e
+  // unidade — escolher uma unidade aqui precisa marcar só os itens dela e
+  // descartar o resto com a justificativa pronta, sem exigir clicar item a
+  // item (e sem se limitar à página visível: o cálculo usa a pesquisa toda)
+  await abrirPrecos(page);
+  await page.locator("#f-unidade").selectOption("Caixa");
+
+  const classificou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "classificar_por_unidade").pop());
+  expect([classificou.busca, classificou.unidade, classificou.ano,
+          classificou.origem]).toEqual(["papel", "Caixa", null, null]);
+  // o mapa de descartes é relido do banco depois — não fica remendado com
+  // o estado antigo do que a página já tinha marcado
+  const chamadas = await page.evaluate(() => window.__chamadas
+    .map(c => c.metodo));
+  const iClassificou = chamadas.lastIndexOf("classificar_por_unidade");
+  expect(chamadas.slice(iClassificou + 1)).toContain("descartes");
+});
+
+test("unidade sem termo de busca não classifica nada",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator("#f-unidade").selectOption("Caixa");
+  const chamou = await page.evaluate(() => window.__chamadas
+    .some(c => c.metodo === "classificar_por_unidade"));
+  expect(chamou).toBe(false);
+});

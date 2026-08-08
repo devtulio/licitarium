@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.15.2 — 2026-08-08
+
+**Três achados do usuário na aba Preços**
+
+- **Rótulos do gráfico de dispersão sobrepostos** quando mediana e média
+  ficam perto uma da outra — mesma família do achado C1 da agenda do
+  Painel. Corrigido empilhando em duas fileiras quando não cabem lado a
+  lado, em vez de deixar sobrepor.
+- **Escolher uma unidade de medida agora classifica a pesquisa inteira**:
+  marca só os itens daquela unidade e descarta o resto com a justificativa
+  "Embalagem ou unidade de medida diferente" já preenchida — antes só
+  filtrava a lista visível, e comparar por uma unidade só exigia desmarcar
+  item por item na mão (e só valia para os itens da página aberta).
+- **Teto da lista em Expandida subiu de 1.400px para 1.600px**: com
+  1.400px, a tabela sobrava margem visível demais em monitor comum e
+  parecia não estar usando a tela. Não existe número que zere ao mesmo
+  tempo a margem de fora e o vão depois do texto de dentro (são a mesma
+  folga vista de dois lados) — 1.600px foi escolhido medindo as duas
+  pontas.
+
+263 pytest + 113 E2E.
+
 ## 1.15.1 — 2026-08-08
 
 **Os três achados do levantamento de relatórios, corrigidos**

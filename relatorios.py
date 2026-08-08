@@ -217,9 +217,10 @@ def _grafico_dispersao(r, fmt, larg=800):
     prosa ao lado já explica em texto, o gráfico só torna visível sem
     obrigar a ler seis números. Exige q1/q3 (resumo_estatistico só calcula
     com n >= MINIMO_PARA_DISPERSAO).
-    ponytail: rótulos podem colidir se os valores estiverem muito
-    próximos entre si — sem anti-colisão aqui (a agenda do Painel tem um
-    caso real disso, este ainda não; adicionar se aparecer com dado real)."""
+    Achado do usuário (2026-08-08): mediana e média perto uma da outra
+    sobrepunham rótulo — igual ao C1 da agenda do Painel, mas em vez de
+    cortar texto (aqui não sobra o que cortar: nome+valor já são curtos),
+    empilha em duas fileiras quando não cabe lado a lado."""
     if r.get("q1") is None:
         return ""
     minimo, maximo = r["minimo"], r["maximo"]
@@ -251,14 +252,34 @@ def _grafico_dispersao(r, fmt, larg=800):
          f' stroke="var(--s1)" stroke-width="2.5"/>'
          f'<circle cx="{x(r["media"]):.1f}" cy="{meio:.1f}" r="4.5"'
          f' fill="var(--s2)"/>')
-    for v, nome, cor in ((minimo, "menor", cor_min), (r["q1"], "Q1", "var(--suave)"),
-                        (r["mediana"], "mediana", "var(--s1)"),
-                        (r["media"], "média", "var(--s2)"),
-                        (r["q3"], "Q3", "var(--suave)"),
-                        (maximo, "maior", cor_max)):
-        g += (f'<text class="rot" x="{x(v):.1f}" y="{y_caixa + alt_caixa + 16}"'
+    pontos = [(minimo, "menor", cor_min), (r["q1"], "Q1", "var(--suave)"),
+              (r["mediana"], "mediana", "var(--s1)"),
+              (r["media"], "média", "var(--s2)"),
+              (r["q3"], "Q3", "var(--suave)"),
+              (maximo, "maior", cor_max)]
+    # duas fileiras, atribuídas por varredura da esquerda pra direita: cada
+    # rótulo entra na primeira fileira onde não esbarra no anterior — mesma
+    # ideia da agenda do Painel (design/DASHBOARD.md), só que empilhando em
+    # vez de cortar texto (aqui não sobra caractere pra cortar)
+    px_por_caractere, margem_rotulo = 6.4, 4
+    borda_direita = [float("-inf"), float("-inf")]
+    fileira = {}
+    for i in sorted(range(len(pontos)), key=lambda i: x(pontos[i][0])):
+        v, nome, _ = pontos[i]
+        largura_rotulo = max(len(nome), len(fmt(v))) * px_por_caractere
+        cx = x(v)
+        f = 0 if cx - largura_rotulo / 2 > borda_direita[0] + margem_rotulo else 1
+        fileira[i] = f
+        borda_direita[f] = cx + largura_rotulo / 2
+    passo_fileira = 22
+    duas_fileiras = any(fileira.values())
+    for i, (v, nome, cor) in enumerate(pontos):
+        deslc = fileira[i] * passo_fileira
+        g += (f'<text class="rot" x="{x(v):.1f}"'
+              f' y="{y_caixa + alt_caixa + 16 + deslc}"'
               f' text-anchor="middle" fill="{cor}">{nome}</text>'
-              f'<text class="val" x="{x(v):.1f}" y="{y_caixa + alt_caixa + 30}"'
+              f'<text class="val" x="{x(v):.1f}"'
+              f' y="{y_caixa + alt_caixa + 30 + deslc}"'
               f' text-anchor="middle" fill="{cor}">{fmt(v)}</text>')
     legenda = ('<div class="leg"><span><i style="background:var(--s1)">'
               '</i>faixa entre Q1 e Q3</span>'
@@ -267,7 +288,8 @@ def _grafico_dispersao(r, fmt, larg=800):
         legenda += ('<span><i style="background:var(--erro)"></i>'
                     'fora da faixa esperada (Tukey)</span>')
     legenda += "</div>"
-    return _svg(larg, y_caixa + alt_caixa + 40, g) + legenda
+    altura = y_caixa + alt_caixa + 40 + (passo_fileira if duas_fileiras else 0)
+    return _svg(larg, altura, g) + legenda
 
 
 def url_pncp(cnpj, ano, sequencial):

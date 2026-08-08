@@ -124,6 +124,34 @@ def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path):
     assert "fora da faixa esperada" in html
 
 
+def _linhas_y(svg, classe):
+    import re
+    return [float(m.group(1)) for m in re.finditer(
+        rf'<text class="{classe}" x="[\d.]+" y="([\d.]+)"', svg)]
+
+
+def test_grafico_de_dispersao_empilha_rotulos_que_colidem():
+    """Achado do usuário (2026-08-08), com print real: mediana e média perto
+    uma da outra tinham o texto sobreposto — mesma família de bug do C1 da
+    agenda do Painel (design/DASHBOARD.md), resolvida empilhando em duas
+    fileiras em vez de cortar (aqui não sobra caractere pra cortar)."""
+    # números fixos (não vêm de resumo_estatistico) pra controlar exatamente
+    # a distância entre mediana e média nos dois casos
+    base = {"limite_inf": -100, "limite_sup": 200}
+    perto = {**base, "minimo": 5.25, "q1": 6.00, "mediana": 6.90,
+             "media": 6.96, "q3": 7.83, "maximo": 9.25}
+    svg = relatorios._grafico_dispersao(perto, relatorios.moeda)
+    ys = _linhas_y(svg, "rot")
+    # seis rótulos, dois em fileiras diferentes — nem todos na mesma linha
+    assert len(set(ys)) == 2
+
+    longe = {**base, "minimo": 0, "q1": 20, "mediana": 40,
+             "media": 70, "q3": 85, "maximo": 100}
+    svg2 = relatorios._grafico_dispersao(longe, relatorios.moeda)
+    ys2 = _linhas_y(svg2, "rot")
+    assert len(set(ys2)) == 1   # bem espaçados, cabem numa fileira só
+
+
 def test_item_descartado_sai_da_conta_e_refaz_a_analise(api):
     antes = api.estatisticas_preco("papel a4")
     depois = api.estatisticas_preco("papel a4", excluidos=["I7"])
@@ -163,6 +191,33 @@ def test_lista_de_unidades_vem_agrupada_e_pela_frequencia(api):
     assert [u["nome"] for u in unidades][:1] == ["Caixa"]
     assert {u["nome"]: u["n"] for u in unidades} == {
         "Caixa": 4, "Pacote": 2, "Serviço": 1}
+
+
+def test_classificar_por_unidade_marca_so_a_escolhida(api):
+    """Pedido do usuário (2026-08-08): buscar "alface" mistura maço, quilo
+    e unidade — escolher uma unidade tem de marcar só os itens dela e
+    descartar o resto com a justificativa pronta, sobre a pesquisa inteira
+    (não só a página que a tela mostra no momento)."""
+    r = api.classificar_por_unidade("papel a4", "Caixa")
+    assert r == {"ok": True, "n": 7}
+
+    descartados = {d["item_id"]: d["motivo"] for d in api.descartes("papel a4")}
+    # I1-I4 (Caixa) ficam dentro; I5/I6 (Pacote) e I7 (Serviço) saem
+    assert descartados.keys() == {"I5", "I6", "I7"}
+    assert set(descartados.values()) == {"embalagem"}
+
+    s = api.estatisticas_preco("papel a4",
+                               excluidos=list(descartados.keys()))
+    assert s["n"] == 4
+
+
+def test_classificar_por_unidade_reclassifica_quem_ja_estava_marcado(api):
+    """Trocar de unidade não pode deixar sobra de uma escolha anterior."""
+    api.classificar_por_unidade("papel a4", "Caixa")
+    api.classificar_por_unidade("papel a4", "Pacote")
+    descartados = {d["item_id"] for d in api.descartes("papel a4")}
+    # agora Caixa (4 itens) e Serviço (1) saem; Pacote (I5, I6) volta
+    assert descartados == {"I1", "I2", "I3", "I4", "I7"}
 
 
 # ── ordenação ───────────────────────────────────────────────────────────

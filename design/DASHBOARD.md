@@ -334,3 +334,26 @@ estado de hover real). Achados, por prioridade:
 Todos os oito, corrigidos e liberados. Cada fix tem teste E2E que morde sem a
 correção (`git diff` revertido, teste roda, falha; correção volta, teste
 passa) — não só passa com a correção presente.
+
+## Três achados do usuário na aba Preços (2026-08-08)
+
+- **Rótulos do gráfico de dispersão sobrepostos** (mediana/média perto uma
+  da outra): mesma família do C1 acima, resolvida do mesmo jeito — quando
+  não cabem lado a lado, empilha em duas fileiras (`_grafico_dispersao`,
+  `relatorios.py`) em vez de cortar texto (aqui não sobra caractere pra
+  cortar, diferente da agenda).
+- **Unidade de medida agora classifica a pesquisa inteira**
+  (`Api.classificar_por_unidade`, `licitarium.py`): antes o seletor só
+  filtrava a lista visível — a estatística (`estatisticas_preco`) sempre
+  rodou sobre o conjunto de descartes gravado, não sobre o filtro da tela,
+  então escolher uma unidade não bastava. A correção roda numa transação
+  só sobre o mesmo recorte (termo/ano/origem) de `estatisticas_preco`, não
+  só a página que a tela mostra — sem isso, uma busca com centenas de
+  itens exigiria trocar de página várias vezes pra pegar todos.
+- **Teto da lista em Expandida, de 1.400px pra 1.600px**: achado real de
+  monitor comum (a margem visível em 1.400px parecia "não estar usando a
+  tela"). Medido contra o vão-depois-do-texto que o m2 corrigiu (ver
+  tabela acima) — são a mesma folga, só que a subida de um número reduz a
+  margem de fora e aumenta o vão de dentro, não tem valor que zere os
+  dois. 1.600px é o meio-termo medido, não uma correção completa: quem
+  quiser mais folga ainda vai ver alguma margem em monitor muito largo.

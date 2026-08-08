@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.15.1"
+VERSAO = "1.15.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -505,6 +505,27 @@ def _termo_fts(busca):
     return " AND ".join(f'"{p}"*' for p in palavras) if palavras else None
 
 
+def _where_pesquisa_precos(busca, ano=None, origem=None):
+    """Mesmo recorte de `estatisticas_preco` e `classificar_por_unidade`:
+    o que entra na pesquisa de preços para um termo, sem olhar descarte."""
+    where = ["valor_unitario_homologado IS NOT NULL"]
+    args = []
+    termo = _termo_fts(busca)
+    if termo:
+        where.append("rowid IN (SELECT rowid FROM itens_fts"
+                     " WHERE itens_fts MATCH ?)")
+        args.append(termo)
+    else:
+        where.append("descricao LIKE ?")
+        args.append(f"%{(busca or '').strip()}%")
+    if ano:
+        where.append("ano=?")
+        args.append(ano)
+    if origem == "proprio":
+        where.append("referencia=0")
+    return where, args
+
+
 class Api:
     """Métodos chamados do JS via window.pywebview.api.*"""
 
@@ -963,6 +984,42 @@ class Api:
         finally:
             db.close()
 
+    def classificar_por_unidade(self, busca, unidade, ano=None, origem=None):
+        """Marca só os itens da unidade escolhida; os outros saem da
+        pesquisa com a justificativa "embalagem" já registrada.
+
+        Pedido do usuário (2026-08-08): buscar "alface" mistura maço, quilo
+        e unidade — sem isso, comparar por uma unidade só exigia desmarcar
+        item por item na mão. Roda numa transação só, sobre o mesmo recorte
+        (termo/ano/origem) de `estatisticas_preco` — não só a página visível.
+        """
+        termo = relatorios.chave_termo(busca)
+        if not termo or not unidade:
+            return {"ok": False}
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        db = abrir_db()
+        try:
+            linhas = db.execute(
+                "SELECT id, unidade_canonica(unidade) FROM itens WHERE "
+                + " AND ".join(where), args).fetchall()
+            agora = datetime.now().isoformat()
+            for item_id, uc in linhas:
+                if uc == unidade:
+                    db.execute("DELETE FROM precos_descartes"
+                               " WHERE termo=? AND item_id=?",
+                               (termo, str(item_id)))
+                else:
+                    db.execute(
+                        "INSERT INTO precos_descartes (termo, item_id,"
+                        " motivo, criado_em) VALUES (?,?,?,?)"
+                        " ON CONFLICT(termo, item_id)"
+                        " DO UPDATE SET motivo=excluded.motivo",
+                        (termo, str(item_id), "embalagem", agora))
+            db.commit()
+            return {"ok": True, "n": len(linhas)}
+        finally:
+            db.close()
+
     def motivos_descarte(self):
         """Lista para a tela montar o seletor, na ordem em que aparece."""
         return [{"id": k, "texto": v} for k, v in relatorios.MOTIVOS_DESCARTE.items()]
@@ -981,21 +1038,7 @@ class Api:
         """
         if not (busca or "").strip():
             return None
-        termo = _termo_fts(busca)
-        where = ["valor_unitario_homologado IS NOT NULL"]
-        args = []
-        if termo:
-            where.append("rowid IN (SELECT rowid FROM itens_fts"
-                         " WHERE itens_fts MATCH ?)")
-            args.append(termo)
-        else:
-            where.append("descricao LIKE ?")
-            args.append(f"%{busca.strip()}%")
-        if ano:
-            where.append("ano=?")
-            args.append(ano)
-        if origem == "proprio":
-            where.append("referencia=0")
+        where, args = _where_pesquisa_precos(busca, ano, origem)
         # itens que o usuário desmarcou na lista: a pesquisa de preços do
         # art. 23 só vale sobre itens comparáveis, e é ele quem julga isso
         for grupo in _blocos(excluidos):

@@ -605,6 +605,19 @@ function foraDaCurvaHtml(s) {
 
 let ultimoTermoPrecos = null;
 
+// releitura completa do mapa de descartes a partir do banco — usada na troca
+// de termo e depois de uma classificação em lote, onde vários itens mudam
+// de estado no servidor de uma vez (mesclar no Map local arriscaria sobrar
+// entrada de item que acabou de ser restaurado)
+async function recarregarDescartes(termo) {
+  precosDescartados = new Map();
+  if (api.descartes && termo)
+    for (const d of await api.descartes(termo))
+      precosDescartados.set(String(d.item_id),
+        {motivo: d.motivo, descricao: d.descricao, valor: d.valor});
+  atualizarSelecaoPrecos();
+}
+
 async function mostrarResumoPrecos() {
   const caixa = $("precos-resumo");
   const termo = $("f-busca").value.trim();
@@ -612,12 +625,7 @@ async function mostrarResumoPrecos() {
   // amanhã traz de volta o que foi desconsiderado e por quê
   if (termo !== ultimoTermoPrecos) {
     ultimoTermoPrecos = termo;
-    precosDescartados = new Map();
-    if (api.descartes && termo)
-      for (const d of await api.descartes(termo))
-        precosDescartados.set(String(d.item_id),
-          {motivo: d.motivo, descricao: d.descricao, valor: d.valor});
-    atualizarSelecaoPrecos();
+    await recarregarDescartes(termo);
   }
   if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
     caixa.classList.add("oculto");
@@ -964,8 +972,26 @@ $("kpi-card-homologado").addEventListener("click",
   () => irPara("contratacoes", {ano: String(new Date().getFullYear())}));
 $("kpi-card-vigentes").addEventListener("click",
   () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
-["f-ano","f-modalidade","f-situacao","f-orgao","f-unidade"].forEach(id =>
+["f-ano","f-modalidade","f-situacao","f-orgao"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
+// achado do usuário (2026-08-08): escolher uma unidade aqui já filtrava a
+// lista, mas não classificava a pesquisa de preços — buscar "alface" mistura
+// maço, quilo e unidade, e comparar por uma só exigia desmarcar item por
+// item na mão. Agora a escolha já marca só os da unidade e descarta o resto
+// com a justificativa pronta ("embalagem ou unidade de medida diferente").
+$("f-unidade").addEventListener("change", async () => {
+  estado.pagina = 1;
+  const unidade = $("f-unidade").value;
+  const termo = $("f-busca").value.trim();
+  if (unidade && estado.tipo === "itens" && termo && api.classificar_por_unidade) {
+    await api.classificar_por_unidade(termo, unidade,
+      $("f-ano").value ? +$("f-ano").value : null,
+      $("f-so-meu").checked ? "proprio" : null);
+    await recarregarDescartes(termo);
+  }
+  carregarLista();
+  mostrarResumoPrecos();
+});
 let buscaTimer;
 $("f-busca").addEventListener("input", () => {
   clearTimeout(buscaTimer);
