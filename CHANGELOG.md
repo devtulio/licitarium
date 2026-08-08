@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.16.1 — 2026-08-08
+
+**Pesquisa de preços: contador e três novos jeitos de selecionar**
+
+Pedido do usuário, depois do levantamento de filtros da v1.16.0:
+
+- **Contador "X de Y selecionados"** no resumo — o total é a busca
+  inteira, sem olhar seleção nem descarte.
+- **Filtro por unidade agora acumula**, não substitui: escolher "Maço" e
+  depois "Unidade" deixa as duas dentro (antes, a segunda escolha
+  trocava a primeira).
+- **Selecionar por fornecedor** — lista quem aparece na busca, do mais
+  frequente pro mais raro.
+- **Selecionar por faixa de valor** — De/Até, um dos dois pode ficar
+  vazio; corte manual complementar ao aviso de preço fora da curva.
+- **Selecionar por texto na descrição** — para separar o que uma unidade
+  só não separa (ex.: dentro de "papel", só quem tem "sulfite").
+
+Os quatro seletores por critério (unidade, fornecedor, faixa, texto)
+compartilham a mesma regra: somam à seleção atual, nunca substituem.
+
+282 pytest + 121 E2E. Cada seletor com teste que morde sem a correção.
+
 ## 1.16.0 — 2026-08-08
 
 **Pesquisa de preços: seleção passa a ser opt-in, não opt-out**

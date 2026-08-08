@@ -428,3 +428,30 @@ novo (Set vazio = "nada selecionado" = tudo desmarcado, mascarando
 justamente os testes que verificavam seleção pré-carregada). Corrigido
 movendo o carregamento de descartes/seleção pra dentro de
 `carregarLista()`, com `await`, antes de desenhar qualquer linha.
+
+## Contador e três seletores por critério (2026-08-08)
+
+Pedido do usuário, depois do levantamento de filtros da v1.16.0 (contador
+visível, unidade acumulando, fornecedor, faixa de valor, texto contido —
+os cinco itens do levantamento).
+
+**`total` em `estatisticas_preco`**: computado sempre, sem olhar seleção
+nem descarte — via uma consulta `COUNT(*)` própria com
+`_where_pesquisa_precos`, antes dos filtros de `incluidos`/`excluidos`
+entrarem. Presente nos quatro caminhos de retorno (`nada_selecionado`,
+os dois early-return de `corrigir`/`por_conteudo` vazios, e o resumo
+final) — faltar em um deles quebraria o contador só naquele estado, o
+tipo de bug que só aparece testando o caminho certo.
+
+**`_selecionar_ids(db, termo, ids)`**: helper de módulo compartilhado
+pelos quatro seletores por critério (unidade, fornecedor, faixa, texto).
+Todos **somam** à seleção, nunca substituem — `classificar_por_unidade`
+(v1.15.2) tinha um `DELETE FROM precos_selecionados WHERE termo=?` antes
+de inserir, removido nesta versão; só `selecionar_todos_precos` continua
+limpando tudo primeiro (é reset completo por definição, não um critério).
+
+**`fornecedores_pesquisa_precos`**: lista os fornecedores só desta busca
+(termo/ano/origem), não o cadastro inteiro — diferente de
+`filtros_disponiveis()`'s `unidades`, que é global ao acervo (achado ao
+revisar: um seletor de fornecedor com escopo global teria centenas de
+opções irrelevantes pra maioria das buscas).

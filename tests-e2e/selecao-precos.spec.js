@@ -104,3 +104,68 @@ test("trocar o termo recomeça a seleção", async ({ page }) => {
   await page.locator("#f-busca").fill("caneta");
   await expect(page.locator("#precos-selecao")).toBeHidden();
 });
+
+// ── contador e filtros que selecionam (2026-08-08, propostos e pedidos) ────
+
+test("contador mostra quantos de quantos estão selecionados",
+    async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");
+  await expect(page.locator("#precos-resumo")).toContainText(
+    "0 de 6 selecionados");
+  await caixas(page).first().check();
+  // o total nunca muda (é a busca inteira); o "N de" segue o que a
+  // estatística conta — a fixture do mock não recalcula por item marcado,
+  // então só confere que saiu do estado "0 de"
+  await expect(page.locator("#precos-resumo")).not.toContainText(
+    "0 de 6 selecionados");
+  await expect(page.locator("#precos-resumo")).toContainText(
+    "de 6 selecionados");
+});
+
+test("selecionar por fornecedor soma à seleção", async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");
+  const resumo = page.locator("#precos-resumo");
+  await expect(resumo.locator("#sel-fornecedor-preco")).toBeVisible();
+  await expect(resumo.locator("#sel-fornecedor-preco option")).toHaveCount(3); // vazio + 2
+  await resumo.locator("#sel-fornecedor-preco")
+    .selectOption("11.111.111/0001-11");
+
+  const chamou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_por_fornecedor").pop());
+  expect([chamou.busca, chamou.fornecedor_ni])
+    .toEqual(["papel", "11.111.111/0001-11"]);
+});
+
+test("selecionar por faixa de valor soma à seleção", async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");
+  const resumo = page.locator("#precos-resumo");
+  await resumo.locator("#sel-valor-min").fill("100");
+  await resumo.locator("#sel-valor-max").fill("300");
+  await resumo.locator("#btn-selecionar-faixa").click();
+
+  const chamou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_por_faixa").pop());
+  expect([chamou.busca, chamou.minimo, chamou.maximo])
+    .toEqual(["papel", 100, 300]);
+});
+
+test("faixa aceita só um lado preenchido", async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");
+  const resumo = page.locator("#precos-resumo");
+  await resumo.locator("#sel-valor-min").fill("1000");
+  await resumo.locator("#btn-selecionar-faixa").click();
+  const chamou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_por_faixa").pop());
+  expect([chamou.minimo, chamou.maximo]).toEqual([1000, null]);
+});
+
+test("selecionar por texto na descrição soma à seleção", async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");
+  const resumo = page.locator("#precos-resumo");
+  await resumo.locator("#sel-texto").fill("sulfite");
+  await resumo.locator("#btn-selecionar-texto").click();
+
+  const chamou = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_por_texto").pop());
+  expect([chamou.busca, chamou.contendo]).toEqual(["papel", "sulfite"]);
+});

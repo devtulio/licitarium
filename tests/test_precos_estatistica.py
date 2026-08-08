@@ -235,12 +235,15 @@ def test_classificar_por_unidade_marca_so_a_escolhida(api):
     assert s["n"] == 4
 
 
-def test_classificar_por_unidade_reclassifica_quem_ja_estava_marcado(api):
-    """Trocar de unidade não pode deixar sobra de uma escolha anterior."""
+def test_classificar_por_unidade_acumula_em_vez_de_substituir(api):
+    """Pedido do usuário (2026-08-08): escolher "Maço" e depois "Unidade"
+    tem de deixar as duas dentro — trocar de unidade não pode apagar a
+    escolha anterior."""
     api.classificar_por_unidade("papel a4", "Caixa")
     api.classificar_por_unidade("papel a4", "Pacote")
-    # Pacote (I5, I6) é quem fica selecionado agora — Caixa saiu inteiro
-    assert set(api.selecionados("papel a4")) == {"I5", "I6"}
+    # Caixa (I1-I4) continua, Pacote (I5, I6) se soma
+    assert set(api.selecionados("papel a4")) == \
+        {"I1", "I2", "I3", "I4", "I5", "I6"}
     assert api.descartes("papel a4") == []
 
 
@@ -251,7 +254,9 @@ def test_classificar_por_unidade_reclassifica_quem_ja_estava_marcado(api):
 def test_busca_nova_nao_tem_nada_selecionado(api):
     assert api.selecionados("papel a4") == []
     s = api.estatisticas_preco("papel a4", incluidos=[])
-    assert s == {"n": 0, "nada_selecionado": True}
+    # total conta a busca inteira (pro contador "X de Y"), mesmo sem nada
+    # selecionado ainda
+    assert s == {"n": 0, "nada_selecionado": True, "total": 7}
 
 
 def test_selecionar_e_desselecionar_um_item(api):
@@ -308,6 +313,57 @@ def test_relatorio_de_precos_segue_a_selecao_da_tela(api, tmp_path):
     html = _Path(r["html"]).read_text(encoding="utf-8")
     assert "5000 FLS" in html                       # I3 (Caixa), presente
     assert "TIMBRADO" not in html                   # I7 (Serviço), fora
+
+
+# ── filtros que selecionam (2026-08-08, propostos e pedidos pelo usuário) ──
+# unidade, fornecedor, faixa de valor e texto contido acumulam na seleção,
+# nunca substituem — a mesma regra do achado 2 acima.
+
+def test_total_conta_a_busca_inteira_mesmo_sem_selecao(api):
+    """Pro contador "X de Y selecionados" da tela: total não olha seleção
+    nem descarte, sempre a busca inteira."""
+    s = api.estatisticas_preco("papel a4", incluidos=[])
+    assert s["total"] == 7
+    api.selecionar_preco("papel a4", "I1")
+    s = api.estatisticas_preco("papel a4", incluidos=["I1"])
+    assert s["n"] == 1 and s["total"] == 7
+
+
+def test_fornecedores_da_pesquisa_vem_do_mais_frequente(api):
+    fornecedores = api.fornecedores_pesquisa_precos("papel a4")
+    assert len(fornecedores) == 7          # um fornecedor por item, nesta fixture
+    assert {f["ni"] for f in fornecedores} == {f"ni{i}" for i in range(1, 8)}
+
+
+def test_selecionar_por_fornecedor_acumula(api):
+    api.classificar_por_unidade("papel a4", "Caixa")     # I1-I4
+    r = api.selecionar_por_fornecedor("papel a4", "ni7")  # I7 (Serviço)
+    assert r == {"ok": True, "n": 1}
+    assert set(api.selecionados("papel a4")) == {"I1", "I2", "I3", "I4", "I7"}
+
+
+def test_selecionar_por_faixa_de_valor(api):
+    r = api.selecionar_por_faixa("papel a4", minimo=200, maximo=280)
+    assert r["ok"] and r["n"] == 4           # I1, I2, I3, I4
+    assert set(api.selecionados("papel a4")) == {"I1", "I2", "I3", "I4"}
+
+
+def test_selecionar_por_faixa_aceita_so_um_lado(api):
+    api.selecionar_por_faixa("papel a4", minimo=1000)
+    assert api.selecionados("papel a4") == ["I7"]   # só o de R$ 1.490,00
+
+
+def test_selecionar_por_texto_contido(api):
+    r = api.selecionar_por_texto("papel a4", "SULFITE")
+    assert r["ok"] and r["n"] == 4           # I1-I4 têm "SULFITE" na descrição
+    assert set(api.selecionados("papel a4")) == {"I1", "I2", "I3", "I4"}
+
+
+def test_selecionar_por_texto_acumula_sobre_selecao_existente(api):
+    api.selecionar_por_faixa("papel a4", minimo=1000)      # I7
+    api.selecionar_por_texto("papel a4", "SULFITE")        # I1-I4
+    assert set(api.selecionados("papel a4")) == \
+        {"I1", "I2", "I3", "I4", "I7"}
 
 
 # ── ordenação ───────────────────────────────────────────────────────────

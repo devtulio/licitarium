@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.16.0"
+VERSAO = "1.16.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -536,6 +536,25 @@ def _where_pesquisa_precos(busca, ano=None, origem=None):
     return where, args
 
 
+def _selecionar_ids(db, termo, ids):
+    """Marca cada id — e desfaz um descarte anterior dele, se houver.
+
+    Compartilhado pelos filtros que selecionam por critério (unidade,
+    fornecedor, faixa de valor, texto): todos acumulam na seleção em vez
+    de substituir (pedido do usuário, 2026-08-08 — escolher "Maço" e
+    depois "Unidade" tem de deixar as duas dentro, não trocar uma pela
+    outra).
+    """
+    agora = datetime.now().isoformat()
+    for item_id in ids:
+        db.execute(
+            "INSERT INTO precos_selecionados (termo, item_id, criado_em)"
+            " VALUES (?,?,?) ON CONFLICT(termo, item_id) DO NOTHING",
+            (termo, str(item_id), agora))
+        db.execute("DELETE FROM precos_descartes"
+                   " WHERE termo=? AND item_id=?", (termo, str(item_id)))
+
+
 class Api:
     """Métodos chamados do JS via window.pywebview.api.*"""
 
@@ -995,16 +1014,12 @@ class Api:
             db.close()
 
     def classificar_por_unidade(self, busca, unidade, ano=None, origem=None):
-        """Seleciona só os itens da unidade escolhida — substitui a seleção
-        atual desta busca pelos que batem.
+        """Seleciona os itens da unidade escolhida — soma à seleção atual,
+        não substitui (pedido do usuário, 2026-08-08: escolher "Maço" e
+        depois "Unidade" tem de deixar as duas dentro).
 
-        Pedido do usuário (2026-08-08): buscar "alface" mistura maço, quilo
-        e unidade — sem isso, comparar por uma unidade só exigia marcar
-        item por item na mão. Roda numa transação só, sobre o mesmo recorte
-        (termo/ano/origem) de `estatisticas_preco` — não só a página
-        visível. Desde que a busca passou a abrir com tudo desmarcado
-        (2026-08-08), "os outros" não precisam mais de justificativa: eles
-        já nascem fora, só entram os que batem com a unidade.
+        Roda sobre o mesmo recorte (termo/ano/origem) de
+        `estatisticas_preco` — não só a página visível.
         """
         termo = relatorios.chave_termo(busca)
         if not termo or not unidade:
@@ -1015,23 +1030,95 @@ class Api:
             linhas = db.execute(
                 "SELECT id, unidade_canonica(unidade) FROM itens WHERE "
                 + " AND ".join(where), args).fetchall()
-            agora = datetime.now().isoformat()
-            db.execute("DELETE FROM precos_selecionados WHERE termo=?",
-                       (termo,))
-            n = 0
-            for item_id, uc in linhas:
-                if uc == unidade:
-                    db.execute(
-                        "INSERT INTO precos_selecionados (termo, item_id,"
-                        " criado_em) VALUES (?,?,?)"
-                        " ON CONFLICT(termo, item_id) DO NOTHING",
-                        (termo, str(item_id), agora))
-                    db.execute("DELETE FROM precos_descartes"
-                               " WHERE termo=? AND item_id=?",
-                               (termo, str(item_id)))
-                    n += 1
+            ids = [item_id for item_id, uc in linhas if uc == unidade]
+            _selecionar_ids(db, termo, ids)
             db.commit()
-            return {"ok": True, "n": n}
+            return {"ok": True, "n": len(ids)}
+        finally:
+            db.close()
+
+    def fornecedores_pesquisa_precos(self, busca, ano=None, origem=None):
+        """Fornecedores que aparecem nesta busca, do mais frequente pro mais
+        raro — para o filtro por fornecedor saber o que oferecer."""
+        termo = relatorios.chave_termo(busca)
+        if not termo:
+            return []
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        db = abrir_db()
+        try:
+            linhas = db.execute(
+                "SELECT fornecedor_ni, fornecedor_nome, COUNT(*) n"
+                " FROM itens WHERE " + " AND ".join(where)
+                + " AND fornecedor_ni IS NOT NULL"
+                " GROUP BY fornecedor_ni ORDER BY 3 DESC, 2", args).fetchall()
+            return [{"ni": r[0], "nome": r[1], "n": r[2]} for r in linhas]
+        finally:
+            db.close()
+
+    def selecionar_por_fornecedor(self, busca, fornecedor_ni, ano=None,
+                                  origem=None):
+        """Seleciona os itens de um fornecedor — soma à seleção atual."""
+        termo = relatorios.chave_termo(busca)
+        if not termo or not fornecedor_ni:
+            return {"ok": False}
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        where.append("fornecedor_ni=?")
+        args.append(fornecedor_ni)
+        db = abrir_db()
+        try:
+            ids = [r[0] for r in db.execute(
+                "SELECT id FROM itens WHERE " + " AND ".join(where),
+                args).fetchall()]
+            _selecionar_ids(db, termo, ids)
+            db.commit()
+            return {"ok": True, "n": len(ids)}
+        finally:
+            db.close()
+
+    def selecionar_por_faixa(self, busca, minimo=None, maximo=None,
+                             ano=None, origem=None):
+        """Seleciona os itens com preço unitário homologado na faixa —
+        soma à seleção atual. Corte manual, complementar ao de Tukey."""
+        termo = relatorios.chave_termo(busca)
+        if not termo or (minimo is None and maximo is None):
+            return {"ok": False}
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        if minimo is not None:
+            where.append("valor_unitario_homologado>=?")
+            args.append(minimo)
+        if maximo is not None:
+            where.append("valor_unitario_homologado<=?")
+            args.append(maximo)
+        db = abrir_db()
+        try:
+            ids = [r[0] for r in db.execute(
+                "SELECT id FROM itens WHERE " + " AND ".join(where),
+                args).fetchall()]
+            _selecionar_ids(db, termo, ids)
+            db.commit()
+            return {"ok": True, "n": len(ids)}
+        finally:
+            db.close()
+
+    def selecionar_por_texto(self, busca, contendo, ano=None, origem=None):
+        """Seleciona os itens cuja descrição contém o texto — soma à
+        seleção atual. Para separar o que uma unidade só não separa
+        (ex.: dentro de "papel", selecionar só quem tem "sulfite")."""
+        termo = relatorios.chave_termo(busca)
+        contendo = (contendo or "").strip()
+        if not termo or not contendo:
+            return {"ok": False}
+        where, args = _where_pesquisa_precos(busca, ano, origem)
+        where.append("descricao LIKE ?")
+        args.append(f"%{contendo}%")
+        db = abrir_db()
+        try:
+            ids = [r[0] for r in db.execute(
+                "SELECT id FROM itens WHERE " + " AND ".join(where),
+                args).fetchall()]
+            _selecionar_ids(db, termo, ids)
+            db.commit()
+            return {"ok": True, "n": len(ids)}
         finally:
             db.close()
 
@@ -1102,20 +1189,18 @@ class Api:
         where, args = _where_pesquisa_precos(busca, ano, origem)
         db = abrir_db()
         try:
-            linhas = db.execute(
+            ids = [r[0] for r in db.execute(
                 "SELECT id FROM itens WHERE " + " AND ".join(where),
-                args).fetchall()
-            agora = datetime.now().isoformat()
+                args).fetchall()]
+            # "selecionar todos" é reset completo — limpa até descarte de
+            # item fora do recorte desta consulta, diferente dos filtros
+            # por critério (unidade/fornecedor/faixa/texto), que só tocam
+            # o que bateram com o critério
             db.execute("DELETE FROM precos_descartes WHERE termo=?",
                        (termo,))
-            for (item_id,) in linhas:
-                db.execute(
-                    "INSERT INTO precos_selecionados (termo, item_id,"
-                    " criado_em) VALUES (?,?,?)"
-                    " ON CONFLICT(termo, item_id) DO NOTHING",
-                    (termo, str(item_id), agora))
+            _selecionar_ids(db, termo, ids)
             db.commit()
-            return {"ok": True, "n": len(linhas)}
+            return {"ok": True, "n": len(ids)}
         finally:
             db.close()
 
@@ -1145,8 +1230,18 @@ class Api:
         """
         if not (busca or "").strip():
             return None
+        where0, args0 = _where_pesquisa_precos(busca, ano, origem)
+        db0 = abrir_db()
+        try:
+            total = db0.execute(
+                "SELECT COUNT(*) FROM itens WHERE " + " AND ".join(where0),
+                args0).fetchone()[0]
+        finally:
+            db0.close()
+        # "1 de 47 selecionados", pro contador da tela: quantos a busca traz
+        # ao todo, sem olhar seleção nem descarte (pedido do usuário, item 1)
         if incluidos is not None and not incluidos:
-            return {"n": 0, "nada_selecionado": True}
+            return {"n": 0, "nada_selecionado": True, "total": total}
         where, args = _where_pesquisa_precos(busca, ano, origem)
         # itens que o usuário desmarcou na lista: a pesquisa de preços do
         # art. 23 só vale sobre itens comparáveis, e é ele quem julga isso
@@ -1176,14 +1271,14 @@ class Api:
                 ipca = relatorios.fatores_ipca(db)
                 linhas, sem_indice = _corrigir_pelo_ipca(linhas, ipca)
                 if not linhas:
-                    return {"n": 0, "corrigido": True,
+                    return {"n": 0, "corrigido": True, "total": total,
                             "sem_indice": sem_indice,
                             "ipca_ate": ipca["ate"]}
             base = None
             if por_conteudo:
                 linhas, base, sem_conversao = _normalizar_por_conteudo(linhas)
                 if not linhas:
-                    return {"n": 0, "por_conteudo": True,
+                    return {"n": 0, "por_conteudo": True, "total": total,
                             "sem_conversao": sem_conversao}
             resumo = relatorios.resumo_estatistico(
                 [r[1] for r in linhas])
@@ -1216,7 +1311,7 @@ class Api:
                     f"SELECT COUNT(*) FROM itens WHERE referencia=0"
                     f" AND id IN ({marcas})", grupo).fetchone()[0]
             resumo.update(fornecedores=fornecedores, proprios=proprios,
-                          referencia=resumo["n"] - proprios)
+                          referencia=resumo["n"] - proprios, total=total)
             return resumo
         finally:
             db.close()

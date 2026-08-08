@@ -631,6 +631,61 @@ async function recarregarSelecao(termo) {
       precosIncluidos.add(String(id));
 }
 
+// pedido do usuário (2026-08-08): além de marcar item a item, dá pra
+// selecionar por fornecedor, faixa de valor ou texto contido na descrição —
+// os três somam à seleção atual (nunca substituem, mesma regra da unidade).
+async function toolbarSelecaoPrecos(termo, ano, origemVal) {
+  const fornecedores = api.fornecedores_pesquisa_precos
+    ? await api.fornecedores_pesquisa_precos(termo, ano, origemVal) : [];
+  const opcoesForn = fornecedores.map(f =>
+    `<option value="${esc(f.ni)}">${esc(f.nome ?? f.ni)} (${f.n})</option>`
+  ).join("");
+  return `<div class="filtros" id="precos-selecao-criterio">
+    <select id="sel-fornecedor-preco" aria-label="Selecionar por fornecedor">
+      <option value="">Selecionar por fornecedor…</option>${opcoesForn}
+    </select>
+    <input type="number" id="sel-valor-min" placeholder="De R$" step="0.01"
+      aria-label="Selecionar valor mínimo" style="width:100px">
+    <input type="number" id="sel-valor-max" placeholder="Até R$" step="0.01"
+      aria-label="Selecionar valor máximo" style="width:100px">
+    <button class="btn ghost" id="btn-selecionar-faixa">Selecionar faixa</button>
+    <input type="text" id="sel-texto" placeholder="Texto na descrição…"
+      aria-label="Selecionar por texto na descrição" style="flex:1; min-width:170px">
+    <button class="btn ghost" id="btn-selecionar-texto">Selecionar</button>
+  </div>`;
+}
+
+function ligarToolbarSelecaoPrecos(termo, ano, origemVal) {
+  $("sel-fornecedor-preco").addEventListener("change", async (e) => {
+    const ni = e.target.value;
+    if (!ni || !api.selecionar_por_fornecedor) return;
+    await api.selecionar_por_fornecedor(termo, ni, ano, origemVal);
+    await recarregarDescartes(termo);
+    await recarregarSelecao(termo);
+    carregarLista();
+    mostrarResumoPrecos();
+  });
+  $("btn-selecionar-faixa").addEventListener("click", async () => {
+    const minimo = $("sel-valor-min").value ? +$("sel-valor-min").value : null;
+    const maximo = $("sel-valor-max").value ? +$("sel-valor-max").value : null;
+    if ((minimo == null && maximo == null) || !api.selecionar_por_faixa) return;
+    await api.selecionar_por_faixa(termo, minimo, maximo, ano, origemVal);
+    await recarregarDescartes(termo);
+    await recarregarSelecao(termo);
+    carregarLista();
+    mostrarResumoPrecos();
+  });
+  $("btn-selecionar-texto").addEventListener("click", async () => {
+    const texto = $("sel-texto").value.trim();
+    if (!texto || !api.selecionar_por_texto) return;
+    await api.selecionar_por_texto(termo, texto, ano, origemVal);
+    await recarregarDescartes(termo);
+    await recarregarSelecao(termo);
+    carregarLista();
+    mostrarResumoPrecos();
+  });
+}
+
 async function mostrarResumoPrecos() {
   // carregarLista já garante descartes/seleção carregados antes de chamar
   // esta função (a corrida entre desenhar as linhas e ler o Set de
@@ -641,19 +696,27 @@ async function mostrarResumoPrecos() {
     caixa.classList.add("oculto");
     return;
   }
-  const s = await api.estatisticas_preco(termo,
-    $("f-ano").value ? +$("f-ano").value : null,
-    $("f-so-meu").checked ? "proprio" : null,
+  const ano = $("f-ano").value ? +$("f-ano").value : null;
+  const origemVal = $("f-so-meu").checked ? "proprio" : null;
+  const s = await api.estatisticas_preco(termo, ano, origemVal,
     null, porConteudo, corrigirIpca, [...precosIncluidos]);
   if (!s) { caixa.classList.add("oculto"); return; }
+  // "X de Y selecionados" — Y é a busca inteira, sem olhar seleção nem
+  // descarte (pedido do usuário, item 1: contador visível)
+  const contador = s.total != null
+    ? `<div class="dim" style="font-size:12px; margin:-4px 0 8px">${
+        s.nada_selecionado ? 0 : s.n} de ${s.total} selecionados</div>` : "";
   if (s.nada_selecionado) {
     caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
+      ${contador}
       <div class="disp">Nenhum item selecionado ainda. Marque os que quer
         comparar na lista abaixo, ou
         <button class="btn ghost" id="btn-selecionar-todos-resumo"
-          style="margin-left:4px">Selecionar todos</button></div>`;
+          style="margin-left:4px">Selecionar todos</button></div>
+      ${await toolbarSelecaoPrecos(termo, ano, origemVal)}`;
     caixa.classList.remove("oculto");
     $("btn-selecionar-todos-resumo").addEventListener("click", selecionarTodosPrecos);
+    ligarToolbarSelecaoPrecos(termo, ano, origemVal);
     return;
   }
   if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
@@ -677,6 +740,7 @@ async function mostrarResumoPrecos() {
     ? ` <small class="dim">— ${s.proprios} do seu município e ${s.referencia} de referência</small>`
     : "";
   caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"${origem}</h3>
+    ${contador}
     <div class="grade">
       ${cel(val(s.minimo), rot("menor", "menor unitário"))}
       ${cel(val(s.mediana), rot("mediana", "mediana"), true)}
@@ -687,7 +751,8 @@ async function mostrarResumoPrecos() {
       <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
         Relatório de pesquisa de preços</button>
     </div>
-    ${correcaoHtml(s)}${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}`;
+    ${correcaoHtml(s)}${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}
+    ${await toolbarSelecaoPrecos(termo, ano, origemVal)}`;
   caixa.classList.remove("oculto");
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
   $("btn-descartar-fora")?.addEventListener("click", async () => {
@@ -701,6 +766,7 @@ async function mostrarResumoPrecos() {
     mostrarResumoPrecos();
     atualizarSelecaoPrecos();
   });
+  ligarToolbarSelecaoPrecos(termo, ano, origemVal);
 }
 
 // ── largura das colunas: arrastar ajusta, duplo clique dá autofit ─────────

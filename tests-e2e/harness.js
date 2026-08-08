@@ -177,25 +177,26 @@ function scriptPonte(temaBanco = "portal") {
                                  origem, excluidos, porConteudo, corrigir,
                                  incluidos });
         if (!/papel/i.test(busca || "")) return null;
+        const total = (DADOS.itens || []).length;
         if (incluidos && !incluidos.length)
-          return { n: 0, nada_selecionado: true };
+          return { n: 0, nada_selecionado: true, total };
         if (corrigir && !porConteudo) return {
           n: 4, minimo: 20.6, maximo: 700000, media: 175030, mediana: 30.2,
           fornecedores: 3, desvio: 349985, cv: 2.0, q1: 25.1, q3: 175015,
           limite_inf: -224733, limite_sup: 424873, fora_da_curva: [],
           proprios: 3, referencia: 1, corrigido: true, ipca_ate: "2026-06",
-          ipca_ate_extenso: "jun/2026",
+          ipca_ate_extenso: "jun/2026", total,
           // 1 de 5 é 20% da série: acima do limiar, o backend acusa
           sem_indice: window.__serieInteira ? 0 : 1,
           amostra_reduzida: !window.__serieInteira };
         if (porConteudo) return window.__semConteudo
-          ? { n: 0, por_conteudo: true, sem_conversao: 4 }
+          ? { n: 0, por_conteudo: true, sem_conversao: 4, total }
           : { n: 3, minimo: 0.0375, maximo: 0.389, media: 0.158,
               mediana: 0.0466, fornecedores: 2, desvio: 0.19, cv: 1.2,
               q1: 0.042, q3: 0.21, limite_inf: -0.21, limite_sup: 0.46,
               fora_da_curva: [], proprios: 2, referencia: 1,
               por_conteudo: true, base: "un", rotulo_base: "unidade",
-              sem_conversao: 2 };
+              sem_conversao: 2, total };
         const foraSaiu = (excluidos || []).includes("X-3#10")
           || (incluidos && !incluidos.includes("X-3#10"));
         const fora = foraSaiu ? [] : ["X-3#10"];
@@ -203,7 +204,7 @@ function scriptPonte(temaBanco = "portal") {
                  mediana: 18.75, fornecedores: 2,
                  desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
                  limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,
-                 proprios: 2, referencia: 1 };
+                 proprios: 2, referencia: 1, total };
       },
       detalhe: async (tipo, nc) =>
         ({ ...(DADOS[tipo] || []).find(d => d.numero_controle === nc),
@@ -251,6 +252,29 @@ function scriptPonte(temaBanco = "portal") {
         window.__chamadas.push({ metodo: "selecionar_todos_precos", busca,
                                  ano, origem });
         return { ok: true, n: (DADOS.itens || []).length };
+      },
+      fornecedores_pesquisa_precos: async (busca, ano, origem) => {
+        window.__chamadas.push({ metodo: "fornecedores_pesquisa_precos",
+                                 busca, ano, origem });
+        return window.__fornecedoresPrecos ?? [
+          { ni: "11.111.111/0001-11", nome: "Fornecedor Um", n: 3 },
+          { ni: "22.222.222/0001-22", nome: "Fornecedor Dois", n: 2 },
+        ];
+      },
+      selecionar_por_fornecedor: async (busca, fornecedor_ni, ano, origem) => {
+        window.__chamadas.push({ metodo: "selecionar_por_fornecedor", busca,
+                                 fornecedor_ni, ano, origem });
+        return { ok: true, n: 0 };
+      },
+      selecionar_por_faixa: async (busca, minimo, maximo, ano, origem) => {
+        window.__chamadas.push({ metodo: "selecionar_por_faixa", busca,
+                                 minimo, maximo, ano, origem });
+        return { ok: true, n: 0 };
+      },
+      selecionar_por_texto: async (busca, contendo, ano, origem) => {
+        window.__chamadas.push({ metodo: "selecionar_por_texto", busca,
+                                 contendo, ano, origem });
+        return { ok: true, n: 0 };
       },
       motivos_descarte: async () => ([
         { id: "nao_comparavel", texto: "Item não comparável ao objeto pesquisado" },
