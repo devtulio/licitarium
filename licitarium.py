@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.17.0"
+VERSAO = "1.17.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -450,6 +450,11 @@ _CANONICA = {texto: grupo
 _SO_A_PALAVRA = re.compile(r"^([A-Za-zÀ-ÿ]+)[\s.]+[\d.,]+.*$")
 
 
+def _sem_acento(texto):
+    return (unicodedata.normalize("NFD", str(texto or ""))
+            .encode("ascii", "ignore").decode()).upper()
+
+
 def _unidade_canonica(texto):
     """Agrupa as grafias de uma mesma unidade sob um rótulo legível."""
     if not texto:
@@ -780,14 +785,36 @@ class Api:
             db.close()
 
     def add_orgao(self, cnpj, nome):
+        """Órgão monitorado entra manualmente só depois de confirmado no
+        PNCP: contratos/atas são baixados por CNPJ isolado (a API não
+        filtra por município nessa fase), então um CNPJ de outra
+        prefeitura entraria sem processo-mãe e contaminaria os relatórios
+        oficiais — que confiam em `referencia=0` para separar o que é
+        nosso do que não é."""
         cnpj = "".join(c for c in (cnpj or "") if c.isdigit())
         if len(cnpj) != 14:
             return {"ok": False, "erro": "CNPJ deve ter 14 dígitos"}
         db = abrir_db()
         try:
+            municipio = pncp._config(db, "municipio_nome") or ""
+            try:
+                registro = pncp.consultar_orgao(cnpj)
+            except pncp.PncpErro as e:
+                return {"ok": False,
+                        "erro": f"não consegui confirmar o CNPJ no PNCP ({e})"}
+            if not registro:
+                return {"ok": False, "erro": "CNPJ não encontrado no PNCP"}
+            razao = registro.get("razaoSocial") or ""
+            if registro.get("esferaId") != "M":
+                return {"ok": False,
+                        "erro": f"{razao or cnpj} não é órgão municipal"}
+            if municipio and _sem_acento(municipio) not in _sem_acento(razao):
+                return {"ok": False,
+                        "erro": f"{razao} não parece ser de {municipio} — "
+                                "confira o CNPJ"}
             db.execute(
                 "INSERT OR IGNORE INTO orgaos (cnpj, razao_social, ativo, origem)"
-                " VALUES (?,?,1,'manual')", (cnpj, nome or cnpj))
+                " VALUES (?,?,1,'manual')", (cnpj, razao or nome or cnpj))
             db.commit()
             return {"ok": True}
         finally:

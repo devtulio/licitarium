@@ -433,6 +433,13 @@ def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None,
     return total
 
 
+def consultar_orgao(cnpj):
+    """Registro do CNPJ no PNCP (razão social, esfera) — None se o CNPJ não
+    existe no portal. Usado para conferir um órgão antes de adicioná-lo à
+    mão, já que a API de contratações não filtra por CNPJ isolado."""
+    return _get(f"/v1/orgaos/{cnpj}", {}, base=BASE_PNCP)
+
+
 def descobrir_orgaos(db):
     """CNPJs distintos das contratações viram órgãos monitorados."""
     db.execute(

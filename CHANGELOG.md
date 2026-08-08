@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.17.1 — 2026-08-08
+
+**Adicionar órgão manualmente confere o CNPJ no PNCP antes de aceitar**
+
+Achado ao discutir se "órgãos monitorados" serviria para comparar
+prefeituras: contratos/atas são baixados por CNPJ isolado, sem checar
+município — o campo de CNPJ manual só exigia 14 dígitos, então o CNPJ de
+**outra prefeitura** entraria sem o processo de origem (só a fase 1,
+por município, cria a contratação-mãe) e contaminaria os relatórios
+oficiais, que confiam em `referencia=0` para separar o que é seu do que
+não é.
+
+- **`pncp.consultar_orgao(cnpj)`** — nova consulta ao registro do CNPJ no
+  PNCP (`/v1/orgaos/{cnpj}`: razão social e esfera).
+- **`add_orgao` agora recusa**: CNPJ que o PNCP não reconhece, órgão que
+  não é da esfera municipal, e razão social que não cita o nome do
+  município configurado (comparação sem acento/caixa). Erro claro na
+  tela, com a razão social encontrada — sem checagem se o município ainda
+  não foi configurado (acervo novo).
+
+297 pytest (era 289) + 124 E2E. Teste que morde sem a checagem: CNPJ de
+outra prefeitura era aceito antes da correção.
+
 ## 1.17.0 — 2026-08-08
 
 **Painel ganha a vista Economia — quanto foi economizado, por modalidade,

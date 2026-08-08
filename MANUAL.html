@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.17.0</title>
+<title>Manual Operacional — Licitarium v1.17.1</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.17.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.17.1 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.17.0</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.17.1</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.17.0.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.17.1.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -655,6 +655,12 @@ oficiais continuam sendo exclusivamente do seu município.</div>
 órgão ainda não publicou nenhuma contratação, adicione-o manualmente pelo CNPJ
 para que seus contratos e atas também sejam baixados. Desmarcar um órgão
 suspende a busca de novos dados dele.</p>
+<div class="caixa"><b>O CNPJ é conferido no PNCP antes de entrar.</b> O
+programa recusa CNPJ que o PNCP não reconhece, que não seja da esfera
+municipal, ou cuja razão social não pareça ser do seu município — contratos e
+atas são baixados por CNPJ isolado, sem checar município, então o CNPJ de
+outra prefeitura entraria sem o processo de origem e misturaria dado alheio
+nos seus relatórios oficiais.</div>
 <h3>Limites de dispensa</h3>
 <p>Os valores do art. 75, I e II, usados pelo Alerta de Fracionamento. São
 atualizados por decreto federal — confira e ajuste o valor vigente.</p>
