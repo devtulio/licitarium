@@ -34,6 +34,7 @@ TITULOS = {"contratacoes": "Relação de Contratações",
            "contratos": "Relação de Contratos",
            "atas": "Relação de Atas de Registro de Preços",
            "executivo": "Resumo Executivo de Contratações",
+           "economia": "Economia e Comparativos por Modalidade e Categoria",
            "fracionamento": "Alerta de Fracionamento — Dispensas × Limites",
            "precos": "Pesquisa de Preços — Histórico de Contratações",
            "minuta_pca": "Minuta do Plano de Contratações Anual"}
@@ -514,11 +515,12 @@ def dados_painel(db, ano, orgao=None, limites=None):
     parcial = ano == hoje.year
     corte = f"{ano - 1}-{hoje:%m-%d}" if parcial else f"{ano - 1}-12-31"
     ant = db.execute(
-        f"""SELECT COUNT(*), SUM(valor_homologado) FROM contratacoes
+        f"""SELECT COUNT(*), SUM(valor_homologado), SUM(valor_estimado)
+              FROM contratacoes
              WHERE referencia=0 AND ano=?
                AND (data_publicacao IS NULL OR substr(data_publicacao,1,10) <= ?)
                {og}""", [ano - 1, corte] + og_args).fetchone()
-    anterior = {"n": ant[0], "homologado": ant[1] or 0}
+    anterior = {"n": ant[0], "homologado": ant[1] or 0, "estimado": ant[2] or 0}
     # homologado é homologado: o resumo executivo usa
     # COALESCE(homologado, estimado) para não zerar processo em andamento,
     # mas aqui as duas barras são comparadas lado a lado — misturar as duas
@@ -563,7 +565,42 @@ def dados_painel(db, ano, orgao=None, limites=None):
                   AND valor_homologado IS NOT NULL{og}
                 GROUP BY 1 ORDER BY 3 DESC""", [ano] + og_args):
         desagios.append({"modalidade": r[0], "n": r[1],
+                         "estimado": r[2] or 0, "homologado": r[3] or 0,
+                         "economizado": (r[2] or 0) - (r[3] or 0),
                          "pct": (1 - (r[3] or 0) / r[2]) * 100 if r[2] else 0})
+
+    # economia por família de item e por categoria bruta do PNCP — a mesma
+    # pergunta do deságio por modalidade, só que descendo ao item; uma
+    # consulta só em `itens` alimenta as duas listas
+    itens_economia = [dict(r) for r in db.execute(
+        f"""SELECT descricao, COALESCE(categoria, material_servico) categoria,
+                   valor_total_estimado est, valor_total_homologado hom
+              FROM itens
+             WHERE referencia=0 AND ano=? AND valor_total_estimado > 0
+               AND valor_total_homologado IS NOT NULL{og}""",
+        [ano] + og_args)]
+    por_familia, por_categoria = {}, {}
+    for it in itens_economia:
+        chave = pca_builder.chave_agrupamento(it["descricao"], palavras=2) \
+            or "(sem descrição)"
+        alvo = por_familia.setdefault(
+            chave, {"nome": chave, "n": 0, "estimado": 0.0, "homologado": 0.0})
+        alvo["n"] += 1
+        alvo["estimado"] += it["est"] or 0
+        alvo["homologado"] += it["hom"] or 0
+        cat = it["categoria"] or "(sem categoria)"
+        alvo_cat = por_categoria.setdefault(
+            cat, {"nome": cat, "n": 0, "estimado": 0.0, "homologado": 0.0})
+        alvo_cat["n"] += 1
+        alvo_cat["estimado"] += it["est"] or 0
+        alvo_cat["homologado"] += it["hom"] or 0
+    for grupo in (por_familia, por_categoria):
+        for v in grupo.values():
+            v["economizado"] = v["estimado"] - v["homologado"]
+            v["pct"] = (1 - v["homologado"] / v["estimado"]) * 100 \
+                if v["estimado"] else 0
+    por_familia = sorted(por_familia.values(), key=lambda o: -o["economizado"])
+    por_categoria = sorted(por_categoria.values(), key=lambda o: -o["economizado"])
 
     # concentração: quanto do valor está nos maiores fornecedores
     valores = [r[0] or 0 for r in db.execute(
@@ -687,6 +724,20 @@ def dados_painel(db, ano, orgao=None, limites=None):
         "vigilancia": {"funil": funil, "limites": objetos[:6],
                        "limite_compras": fracionamento["limite_compras"],
                        "agenda": executivo["vencendo"][:40]},
+        "economia": {
+            "estimado": executivo["cards"]["estimado"],
+            "homologado": executivo["cards"]["homologado"],
+            "economizado": (executivo["cards"]["estimado"] or 0)
+                - (executivo["cards"]["homologado"] or 0),
+            "pct": executivo["cards"]["desagio"],
+            "estimado_anterior": anterior["estimado"],
+            "homologado_anterior": anterior["homologado"],
+            "economizado_anterior": (anterior["estimado"] - anterior["homologado"])
+                if anterior["estimado"] and anterior["homologado"] else None,
+            "por_modalidade": desagios,
+            "por_familia": por_familia[:10],
+            "por_categoria": por_categoria[:10],
+        },
     }
 
 
@@ -1711,6 +1762,89 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
                    paisagem=True, tema=tema, estilo_extra=_css_painel(tema))
 
 
+def render_economia(d, municipio, uf, tema="pergaminho"):
+    """Quanto foi economizado no ano, por modalidade, família de item e
+    categoria do PNCP. `d` é o retorno de `dados_painel` — mesmos números
+    da vista Economia do Painel, num documento que se gera sem abrir o
+    Painel."""
+    ano = d["ano"]
+    e = d["economia"]
+    ate_hoje = " até hoje" if d["comparacao_parcial"] else ""
+
+    var_econ = None
+    if e.get("economizado_anterior"):
+        var_econ = (e["economizado"] / e["economizado_anterior"] - 1) * 100
+    if var_econ is None:
+        linha_econ = f"sem {ano - 1} para comparar"
+    else:
+        seta = "▲" if var_econ >= 0 else "▼"
+        classe = "up" if var_econ >= 0 else "down"
+        pct_txt = f"{abs(var_econ):.1f}%".replace(".", ",")
+        linha_econ = (f'<span class="{classe}">{seta} {pct_txt}</span>'
+                      f' sobre {ano - 1}{ate_hoje}')
+    desagio = f"{e['pct']:.1f}%".replace(".", ",") if e["pct"] is not None \
+        else "–"
+
+    hero = f"""<div class="faixa f-3">
+<div class="card hero">
+  <h3>Economizado em {ano}</h3>
+  <div class="n">{compacto(e['economizado'])}</div>
+  <div class="r">{linha_econ}</div>
+</div>
+<div class="card kpiv"><div class="v">{desagio}</div>
+  <div class="r">deságio médio</div>
+  <div class="r" style="margin-top:8px">{compacto(e['estimado'])} estimados</div>
+</div>
+<div class="card kpiv"><div class="v">{compacto(e['homologado'])}</div>
+  <div class="r">homologado no ano</div></div>
+</div>"""
+
+    graf_mod = _grafico_barras(
+        e["por_modalidade"][:8], valor=lambda m: m["economizado"] or 0,
+        rotulo=lambda m: m["modalidade"] or "–",
+        sub=lambda m: f"{m['n']} {'processo' if m['n'] == 1 else 'processos'}",
+        cor="var(--s1)", larg=300)
+    graf_fam = _grafico_barras(
+        e["por_familia"], valor=lambda f: f["economizado"] or 0,
+        rotulo=lambda f: f["nome"] or "–",
+        sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'}",
+        cor="var(--s2)", larg=300)
+    graf_cat = _grafico_barras(
+        e["por_categoria"], valor=lambda c: c["economizado"] or 0,
+        rotulo=lambda c: c["nome"] or "–",
+        sub=lambda c: f"{c['n']} {'item' if c['n'] == 1 else 'itens'}",
+        cor="var(--s3)", larg=300)
+    charts = f"""<div class="faixa f-3">
+<div class="card"><h3>Por modalidade</h3>{graf_mod}</div>
+<div class="card"><h3>Por família de item</h3>{graf_fam}</div>
+<div class="card"><h3>Por categoria (PNCP)</h3>{graf_cat}</div>
+</div>"""
+
+    def _tabela(titulo_secao, coluna, linhas):
+        corpo_linhas = "".join(f"""<tr><td>{_e(l['nome'])}</td>
+          <td class="num">{l['n']}</td>
+          <td class="num">{moeda(l['estimado'])}</td>
+          <td class="num">{moeda(l['homologado'])}</td>
+          <td class="num">{moeda(l['economizado'])}</td></tr>"""
+          for l in linhas)
+        return f"""<h2>{titulo_secao}</h2>
+<table><thead><tr><th>{coluna}</th><th class="num">Qtde</th>
+<th class="num">Estimado</th><th class="num">Homologado</th>
+<th class="num">Economizado</th></tr></thead>
+<tbody>{corpo_linhas or f'<tr><td colspan="5">Sem dados.</td></tr>'}</tbody>
+</table>"""
+
+    mod_linhas = [{"nome": m["modalidade"], **m} for m in e["por_modalidade"]]
+    corpo = f"""{hero}
+{charts}
+{_tabela("Economia por modalidade", "Modalidade", mod_linhas)}
+{_tabela("Economia por família de item", "Família", e["por_familia"])}
+{_tabela("Economia por categoria (PNCP)", "Categoria", e["por_categoria"])}"""
+    titulo = f"{TITULOS['economia']} {ano} — {municipio}"
+    return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
+                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema))
+
+
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
 
 # cores de série do painel — espelham ui/estilo.css (não vêm do tema: foram
@@ -1739,6 +1873,7 @@ _CSS_PAINEL_RESTO = """
   .f-4 { grid-template-columns:1.15fr 1fr 1fr 1fr; }
   .f-21 { grid-template-columns:1.6fr 1fr; }
   .f-11 { grid-template-columns:1fr 1fr; }
+  .f-3 { grid-template-columns:1fr 1fr 1fr; }
   .card { background:var(--superficie); border:1px solid var(--borda);
           border-radius:3px; padding:12px 14px; break-inside:avoid; }
   .card h3 { font-size:9.5pt; color:var(--suave); font-weight:600;
@@ -1791,7 +1926,8 @@ def _css_painel(tema):
 
 TITULOS_PAINEL = {"execucao": "Execução do exercício",
                   "analise": "Análise comparativa",
-                  "vigilancia": "Vigilância e prazos"}
+                  "vigilancia": "Vigilância e prazos",
+                  "economia": "Economia e comparativos"}
 
 
 def render_painel(vistas, municipio, uf, ano, tema="pergaminho"):
@@ -1828,6 +1964,13 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         conteudo = render_executivo(d, municipio, uf, tema)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
+    elif tipo == "economia":
+        if not ano:
+            ano = date.today().year
+        d = dados_painel(db, ano, orgao, params.get("limites"))
+        conteudo = render_economia(d, municipio, uf, tema)
+        nome = f"economia_comparativo_{ano}"
+        linhas_csv = d["economia"]["por_familia"]
     elif tipo == "minuta_pca":
         import pca_builder
         if not ano:

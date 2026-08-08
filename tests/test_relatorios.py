@@ -86,6 +86,34 @@ def test_gerar_executivo_sem_csv(db, tmp_path):
     assert "Resumo Executivo" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
+    """Sem item com par estimado/homologado, por_familia fica vazia — mesmo
+    critério de "sem dados" que os outros relatórios já usam (linhas_csv
+    vazia não gera arquivo)."""
+    r = relatorios.gerar(db, "economia", {"ano": 2026}, "T", "SP", tmp_path)
+    assert r["csv"] is None
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Economia e Comparativos" in html
+    # 300 estimados (A+B) - 80 homologados (só A) = 220
+    assert "220,00" in html
+
+
+def test_gerar_economia_com_itens_traz_familia_no_documento_e_no_csv(db, tmp_path):
+    db.execute(
+        "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
+        " categoria, valor_total_estimado, valor_total_homologado,"
+        " referencia, raw) VALUES ('A#1','A',2026,'MERENDA ESCOLAR',"
+        " 'Alimentação',100.0,80.0,0,'{}')")
+    db.commit()
+    r = relatorios.gerar(db, "economia", {"ano": 2026}, "T", "SP", tmp_path)
+    assert r["csv"] is not None
+    csv_texto = Path(r["csv"]).read_text(encoding="utf-8-sig")
+    assert "MERENDA ESCOLAR" in csv_texto
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "MERENDA ESCOLAR" in html
+    assert "Alimentação" in html            # tabela por categoria
+
+
 def test_filtro_orgao_nos_relatorios(db, tmp_path):
     db.execute("UPDATE contratacoes SET orgao_cnpj='111'")
     db.execute("UPDATE contratacoes SET orgao_cnpj='222'"

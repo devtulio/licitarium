@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.17.0 — 2026-08-08
+
+**Painel ganha a vista Economia — quanto foi economizado, por modalidade,
+família de item e categoria**
+
+Primeiro passo para preparar o sistema para prefeituras menores: o Painel
+já media desempenho de contratação, mas o quanto foi economizado só
+aparecia como um número solto no Resumo Executivo. Agora é uma vista
+própria, com os mesmos dados por trás do restante do Painel — sem ida
+extra ao banco.
+
+- **4ª subaba "Economia"**, ao lado de Execução/Análise/Vigilância — total
+  economizado no ano, comparação com o mesmo período do ano anterior,
+  deságio médio, e três gráficos de barras (por modalidade, por família de
+  item — o mesmo agrupamento do medidor de limite de fracionamento — e por
+  categoria bruta do PNCP).
+- **Entra na impressão do Painel em A3** de graça: o botão "Imprimir" já
+  captura a vista nova junto das outras três.
+- **Novo relatório avulso "Economia e Comparativos"**, no modal de
+  Relatórios — mesmos números, em documento que se gera sem abrir o
+  Painel, com tabela completa (não só o topo) por modalidade, família e
+  categoria; CSV pela família de item.
+
+289 pytest + 124 E2E. Cada agrupamento com teste que morde sem a correção.
+
 ## 1.16.1 — 2026-08-08
 
 **Pesquisa de preços: contador e três novos jeitos de selecionar**

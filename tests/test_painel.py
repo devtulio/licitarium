@@ -451,6 +451,97 @@ def test_impressao_ignora_vista_vazia(tmp_path, monkeypatch):
     assert "Análise comparativa" not in html
 
 
+# ── economia ────────────────────────────────────────────────────────────
+
+def test_economia_totais_batem_com_os_cards_do_ano(api):
+    d = api.painel(ANO)
+    e, c = d["economia"], d["execucao"]["cards"]
+    assert e["estimado"] == c["estimado"]
+    assert e["homologado"] == c["homologado"]
+    assert e["economizado"] == pytest.approx(c["estimado"] - c["homologado"])
+    assert e["pct"] == pytest.approx(c["desagio"])
+    # D3, exercício anterior: 20.000 estimados, 18.000 homologados
+    assert e["economizado_anterior"] == pytest.approx(2000.0)
+
+
+def test_economia_por_modalidade_traz_valor_em_reais(api):
+    por_mod = {m["modalidade"]: m
+               for m in api.painel(ANO)["economia"]["por_modalidade"]}
+    # pregão: 400.000 estimados, 320.000 homologados
+    assert por_mod["Pregão"]["economizado"] == pytest.approx(80000.0)
+    # dispensas: 55.000 estimados, 52.000 homologados
+    assert por_mod["Dispensa"]["economizado"] == pytest.approx(3000.0)
+
+
+def test_economia_por_familia_agrupa_como_o_medidor_de_limite(api):
+    """Mesma chave de agrupamento do fracionamento (pca_builder.chave_agrupamento):
+    os dois "papel A4" do PNCP caem na mesma família."""
+    db = _db()
+    try:
+        db.executemany(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, categoria, valor_total_estimado,"
+            " valor_total_homologado, referencia, raw)"
+            " VALUES (?,?,?,?,?,?,?,?,0,'{}')",
+            [("D1#papel", "D1", "111", ANO, "AQUISIÇÃO DE PAPEL A4",
+              "Material de consumo", 5000.0, 4000.0),
+             ("D2#papel", "D2", "111", ANO, "AQUISICAO DE PAPEL A4 SULFITE",
+              "Material de consumo", 3000.0, 2500.0),
+             ("P1#tinta", "P1", "111", ANO, "CARTUCHO DE TINTA",
+              "Material de consumo", 2000.0, 1800.0)])
+        db.commit()
+    finally:
+        db.close()
+
+    por_familia = {f["nome"]: f
+                   for f in api.painel(ANO)["economia"]["por_familia"]}
+    papel = por_familia["PAPEL A4"]
+    assert papel["n"] == 2
+    assert papel["estimado"] == pytest.approx(8000.0)
+    assert papel["economizado"] == pytest.approx(1500.0)
+    assert "CARTUCHO TINTA" in por_familia
+
+
+def test_economia_por_categoria_usa_material_servico_quando_falta_categoria(api):
+    db = _db()
+    try:
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, categoria, material_servico, valor_total_estimado,"
+            " valor_total_homologado, referencia, raw)"
+            " VALUES ('P1#serv','P1','111',?,'MANUTENÇÃO DE VEÍCULO',NULL,"
+            "'Serviço de manutenção',6000.0,5000.0,0,'{}')", (ANO,))
+        db.commit()
+    finally:
+        db.close()
+
+    por_cat = {c["nome"]: c
+               for c in api.painel(ANO)["economia"]["por_categoria"]}
+    assert "Serviço de manutenção" in por_cat
+    assert por_cat["Serviço de manutenção"]["economizado"] == pytest.approx(1000.0)
+
+
+def test_economia_ordenada_por_valor_economizado(api):
+    db = _db()
+    try:
+        db.executemany(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, categoria, valor_total_estimado,"
+            " valor_total_homologado, referencia, raw)"
+            " VALUES (?,?,?,?,?,?,?,?,0,'{}')",
+            [("D1#a", "D1", "111", ANO, "CADEIRA ESCOLAR", "Cat",
+              1000.0, 900.0),
+             ("D1#b", "D1", "111", ANO, "MESA ESCRITORIO", "Cat",
+              5000.0, 3000.0)])
+        db.commit()
+    finally:
+        db.close()
+
+    economizados = [f["economizado"]
+                    for f in api.painel(ANO)["economia"]["por_familia"]]
+    assert economizados == sorted(economizados, reverse=True)
+
+
 def test_filtro_de_orgao_nao_quebra_o_painel(api):
     """`contratacoes` e `itens` têm as duas uma coluna orgao_cnpj.
 

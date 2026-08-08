@@ -184,6 +184,37 @@ test("análise traz as três séries e o mapa de calor", async ({ page }) => {
   expect(await v.locator("svg polyline").count()).toBeGreaterThanOrEqual(3);
 });
 
+test("economia mostra o total do ano e os três agrupamentos",
+    async ({ page }) => {
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  const v = page.locator("#p-economia");
+  await expect(v).toContainText("Economizado em 2026");
+  await expect(v).toContainText("deságio médio");
+  await expect(v).toContainText("Economia por modalidade");
+  await expect(v).toContainText("Economia por família de item");
+  await expect(v).toContainText("Economia por categoria");
+  await expect(v.locator("svg rect").first()).toBeVisible();
+});
+
+test("economia fica lembrada como as outras subabas", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  const salvo = await page.evaluate(() => window.__chamadas
+    .find(c => c.metodo === "set_config" && c.k === "painel_vista"));
+  expect(salvo.v).toBe("economia");
+});
+
+test("botão de relatório da vista economia chama gerar_relatorio",
+    async ({ page }) => {
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  await page.locator("#economia-relatorio").click();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop());
+  expect(chamada.tipo).toBe("economia");
+  expect(chamada.params.ano).toBe(2026);
+  await expect(page.locator("#economia-status"))
+    .toContainText("aberto no navegador");
+});
+
 test("vigilância mostra medidores, funil e agenda", async ({ page }) => {
   await page.locator('.subabas button[data-vista="vigilancia"]').click();
   const v = page.locator("#p-vigilancia");
@@ -299,13 +330,13 @@ test("trocar o exercício recarrega o painel inteiro", async ({ page }) => {
   expect(chamada.ano).toBe("2025");
 });
 
-test("imprimir manda as três vistas ao documento", async ({ page }) => {
+test("imprimir manda as quatro vistas ao documento", async ({ page }) => {
   await page.locator("#btn-imprimir-painel").click();
   const chamada = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "imprimir_painel").pop());
   expect(chamada.tamanhos.map(t => t[0]))
-    .toEqual(["execucao", "analise", "vigilancia"]);
-  // as três vão com conteúdo, mesmo as que não estavam à vista
+    .toEqual(["execucao", "analise", "vigilancia", "economia"]);
+  // as quatro vão com conteúdo, mesmo as que não estavam à vista
   expect(chamada.tamanhos.every(([, tamanho]) => tamanho > 500)).toBe(true);
 });
 
@@ -425,12 +456,14 @@ test("número do hero cabe numa linha só na largura mínima da janela",
   // licitarium.py) "R$ 19,6 mi" quebrava em duas linhas dentro do card.
   // fonte virou clamp() — este teste confere que ela de fato encolheu o
   // bastante pra caber, e não só reduziu sem resolver.
+  // desde a vista Economia, mais de um ".card.hero" existe no DOM (as vistas
+  // ficam todas montadas, só ocultas) — escopado à vista à mostra
   await page.setViewportSize({ width: 900, height: 700 });
-  const numero = page.locator(".card.hero .n");
+  const numero = page.locator("#p-execucao .card.hero .n");
   const caixa = await numero.boundingBox();
   const linha = await numero.evaluate(
     el => parseFloat(getComputedStyle(el).lineHeight));
-  const hero = await page.locator(".card.hero").boundingBox();
+  const hero = await page.locator("#p-execucao .card.hero").boundingBox();
   expect(caixa.height).toBeLessThan(linha * 1.5);
   expect(caixa.width).toBeLessThanOrEqual(hero.width - 16);
 });

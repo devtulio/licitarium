@@ -166,7 +166,7 @@ intervalo entre elas para as conexões não voltarem em bloco e **reduz o númer
 de conexões simultâneas** ao perceber o portal sobrecarregado. O que falha fica
 registrado e é refeito na coleta seguinte.
 
-**Desempenho do Painel**: a consulta que alimenta as três visões custa ~120 ms
+**Desempenho do Painel**: a consulta que alimenta as quatro visões custa ~120 ms
 num acervo de 114 MB (3.360 contratações, 25 mil itens); montar e desenhar os
 gráficos, ~2 ms. A compactação do banco, que bloqueia leituras, só roda quando
 há mais de 5% do arquivo em espaço ocioso.
@@ -261,10 +261,11 @@ públicos; o Peculium guarda dados pessoais num cofre cifrado.
 
 ## Painel
 
-A tela inicial resume o exercício em gráficos, em três visões — **Execução**
-(como está o ano), **Análise** (o que mudou e onde concentra) e **Vigilância**
-(o que precisa de ação). Os alertas ficam acima das três e levam à lista já
-filtrada.
+A tela inicial resume o exercício em gráficos, em quatro visões — **Execução**
+(como está o ano), **Análise** (o que mudou e onde concentra), **Vigilância**
+(o que precisa de ação) e **Economia** (quanto foi economizado, por
+modalidade, família de item e categoria). Os alertas ficam acima das quatro e
+levam à lista já filtrada.
 
 Os gráficos são SVG desenhado pelo próprio programa — sem biblioteca e sem
 rede —, seguem um método com paleta validada para daltonismo e contraste, e

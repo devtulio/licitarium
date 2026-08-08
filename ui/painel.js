@@ -571,6 +571,15 @@ const DESENHO = {
                               P.dados.vigilancia.limite_compras, l),
   funil: (l) => grafFunil(P.dados.vigilancia.funil, l),
   agenda: (l) => grafAgenda(P.dados.vigilancia.agenda, l),
+  economia_modalidade: (l) => grafBarras(P.dados.economia.por_modalidade, {
+    valor: m => m.economizado || 0, rotulo: m => m.modalidade ?? "–",
+    sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}`}, l),
+  economia_familia: (l) => grafBarras(P.dados.economia.por_familia, {
+    valor: f => f.economizado || 0, rotulo: f => f.nome ?? "–",
+    sub: f => `${f.n} ${f.n === 1 ? "item" : "itens"}`}, l),
+  economia_categoria: (l) => grafBarras(P.dados.economia.por_categoria, {
+    valor: c => c.economizado || 0, rotulo: c => c.nome ?? "–",
+    sub: c => `${c.n} ${c.n === 1 ? "item" : "itens"}`}, l),
 };
 
 function desenharGraficos(raiz) {
@@ -706,10 +715,46 @@ function vistaVigilancia(d) {
             disso.`)}`;
 }
 
+function vistaEconomia(d) {
+  const e = d.economia, ano = d.ano;
+  const varEcon = e.economizado_anterior
+    ? (e.economizado / e.economizado_anterior - 1) * 100 : null;
+  return `
+  <div class="faixa f-3">
+    <div class="card hero">
+      <h3>Economizado em ${ano}</h3>
+      <div class="n">${compacto(e.economizado)}</div>
+      <div class="r">${varEcon == null ? `sem ${ano - 1} para comparar`
+        : `<span class="${varEcon >= 0 ? "up" : "down"}">${
+            varEcon >= 0 ? "▲" : "▼"} ${pct(Math.abs(varEcon), 0)}</span>
+           sobre ${ano - 1}${d.comparacao_parcial ? " no mesmo período" : ""}`}</div>
+    </div>
+    <div class="card kpiv"><div class="v">${pct(e.pct)}</div>
+      <div class="r">deságio médio</div>
+      <div class="r" style="margin-top:8px">${compacto(e.estimado)} estimados</div>
+    </div>
+    <div class="card kpiv"><div class="v">${compacto(e.homologado)}</div>
+      <div class="r">homologado no ano</div></div>
+  </div>
+  <div class="faixa f-3">
+    ${cartaoGraf("Economia por modalidade", "economia_modalidade")}
+    ${cartaoGraf("Economia por família de item", "economia_familia",
+             `Mesmo agrupamento do medidor de limite — radical de duas
+              palavras da descrição.`)}
+    ${cartaoGraf("Economia por categoria (PNCP)", "economia_categoria",
+             `Categoria como o próprio PNCP classificou o item.`)}
+  </div>
+  <div class="macoes">
+    <button class="btn ghost" id="economia-relatorio">Relatório de economia
+      e comparativos</button>
+    <span class="dim" id="economia-status"></span>
+  </div>`;
+}
+
 // ══ ciclo de vida ═════════════════════════════════════════════════════════
 
 const VISTAS = { execucao: "p-execucao", analise: "p-analise",
-                 vigilancia: "p-vigilancia" };
+                 vigilancia: "p-vigilancia", economia: "p-economia" };
 
 function mostrarVista() {
   for (const id of Object.values(VISTAS))
@@ -746,6 +791,17 @@ async function carregarPainel() {
   $("p-execucao").innerHTML = vistaExecucao(dados);
   $("p-analise").innerHTML = vistaAnalise(dados);
   $("p-vigilancia").innerHTML = vistaVigilancia(dados);
+  $("p-economia").innerHTML = vistaEconomia(dados);
+  $("economia-relatorio")?.addEventListener("click", async () => {
+    const botao = $("economia-relatorio");
+    botao.disabled = true;
+    $("economia-status").textContent = "Gerando…";
+    const r = await api.gerar_relatorio("economia",
+      { ano: dados.ano, orgao: $("p-orgao").value || null });
+    botao.disabled = false;
+    $("economia-status").textContent = r.ok ? "Relatório aberto no navegador"
+                                             : (r.erro || "Falha ao gerar");
+  });
   desenharGraficos();
 }
 
@@ -824,7 +880,7 @@ $("painel").querySelectorAll(".subabas button").forEach(b =>
 // do acervo, órgãos monitorados.
 async function prepararPainel(estadoInicial) {
   const vista = estadoInicial?.painel_vista;
-  if (vista && ["execucao", "analise", "vigilancia"].includes(vista)) {
+  if (vista && ["execucao", "analise", "vigilancia", "economia"].includes(vista)) {
     P.vista = vista;
     $("painel").querySelectorAll(".subabas button").forEach(b =>
       b.classList.toggle("on", b.dataset.vista === vista));
@@ -851,7 +907,8 @@ $("btn-imprimir-painel").addEventListener("click", async () => {
   try {
     const vistas = [["execucao", $("p-execucao").innerHTML],
                     ["analise", $("p-analise").innerHTML],
-                    ["vigilancia", $("p-vigilancia").innerHTML]];
+                    ["vigilancia", $("p-vigilancia").innerHTML],
+                    ["economia", $("p-economia").innerHTML]];
     await api.imprimir_painel(vistas, P.dados.ano);
   } finally {
     botao.disabled = false;

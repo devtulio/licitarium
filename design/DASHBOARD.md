@@ -3,17 +3,18 @@
 O Painel é a primeira tela do programa. Cada número dele vira decisão de quem
 assina processo, então as escolhas abaixo são regra, não estilo.
 
-## Por que três vistas, e não uma tela só
+## Por que quatro vistas, e não uma tela só
 
-Três perguntas diferentes, três leituras diferentes:
+Quatro perguntas diferentes, quatro leituras diferentes:
 
 | Vista | Pergunta | Não serve para |
 |---|---|---|
 | **Execução** | como está o ano | achar padrão |
 | **Análise** | o que mudou e onde concentra | decidir o que fazer hoje |
 | **Vigilância** | o que exige ação agora | medir desempenho |
+| **Economia** | quanto foi economizado, e onde | acompanhar o andamento do ano |
 
-Amontoar as três numa página só produziria a tela que ninguém lê.
+Amontoar as quatro numa página só produziria a tela que ninguém lê.
 
 **Os alertas ficam acima das subabas**, sempre visíveis: alerta que só aparece
 depois de escolher a subaba certa não alerta ninguém. Cada chip leva à lista
@@ -455,3 +456,40 @@ limpando tudo primeiro (é reset completo por definição, não um critério).
 `filtros_disponiveis()`'s `unidades`, que é global ao acervo (achado ao
 revisar: um seletor de fornecedor com escopo global teria centenas de
 opções irrelevantes pra maioria das buscas).
+
+## Quarta vista: Economia (2026-08-08)
+
+Primeiro passo de um pedido maior do usuário (preparar o sistema para
+venda a prefeituras pequenas, com foco em relatórios de economia e
+comparativo sobre os dados da própria prefeitura — arquitetura local,
+sem servidor, decidida à parte). Até aqui só existia um número solto de
+economia (estimado − homologado do ano inteiro, no Resumo Executivo);
+nada por categoria, família ou comparado ano a ano.
+
+**Sem round-trip extra**: a seção `economia` entra dentro de
+`dados_painel`, a mesma consulta única que já serve as outras três
+vistas — o comentário da função já explicava por quê ("a ponte JS custa
+mais que a consulta"). Os totais do ano vêm de graça de
+`executivo["cards"]` (já calculados por `dados_contratacoes`); só duas
+coisas novas vão ao banco: `SUM(valor_estimado)` a mais na consulta do
+ano anterior (para a comparação, mesmo corte de `comparacao_parcial` já
+usado em Execução) e uma consulta em `itens` para família/categoria.
+
+**Por modalidade reaproveita `desagios`**: a mesma lista que a vista
+Análise já usa para o deságio %, só que agora guardando também
+`estimado`/`homologado`/`economizado` em vez de descartar `r[2]`/`r[3]`
+depois de calcular o `pct`.
+
+**Por família de item usa `pca_builder.chave_agrupamento`**, o mesmo
+agrupador do medidor de limite de fracionamento (`dados_fracionamento`'s
+`por_objeto`) — nenhuma taxonomia nova. Por categoria agrupa pelo campo
+cru que o próprio PNCP já manda por item (`categoria`, com
+`material_servico` como reserva quando vem vazio) — não existe, e não foi
+criada, nenhuma classificação própria de categoria no Licitarium.
+
+**Entra na impressão do Painel de graça**: `imprimir_painel` só embrulha
+o HTML que a tela já desenhou (`render_painel`, relatorios.py) — nenhum
+gráfico novo em Python foi escrito para isso. Só o relatório avulso
+("Economia e Comparativos", gerável sem abrir o Painel) precisou de porte
+próprio, reaproveitando `_grafico_barras` — já genérico o bastante para
+os três agrupamentos, sem nenhum SVG novo.
