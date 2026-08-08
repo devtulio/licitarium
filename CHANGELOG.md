@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.15.3 — 2026-08-08
+
+**Largura da página: regra global, não mais teto fixo em pixels**
+
+- Achado do usuário comparando Painel e Contratações lado a lado na mesma
+  janela Expandida: o Painel usava a tela toda, mas a lista parava num
+  teto de 1.600px — inconsistente. Regra virou global e relativa:
+  **Compacta = metade da largura da janela, Expandida = a janela
+  inteira**, para o `<main>` inteiro (Painel) e para as listas igual — sem
+  número escolhido a dedo.
+- Piso de 1.000px na Compacta: 50% puro derrubava a largura útil para
+  450px na janela mínima do programa (900px) — abaixo do que a barra de
+  filtros e os 5 chips de alerta do Painel precisam para caber numa linha
+  só. O piso só entra em jogo abaixo de ~2.000px de janela.
+
+263 pytest + 113 E2E.
+
 ## 1.15.2 — 2026-08-08
 
 **Três achados do usuário na aba Preços**

@@ -726,20 +726,30 @@ test("largura de coluna guardada antes de a aba mudar não quebra a lista",
   expect(await page.evaluate(() => larguras.itens)).toBeUndefined();
 });
 
-test("lista não estica sem limite na largura Expandida",
+test("Compacta é metade da janela, Expandida é a janela inteira",
     async ({ page }) => {
-  // achado da auditoria (m2, 2026-08-08): Expandida solta o teto do <main>
-  // inteiro; sem um teto próprio, a coluna Objeto (elástica) herdava toda
-  // a sobra e virava um vão vazio enorme em monitor largo (medido: ~1614px
-  // de vão a 2560px de janela). Com o teto na lista, o vão não cresce mais
-  // depois de um ponto — mediu 498px tanto a 1920px quanto a 2560px.
+  // pedido do usuário (2026-08-08): a lista tinha teto próprio em pixels
+  // (m2: 1400px, depois 1600px) enquanto o <main> do Painel não tinha
+  // nenhum — o usuário viu a inconsistência comparando os dois lado a
+  // lado na mesma janela Expandida. Regra virou global e relativa: metade
+  // da janela em Compacta, a janela inteira em Expandida, pro <main> e
+  // pra lista igual — sem teto fixo escolhido a dedo. Piso de 1000px
+  // (janela larga o bastante aqui pra não entrar em jogo).
+  await page.setViewportSize({ width: 2400, height: 900 });
+  const compacta = await page.locator("main").evaluate(
+    el => el.getBoundingClientRect().width);
+  expect(compacta).toBeCloseTo(1200, 0);           // 50vw de 2400px
+
   await page.evaluate(() => { document.documentElement.dataset.largura = "expandida"; });
+  const mainExpandida = await page.locator("main").evaluate(
+    el => el.getBoundingClientRect().width);
+  expect(mainExpandida).toBeCloseTo(2400, 0);       // 100% da janela
+
+  // a lista segue a mesma regra do main, sem teto próprio
   await abrirLista(page, "contratos");
-  await page.setViewportSize({ width: 1920, height: 900 });
-  const l1920 = await page.locator("#lista").evaluate(el => el.getBoundingClientRect().width);
-  await page.setViewportSize({ width: 2560, height: 900 });
-  const l2560 = await page.locator("#lista").evaluate(el => el.getBoundingClientRect().width);
-  expect(l2560).toBeCloseTo(l1920, 0);
+  const listaExpandida = await page.locator("#lista").evaluate(
+    el => el.getBoundingClientRect().width);
+  expect(listaExpandida).toBeGreaterThan(2300);
 });
 
 test("filtros que mudam o cálculo se destacam dos que só filtram a lista",

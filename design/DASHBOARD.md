@@ -357,3 +357,28 @@ passa) — não só passa com a correção presente.
   margem de fora e aumenta o vão de dentro, não tem valor que zere os
   dois. 1.600px é o meio-termo medido, não uma correção completa: quem
   quiser mais folga ainda vai ver alguma margem em monitor muito largo.
+  **Substituído pela regra abaixo** — o usuário comparou Painel × lista na
+  mesma janela e viu que o teto próprio da lista já não fazia sentido.
+
+## Largura da página: regra global, não teto fixo (2026-08-08)
+
+O ajuste acima (1.600px) resolvia a lista sozinha, mas o usuário comparou
+Painel e Contratações lado a lado, na mesma janela Expandida: o Painel
+(`<main>` sem teto) ia até a borda; a lista parava em 1.600px e sobrava uma
+faixa vazia que o Painel não tinha. Pediu a regra explícita: **Compacta =
+metade da largura da janela, Expandida = a janela inteira** — para as duas
+telas, não um número de pixels escolhido por medição.
+
+- `main { max-width:max(50vw, 1000px); }` — 50% da janela em Compacta,
+  com piso de 1.000px. Sem o piso, a janela mínima do pywebview (900px,
+  `licitarium.py`) derrubaria o conteúdo útil para 450px — menos do que a
+  barra de filtros e os 5 chips de alerta do Painel precisam para caber
+  numa linha só (teste `os 5 alertas possíveis cabem numa linha só`,
+  `painel.spec.js`). O piso só pesa abaixo de ~2.000px de janela.
+- `[data-largura="expandida"] main { max-width:none; }` — 100%, sem
+  mudança (já era assim).
+- **A lista perdeu o teto próprio** (`[data-largura="expandida"] .lista`,
+  1.400px→1.600px→removido): agora só segue o `<main>`, igual ao Painel.
+  O vão depois do texto do Objeto que o achado m2 apontou volta a existir
+  em monitor muito largo — decisão que passou a ser explícita do usuário
+  (largura = tela toda), não escondida atrás de um teto arbitrário.
