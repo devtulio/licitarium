@@ -521,6 +521,73 @@ def test_economia_por_categoria_usa_material_servico_quando_falta_categoria(api)
     assert por_cat["Serviço de manutenção"]["economizado"] == pytest.approx(1000.0)
 
 
+def test_economia_por_fornecedor_agrupa_pelo_documento(api):
+    """A mesma empresa aparece com grafias diferentes entre processos — o
+    agrupamento é pelo `ni` (CNPJ/CPF), não pelo nome."""
+    db = _db()
+    try:
+        db.executemany(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, fornecedor_ni, fornecedor_nome,"
+            " valor_total_estimado, valor_total_homologado, referencia, raw)"
+            " VALUES (?,?,?,?,?,?,?,?,?,0,'{}')",
+            [("D1#f1", "D1", "111", ANO, "PAPEL A4", "111222",
+              "PAPELARIA CENTRAL LTDA", 5000.0, 4000.0),
+             # mesmo CNPJ, grafia diferente: tem de somar na mesma linha
+             ("D2#f1", "D2", "111", ANO, "CANETA", "111222",
+              "Papelaria Central Ltda ME", 3000.0, 2500.0),
+             ("P1#f1", "P1", "111", ANO, "MERENDA", "999888",
+              "ALIMENTOS SA", 2000.0, 1900.0)])
+        db.commit()
+    finally:
+        db.close()
+
+    por_forn = {f["ni"]: f
+                for f in api.painel(ANO)["economia"]["por_fornecedor"]}
+    assert len(por_forn) == 2
+    central = por_forn["111222"]
+    assert central["n"] == 2
+    assert central["estimado"] == pytest.approx(8000.0)
+    assert central["economizado"] == pytest.approx(1500.0)
+    assert central["pct"] == pytest.approx(18.75)
+
+
+def test_economia_por_fornecedor_ignora_item_sem_fornecedor(api):
+    """Item sem `ni` não é atribuível a ninguém — fica de fora do ranking,
+    em vez de virar uma linha "(sem fornecedor)" que ninguém pode cobrar."""
+    db = _db()
+    try:
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, fornecedor_ni, fornecedor_nome,"
+            " valor_total_estimado, valor_total_homologado, referencia, raw)"
+            " VALUES ('D1#x','D1','111',?,'ITEM ÓRFÃO',NULL,NULL,"
+            " 9000.0,1000.0,0,'{}')", (ANO,))
+        db.commit()
+    finally:
+        db.close()
+
+    assert api.painel(ANO)["economia"]["por_fornecedor"] == []
+
+
+def test_economia_por_fornecedor_ordenada_por_valor_economizado(api):
+    db = _db()
+    try:
+        db.executemany(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, fornecedor_ni, fornecedor_nome,"
+            " valor_total_estimado, valor_total_homologado, referencia, raw)"
+            " VALUES (?,?,?,?,?,?,?,?,?,0,'{}')",
+            [("D1#o1", "D1", "111", ANO, "A", "1", "POUCO", 1000.0, 900.0),
+             ("D1#o2", "D1", "111", ANO, "B", "2", "MUITO", 9000.0, 4000.0)])
+        db.commit()
+    finally:
+        db.close()
+
+    ranking = api.painel(ANO)["economia"]["por_fornecedor"]
+    assert [f["nome"] for f in ranking] == ["MUITO", "POUCO"]
+
+
 def test_economia_series_acumula_estimado_menos_homologado(api):
     """Mesmo padrão da série de Análise (acumulado de 3 exercícios), mas
     seguindo a regra dos KPIs de economia: estimado menos homologado sobre

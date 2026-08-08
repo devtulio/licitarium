@@ -582,12 +582,13 @@ def dados_painel(db, ano, orgao=None, limites=None):
     # consulta só em `itens` alimenta as duas listas
     itens_economia = [dict(r) for r in db.execute(
         f"""SELECT descricao, COALESCE(categoria, material_servico) categoria,
+                   fornecedor_ni, fornecedor_nome,
                    valor_total_estimado est, valor_total_homologado hom
               FROM itens
              WHERE referencia=0 AND ano=? AND valor_total_estimado > 0
                AND valor_total_homologado IS NOT NULL{og}""",
         [ano] + og_args)]
-    por_familia, por_categoria = {}, {}
+    por_familia, por_categoria, por_fornecedor = {}, {}, {}
     for it in itens_economia:
         chave = pca_builder.chave_agrupamento(it["descricao"], palavras=2) \
             or "(sem descrição)"
@@ -602,13 +603,27 @@ def dados_painel(db, ano, orgao=None, limites=None):
         alvo_cat["n"] += 1
         alvo_cat["estimado"] += it["est"] or 0
         alvo_cat["homologado"] += it["hom"] or 0
-    for grupo in (por_familia, por_categoria):
+        # agrupa pelo documento, não pelo nome: a mesma empresa aparece com
+        # grafias diferentes entre processos (o `ni` é CNPJ ou CPF — ver
+        # `documento()`). Item sem fornecedor não é atribuível a ninguém.
+        if it["fornecedor_ni"]:
+            alvo_forn = por_fornecedor.setdefault(
+                it["fornecedor_ni"],
+                {"nome": it["fornecedor_nome"] or it["fornecedor_ni"],
+                 "ni": it["fornecedor_ni"], "n": 0,
+                 "estimado": 0.0, "homologado": 0.0})
+            alvo_forn["n"] += 1
+            alvo_forn["estimado"] += it["est"] or 0
+            alvo_forn["homologado"] += it["hom"] or 0
+    for grupo in (por_familia, por_categoria, por_fornecedor):
         for v in grupo.values():
             v["economizado"] = v["estimado"] - v["homologado"]
             v["pct"] = (1 - v["homologado"] / v["estimado"]) * 100 \
                 if v["estimado"] else 0
     por_familia = sorted(por_familia.values(), key=lambda o: -o["economizado"])
     por_categoria = sorted(por_categoria.values(), key=lambda o: -o["economizado"])
+    por_fornecedor = sorted(por_fornecedor.values(),
+                            key=lambda o: -o["economizado"])
 
     # concentração: quanto do valor está nos maiores fornecedores
     valores = [r[0] or 0 for r in db.execute(
@@ -745,6 +760,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
             "por_modalidade": desagios,
             "por_familia": por_familia[:10],
             "por_categoria": por_categoria[:10],
+            "por_fornecedor": por_fornecedor[:10],
             "series": {str(a): v for a, v in series_economia.items()},
         },
     }
@@ -1833,14 +1849,26 @@ def render_economia(d, municipio, uf, tema="pergaminho", brasao=None):
         rotulo=lambda c: c["nome"] or "–",
         sub=lambda c: f"{c['n']} {'item' if c['n'] == 1 else 'itens'}",
         cor="var(--s3)", larg=300)
+    graf_forn = _grafico_barras(
+        e["por_fornecedor"], valor=lambda f: f["economizado"] or 0,
+        rotulo=lambda f: f["nome"] or "–",
+        sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'} · "
+                      f"{f['pct']:.0f}%",
+        cor="var(--s4)", larg=900)
     charts = f"""<div class="faixa f-3">
 <div class="card"><h3>Por modalidade</h3>{graf_mod}</div>
 <div class="card"><h3>Por família de item</h3>{graf_fam}</div>
 <div class="card"><h3>Por categoria (PNCP)</h3>{graf_cat}</div>
-</div>"""
+</div>
+<div class="card"><h3>Por fornecedor — quem fechou abaixo do estimado</h3>
+{graf_forn}
+<div class="nota">Agrupado pelo CNPJ/CPF, não pelo nome — a mesma empresa
+aparece com grafias diferentes entre processos. Deságio alto não é atestado
+de bom fornecedor: pode ser estimativa inflada na origem.</div></div>"""
 
-    def _tabela(titulo_secao, coluna, linhas):
-        corpo_linhas = "".join(f"""<tr><td>{_e(l['nome'])}</td>
+    def _tabela(titulo_secao, coluna, linhas, rotulo=None):
+        corpo_linhas = "".join(f"""<tr>
+          <td>{rotulo(l) if rotulo else _e(l['nome'])}</td>
           <td class="num">{l['n']}</td>
           <td class="num">{moeda(l['estimado'])}</td>
           <td class="num">{moeda(l['homologado'])}</td>
@@ -1858,7 +1886,10 @@ def render_economia(d, municipio, uf, tema="pergaminho", brasao=None):
 {charts}
 {_tabela("Economia por modalidade", "Modalidade", mod_linhas)}
 {_tabela("Economia por família de item", "Família", e["por_familia"])}
-{_tabela("Economia por categoria (PNCP)", "Categoria", e["por_categoria"])}"""
+{_tabela("Economia por categoria (PNCP)", "Categoria", e["por_categoria"])}
+{_tabela("Economia por fornecedor", "Fornecedor", e["por_fornecedor"],
+         rotulo=lambda f: f"{_e(f['nome'])}<br>"
+                          f"<small>{_e(documento(f['ni']))}</small>")}"""
     titulo = f"{TITULOS['economia']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
                    paisagem=True, tema=tema, estilo_extra=_css_painel(tema),

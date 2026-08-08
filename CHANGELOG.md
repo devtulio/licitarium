@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.19.0 — 2026-08-08
+
+**Ranking de fornecedores por deságio**
+
+Fecha a vista Economia: além de modalidade, família de item e categoria,
+agora também **quem fechou abaixo do estimado** — na tela e no relatório
+avulso, com tabela completa e o documento mascarado (CNPJ ou CPF, pelo
+número de dígitos).
+
+- **Agrupa pelo CNPJ/CPF, não pelo nome** — a mesma empresa aparece com
+  grafias diferentes entre processos; item sem fornecedor fica de fora do
+  ranking em vez de virar uma linha "(sem fornecedor)" que ninguém pode
+  cobrar.
+- **Nenhuma consulta nova**: a mesma leitura de `itens` que já alimentava
+  família e categoria ganhou dois campos e um terceiro agrupamento.
+- **Ressalva junto do número**, na tela e no papel: deságio alto não é
+  atestado de bom fornecedor — pode ser estimativa inflada na origem.
+
+312 pytest + 131 E2E. Cada agrupamento com teste que morde sem ele.
+
 ## 1.18.0 — 2026-08-08
 
 **Brasão do município nos relatórios**

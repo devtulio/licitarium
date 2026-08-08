@@ -205,6 +205,19 @@ test("economia traz a série acumulada de 3 exercícios", async ({ page }) => {
     .toBeGreaterThanOrEqual(3);
 });
 
+test("economia traz o ranking de fornecedores por deságio", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  const cartao = page.locator(
+    '#p-economia .card:has([data-graf="economia_fornecedor"])');
+  await expect(cartao).toContainText("quem fechou abaixo do estimado");
+  // o mais econômico lidera, com quantidade e % ao lado do nome
+  const rotulos = cartao.locator("svg text.rot");
+  await expect(rotulos.first()).toContainText("23 itens");
+  await expect(rotulos.first()).toContainText("16%");
+  // a ressalva anda junto do número: deságio alto pode ser estimativa inflada
+  await expect(cartao).toContainText("estimativa inflada");
+});
+
 test("economia fica lembrada como as outras subabas", async ({ page }) => {
   await page.locator('.subabas button[data-vista="economia"]').click();
   const salvo = await page.evaluate(() => window.__chamadas

@@ -581,6 +581,10 @@ const DESENHO = {
     valor: c => c.economizado || 0, rotulo: c => c.nome ?? "–",
     sub: c => `${c.n} ${c.n === 1 ? "item" : "itens"}`}, l),
   economia_series: (l) => grafSeries(P.dados.economia.series, P.dados.ano, l),
+  economia_fornecedor: (l) => grafBarras(P.dados.economia.por_fornecedor, {
+    valor: f => f.economizado || 0,
+    rotulo: f => fornecedorCurto(f.nome) ?? "–",
+    sub: f => `${f.n} ${f.n === 1 ? "item" : "itens"} · ${pct(f.pct, 0)}`}, l),
 };
 
 function desenharGraficos(raiz) {
@@ -748,6 +752,12 @@ function vistaEconomia(d) {
     ${cartaoGraf("Economia por categoria (PNCP)", "economia_categoria",
              `Categoria como o próprio PNCP classificou o item.`)}
   </div>
+  ${cartaoGraf("Economia por fornecedor — quem fechou abaixo do estimado",
+           "economia_fornecedor",
+           `Agrupado pelo CNPJ/CPF, não pelo nome — a mesma empresa aparece
+            com grafias diferentes entre processos. Deságio alto não é
+            atestado de bom fornecedor: pode ser estimativa inflada na
+            origem. Leia junto com a pesquisa de preços.`)}
   <div class="macoes">
     <button class="btn ghost" id="economia-relatorio">Relatório de economia
       e comparativos</button>

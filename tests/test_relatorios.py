@@ -114,6 +114,28 @@ def test_gerar_economia_com_itens_traz_familia_no_documento_e_no_csv(db, tmp_pat
     assert "Alimentação" in html            # tabela por categoria
 
 
+def test_economia_lista_fornecedores_com_documento_mascarado(db, tmp_path):
+    """CNPJ e CPF convivem no `niFornecedor` do PNCP — a máscara é escolhida
+    pelo número de dígitos (`documento()`), nunca aplicada às cegas."""
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
+        " fornecedor_ni, fornecedor_nome, valor_total_estimado,"
+        " valor_total_homologado, referencia, raw)"
+        " VALUES (?,?,2026,?,?,?,?,?,0,'{}')",
+        [("A#1", "A", "MERENDA", "11222333000144", "ALIMENTOS SA",
+          100.0, 80.0),
+         ("A#2", "A", "CONSULTORIA", "12345678901", "JOSE DA SILVA",
+          50.0, 45.0)])
+    db.commit()
+    r = relatorios.gerar(db, "economia", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Economia por fornecedor" in html
+    assert "11.222.333/0001-44" in html          # CNPJ, 14 dígitos
+    assert "123.456.789-01" in html              # CPF, 11 dígitos
+    # o de maior economia vem primeiro na tabela
+    assert html.index("ALIMENTOS SA") < html.index("JOSE DA SILVA")
+
+
 def test_sem_brasao_configurado_mantem_o_estandarte(db, tmp_path):
     r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP", tmp_path)
     html = Path(r["html"]).read_text(encoding="utf-8")
