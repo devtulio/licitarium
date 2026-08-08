@@ -1265,8 +1265,18 @@ $("rel-gerar").addEventListener("click", async () => {
 });
 
 // ── municípios de referência (banco de preços) ────────────────────────────
+// backend já devolve por tamanho desc (o padrão); nome/itens são reordenados
+// aqui — lista é pequena (poucas dezenas), não vale ida ao banco por critério
+const ORDENS_REFERENCIA = {
+  tamanho: (a, b) => (b.mb || 0) - (a.mb || 0),
+  nome: (a, b) => a.nome.localeCompare(b.nome, "pt-BR"),
+  itens: (a, b) => (b.itens || 0) - (a.itens || 0),
+};
+$("ref-ordem").addEventListener("change", renderReferencia);
+
 async function renderReferencia() {
   const lista = await api.listar_municipios_referencia();
+  lista.sort(ORDENS_REFERENCIA[$("ref-ordem").value]);
   // mesmo formato dos órgãos monitorados logo acima: nome, identificação
   // embaixo e o controle à direita
   $("cfg-referencia").innerHTML = lista.map(m =>

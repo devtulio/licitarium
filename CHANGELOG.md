@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.3 — 2026-08-08
+
+**Municípios de referência: ordem escolhível**
+
+- Seletor "Ordenar por" acima da lista: tamanho em disco (padrão), nome
+  (A-Z) ou nº de preços no banco. Reordena na hora, sem ida ao servidor —
+  a lista já veio inteira.
+
+254 pytest + 111 E2E.
+
 ## 1.14.2 — 2026-08-08
 
 **Municípios de referência: lista ordenada do maior para o menor**

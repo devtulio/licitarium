@@ -646,6 +646,35 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
   await expect(secao).toContainText("Paulo de Faria");
 });
 
+test("municípios de referência: seletor de ordem reordena a lista",
+    async ({ page }) => {
+  // pedido do usuário (2026-08-08): tamanho é o padrão, mas nome e nº de
+  // preços também precisam estar disponíveis — nomes escolhidos de propósito
+  // pra que ordem alfabética, por tamanho e por nº de preços discordem
+  await page.evaluate(() => {
+    window.__referencia = [
+      { ibge: "1", nome: "Zeta", uf: "SP", itens: 5,   mb: 20 },
+      { ibge: "2", nome: "Alfa", uf: "SP", itens: 50,  mb: 1 },
+      { ibge: "3", nome: "Meia", uf: "SP", itens: 500, mb: 8 },
+    ];
+  });
+  await page.locator("#btn-config").click();
+  const nomes = () => page.locator("#cfg-referencia .orgrow")
+    .evaluateAll(els => els.map(el => el.querySelector("span")
+      .firstChild.textContent.trim().replace(" — SP", "")));
+
+  // as três ordens dão as três permutações abaixo, de propósito — se uma
+  // reordenação virar no-op ou copiar outro critério, o teste morde
+  await expect(page.locator("#ref-ordem")).toHaveValue("tamanho");
+  expect(await nomes()).toEqual(["Zeta", "Meia", "Alfa"]);      // 20 > 8 > 1
+
+  await page.locator("#ref-ordem").selectOption("nome");
+  expect(await nomes()).toEqual(["Alfa", "Meia", "Zeta"]);      // A-Z
+
+  await page.locator("#ref-ordem").selectOption("itens");
+  expect(await nomes()).toEqual(["Meia", "Alfa", "Zeta"]);      // 500 > 50 > 5
+});
+
 test("aba Preços mostra a origem e permite ficar só com o município",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="itens"]').click();
