@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.17.2 — 2026-08-08
+
+**Economia ganha o comparativo de 3 exercícios**
+
+Continuação da vista Economia (v1.17.0): gráfico de linha com a economia
+acumulada (estimado − homologado) do ano corrente contra os dois
+anteriores, mês a mês — mesmo padrão já usado na vista Análise para o
+valor homologado acumulado, e a mesma consulta (um `SELECT` a mais por
+ano, não uma consulta nova).
+
+298 pytest + 125 E2E. Teste que morde sem a série.
+
 ## 1.17.1 — 2026-08-08
 
 **Adicionar órgão manualmente confere o CNPJ no PNCP antes de aceitar**

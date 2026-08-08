@@ -196,6 +196,15 @@ test("economia mostra o total do ano e os três agrupamentos",
   await expect(v.locator("svg rect").first()).toBeVisible();
 });
 
+test("economia traz a série acumulada de 3 exercícios", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  const v = page.locator("#p-economia");
+  await expect(v).toContainText("Economia acumulada");
+  // uma linha por exercício comparado, mesmo padrão da série de Análise
+  expect(await v.locator('[data-graf="economia_series"] svg polyline').count())
+    .toBeGreaterThanOrEqual(3);
+});
+
 test("economia fica lembrada como as outras subabas", async ({ page }) => {
   await page.locator('.subabas button[data-vista="economia"]').click();
   const salvo = await page.evaluate(() => window.__chamadas

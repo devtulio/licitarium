@@ -539,21 +539,29 @@ def dados_painel(db, ano, orgao=None, limites=None):
              for m in range(1, 13)]
 
     # ── análise: acumulado do ano e dos dois anteriores, mês a mês
-    series = {}
+    # a mesma consulta serve à série de homologado (análise) e à de
+    # economia (economia): um SELECT a mais (valor_estimado) em vez de
+    # duas idas ao banco por ano
+    series, series_economia = {}, {}
     for a in (ano - 2, ano - 1, ano):
         # mesma regra do gráfico mensal: acumulado de homologado é só do
         # que foi efetivamente homologado
-        por_mes = {r[0]: r[1] or 0 for r in db.execute(
+        por_mes = {r[0]: (r[1] or 0, r[2] or 0) for r in db.execute(
             f"""SELECT CAST(substr(data_publicacao,6,2) AS INTEGER),
-                       SUM(valor_homologado)
+                       SUM(valor_homologado), SUM(valor_estimado)
                 FROM contratacoes
                 WHERE referencia=0 AND ano=? AND data_publicacao IS NOT NULL{og}
                 GROUP BY 1""", [a] + og_args)}
-        acumulado, total = [], 0
+        acumulado, acumulado_economia = [], []
+        total, total_economia = 0, 0
         for m in range(1, 13):
-            total += por_mes.get(m, 0)
+            hom, est = por_mes.get(m, (0, 0))
+            total += hom
             acumulado.append(total)
+            total_economia += est - hom
+            acumulado_economia.append(total_economia)
         series[a] = acumulado
+        series_economia[a] = acumulado_economia
 
     # deságio por modalidade: quanto o certame economizou sobre o estimado
     desagios = []
@@ -737,6 +745,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
             "por_modalidade": desagios,
             "por_familia": por_familia[:10],
             "por_categoria": por_categoria[:10],
+            "series": {str(a): v for a, v in series_economia.items()},
         },
     }
 

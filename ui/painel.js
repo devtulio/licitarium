@@ -580,6 +580,7 @@ const DESENHO = {
   economia_categoria: (l) => grafBarras(P.dados.economia.por_categoria, {
     valor: c => c.economizado || 0, rotulo: c => c.nome ?? "–",
     sub: c => `${c.n} ${c.n === 1 ? "item" : "itens"}`}, l),
+  economia_series: (l) => grafSeries(P.dados.economia.series, P.dados.ano, l),
 };
 
 function desenharGraficos(raiz) {
@@ -736,6 +737,9 @@ function vistaEconomia(d) {
     <div class="card kpiv"><div class="v">${compacto(e.homologado)}</div>
       <div class="r">homologado no ano</div></div>
   </div>
+  ${cartaoGraf(`Economia acumulada — ${ano - 2} a ${ano}`, "economia_series",
+           `O ano corrente em destaque; os anteriores ficam como contexto —
+            a comparação é com o mesmo mês, não com o total do ano.`)}
   <div class="faixa f-3">
     ${cartaoGraf("Economia por modalidade", "economia_modalidade")}
     ${cartaoGraf("Economia por família de item", "economia_familia",

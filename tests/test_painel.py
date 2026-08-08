@@ -521,6 +521,25 @@ def test_economia_por_categoria_usa_material_servico_quando_falta_categoria(api)
     assert por_cat["Serviço de manutenção"]["economizado"] == pytest.approx(1000.0)
 
 
+def test_economia_series_acumula_estimado_menos_homologado(api):
+    """Mesmo padrão da série de Análise (acumulado de 3 exercícios), mas
+    seguindo a regra dos KPIs de economia: estimado menos homologado sobre
+    todo o exercício, sem exigir que o processo já tenha fechado."""
+    e = api.painel(ANO)["economia"]
+    assert sorted(e["series"]) == [str(ANO - 2), str(ANO - 1), str(ANO)]
+    atual = e["series"][str(ANO)]
+    assert len(atual) == 12
+    assert atual[0] == pytest.approx(90000.0)    # jan: P2, sem homologação
+    assert atual[1] == pytest.approx(93000.0)    # fev: + D1 (30.000-27.000)
+    assert atual[2] == pytest.approx(173000.0)   # mar: + D2 (0) + P1 (80.000)
+    assert atual[11] == pytest.approx(173000.0)  # acumulado não decresce
+    anterior = e["series"][str(ANO - 1)]
+    assert anterior[2] == 0                      # antes de abril, nada
+    assert anterior[3] == pytest.approx(2000.0)  # D3: 20.000-18.000
+    assert anterior[11] == pytest.approx(2000.0)
+    assert e["series"][str(ANO - 2)][11] == 0    # exercício sem dados
+
+
 def test_economia_ordenada_por_valor_economizado(api):
     db = _db()
     try:
