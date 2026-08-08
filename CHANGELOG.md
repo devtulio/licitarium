@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.2 — 2026-08-08
+
+**Municípios de referência: lista ordenada do maior para o menor**
+
+- Pedido do usuário: a listagem em Configurações agora vem por tamanho em
+  disco decrescente, não por nome — quem mais pesa no acervo é quem mais
+  interessa ver primeiro.
+
+254 pytest + 110 E2E.
+
 ## 1.14.1 — 2026-08-08
 
 **Os cinco achados restantes da auditoria de design, corrigidos**

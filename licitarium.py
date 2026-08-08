@@ -27,7 +27,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.14.1"
+VERSAO = "1.14.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -627,7 +627,8 @@ class Api:
                           + (SELECT COALESCE(SUM(LENGTH(c.raw)),0)
                              FROM contratacoes c
                              WHERE c.municipio_ibge = m.ibge) bytes_raw
-                   FROM municipios_referencia m ORDER BY m.nome""").fetchall()
+                   FROM municipios_referencia m
+                   ORDER BY bytes_raw DESC, m.nome""").fetchall()
             return [{"ibge": r["ibge"], "nome": r["nome"], "uf": r["uf"],
                      "itens": r["itens"],
                      "mb": round(r["bytes_raw"] * pncp.FATOR_DISCO / 1e6, 1)}

@@ -334,6 +334,28 @@ def test_municipio_de_referencia_sem_dados_nao_ocupa_nada(api):
     assert m["itens"] == 0 and m["mb"] == 0
 
 
+def test_municipios_de_referencia_vem_do_maior_para_o_menor(api):
+    """Ordem padrão é por tamanho em disco, não por nome — pedido do usuário:
+    quem tira o maior peso do acervo é quem mais interessa ver primeiro."""
+    # ordem alfabética (Palestina < Paulo de Faria) é o OPOSTO da ordem de
+    # tamanho aqui de propósito — se a query voltar a ordenar por nome, o
+    # teste morde mesmo sem olhar coincidência de alfabeto
+    api.adicionar_municipio_referencia("3536604", "Paulo de Faria", "SP")
+    api.adicionar_municipio_referencia("3535002", "Palestina", "SP")
+    db = _db()
+    try:
+        db.execute("UPDATE itens SET municipio_ibge='3536604',"
+                   " raw=? WHERE referencia=1", ("x" * 3_000_000,))
+        db.execute("UPDATE contratacoes SET municipio_ibge='3535002',"
+                   " raw=? WHERE referencia=1", ("x" * 500_000,))
+        db.commit()
+    finally:
+        db.close()
+
+    nomes = [m["nome"] for m in api.listar_municipios_referencia()]
+    assert nomes == ["Paulo de Faria", "Palestina"]
+
+
 # Medição de 2026-08-02: contratações e MB de arquivo de cada município de
 # referência já coletado. O MB veio de remover o município de uma cópia do
 # acervo e comparar o arquivo depois de VACUUM.
