@@ -108,6 +108,22 @@ def test_estatisticas_de_preco_trazem_dispersao_e_apontam_o_extremo(api):
     assert s["maximo"] > s["limite_sup"]
 
 
+def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path):
+    """Pedido do usuário (2026-08-08): os 6 números (mín/Q1/mediana/média/
+    Q3/máx) já apareciam em texto — o gráfico (caixa de Tukey) mostra a
+    distância entre mediana e média num olhar só, sem obrigar a ler os
+    números e fazer a conta de cabeça. I7 (R$ 1.490,00) é o extremo real
+    desta fixture, então tem de acender o aviso de "fora da faixa"."""
+    db = licitarium.abrir_db()
+    r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
+                         "T", "SP", tmp_path)
+    db.close()
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert html.count("<svg") >= 1
+    assert "faixa entre Q1 e Q3" in html
+    assert "fora da faixa esperada" in html
+
+
 def test_item_descartado_sai_da_conta_e_refaz_a_analise(api):
     antes = api.estatisticas_preco("papel a4")
     depois = api.estatisticas_preco("papel a4", excluidos=["I7"])

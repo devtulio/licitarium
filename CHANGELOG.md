@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.15.1 — 2026-08-08
+
+**Os três achados do levantamento de relatórios, corrigidos**
+
+- **Alerta de Fracionamento ganha o medidor de limite** — o mesmo gráfico
+  do Painel (barra cheia = limite, ultrapassar vira "×o limite" em vez de
+  esconder a gravidade numa barra do tamanho da de 100%), acima da tabela
+  que já existia.
+- **Pesquisa de Preços ganha a caixa de dispersão (Tukey)** — mín/Q1/
+  mediana/média/Q3/máx num olhar só, com aviso quando o mínimo ou o
+  máximo está fora da faixa esperada. A distância entre mediana e média,
+  que já era descrita em texto, agora também aparece visualmente.
+- **Minuta do PCA mostra a curva ABC** — o cálculo já existia
+  (`pca_builder.classificar_abc`, usado pela tela de Montar PCA) e nunca
+  aparecia no documento. Coluna ABC por item + resumo ("N itens classe A
+  = X% do valor") dizendo onde a revisão rende mais.
+
+260 pytest + 111 E2E.
+
 ## 1.15.0 — 2026-08-08
 
 **Relatórios em paisagem por padrão; resumo executivo reformulado com os gráficos do Painel**

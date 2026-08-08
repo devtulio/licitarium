@@ -164,6 +164,23 @@ def test_fracionamento(db, tmp_path):
     assert r["csv"] and Path(r["csv"]).exists()
 
 
+def test_fracionamento_tem_o_medidor_de_limite(db, tmp_path):
+    """Pedido do usuário (2026-08-08): a tabela já tinha o farol em texto
+    ("ACIMA DO LIMITE"/"Atenção") — o gráfico (porta de
+    ui/painel.js:grafLimites) mostra a distância até lá num olhar só, com
+    "×o limite" acima de 100% em vez de uma barra do tamanho da de 100%
+    escondendo a gravidade."""
+    db.execute("UPDATE contratacoes SET modalidade_id=8, unidade='Sec. Adm'"
+               " WHERE ano=2026")
+    db.commit()
+    r = relatorios.gerar(db, "fracionamento", {"ano": 2026, "limites":
+                         {"compras": 100}}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert html.count("<svg") >= 1
+    assert "2,8× o limite" in html      # 280/100
+    assert "var(--erro)" in html        # cor de estouro
+
+
 def test_relatorio_imprime_no_mesmo_tema_da_tela(db, tmp_path):
     """Achado do usuário (2026-08-08): o relatório saía sempre em pergaminho
     na impressão, mesmo com outro tema ativo na tela (ex.: Portal). Agora
@@ -202,6 +219,31 @@ def test_executivo_usa_os_graficos_do_painel(db, tmp_path):
     assert 'class="card hero"' in html
     assert 'class="card kpiv"' in html
     assert "Por modalidade — valor homologado" in html
+
+
+def test_minuta_pca_mostra_a_curva_abc():
+    """Pedido do usuário (2026-08-08): pca_builder.classificar_abc já rodava
+    dentro de listar_minuta e alimentava a tela de Montar PCA, mas a classe
+    nunca aparecia no documento impresso — só a lista crua de itens."""
+    d = {"ano": 2027, "parametros": {"margem": 10},
+         "totais": {"grupos": 3, "valor": 1000.0},
+         "itens": [
+             {"descricao": "Item A", "categoria": "Material", "unidade": "UN",
+              "quantidade": 1, "valor_unitario": 800.0, "valor_total": 800.0,
+              "abc": "A"},
+             {"descricao": "Item B", "categoria": "Material", "unidade": "UN",
+              "quantidade": 1, "valor_unitario": 150.0, "valor_total": 150.0,
+              "abc": "B"},
+             {"descricao": "Item C", "categoria": "Material", "unidade": "UN",
+              "quantidade": 1, "valor_unitario": 50.0, "valor_total": 50.0,
+              "abc": "C"},
+         ]}
+    html = relatorios.render_minuta_pca(d, "T", "SP")
+    assert "Curva ABC" in html
+    assert "1 item classe A = 80% do valor" in html
+    assert "1 item classe B = 15% do valor" in html
+    assert "1 item classe C = 5% do valor" in html
+    assert '<th class="ctr" title="Curva ABC' in html
 
 
 def test_tipo_desconhecido(db, tmp_path):

@@ -177,6 +177,99 @@ def _grafico_barras(itens, valor, rotulo, cor, larg=900, sub=None):
     return _svg(larg, len(itens) * linha + 6, g)
 
 
+def _grafico_limites(unidades, larg=760):
+    """Medidor por unidade × limite do art. 75 — porta de
+    ui/painel.js:grafLimites. A barra cheia diz "chegou ao limite"; passar
+    dele é gravidade diferente, e "874%" numa barra do tamanho da de 100%
+    esconderia isso — por isso o texto vira "×o limite" acima de 100%."""
+    if not unidades:
+        return '<div class="vazio">Nenhuma dispensa registrada no exercício.</div>'
+    bloco = 66
+    g = ""
+    for i, u in enumerate(unidades):
+        y = i * bloco + 16
+        cheio = larg - 60
+        pct = u.get("pct") or 0
+        w = min(1, pct / 100) * cheio
+        estourou = pct > 100
+        cor = ("var(--erro)" if pct >= 90 else
+               "var(--warn)" if pct >= 75 else "var(--s3)")
+        texto_pct = (f"{pct / 100:.1f}".replace(".", ",") + "× o limite"
+                     if estourou else f"{pct:.0f}% do limite")
+        g += (f'<text class="rot" x="0" y="{y - 4}">{_e(u["unidade"])} · '
+              f'{u["n"]} {"dispensa" if u["n"] == 1 else "dispensas"}</text>'
+              f'<rect x="0" y="{y}" width="{cheio:.1f}" height="14" rx="4"'
+              f' fill="var(--surface2)"/>'
+              f'<rect x="0" y="{y}" width="{max(3, w):.1f}" height="14" rx="4"'
+              f' fill="{cor}"/>')
+        if estourou:
+            g += (f'<path d="M{cheio - 1:.1f},{y - 3} l10,10 l-10,10 z"'
+                  f' fill="var(--erro)"/>')
+        g += (f'<text class="val" x="0" y="{y + 30}">{moeda(u["total"])} · '
+              f'<tspan fill="{cor}" font-weight="600">{texto_pct}</tspan>'
+              f'</text>')
+    return _svg(larg, len(unidades) * bloco + 6, g)
+
+
+def _grafico_dispersao(r, fmt, larg=800):
+    """Caixa (Tukey) do preço unitário: mín/Q1/mediana/Q3/máx num olhar só,
+    com a média marcada à parte — a distância entre as duas é o que a
+    prosa ao lado já explica em texto, o gráfico só torna visível sem
+    obrigar a ler seis números. Exige q1/q3 (resumo_estatistico só calcula
+    com n >= MINIMO_PARA_DISPERSAO).
+    ponytail: rótulos podem colidir se os valores estiverem muito
+    próximos entre si — sem anti-colisão aqui (a agenda do Painel tem um
+    caso real disso, este ainda não; adicionar se aparecer com dado real)."""
+    if r.get("q1") is None:
+        return ""
+    minimo, maximo = r["minimo"], r["maximo"]
+    if maximo == minimo:
+        return ""
+    margem = 70
+    largura_util = larg - 2 * margem
+
+    def x(v):
+        return margem + (v - minimo) / (maximo - minimo) * largura_util
+
+    y_caixa, alt_caixa = 22, 28
+    meio = y_caixa + alt_caixa / 2
+    fora_inf = minimo < r["limite_inf"]
+    fora_sup = maximo > r["limite_sup"]
+    cor_min = "var(--erro)" if fora_inf else "var(--suave)"
+    cor_max = "var(--erro)" if fora_sup else "var(--suave)"
+    g = (f'<line x1="{x(minimo):.1f}" y1="{meio}" x2="{x(maximo):.1f}"'
+         f' y2="{meio}" stroke="var(--borda)"/>'
+         f'<line x1="{x(minimo):.1f}" y1="{y_caixa}" x2="{x(minimo):.1f}"'
+         f' y2="{y_caixa + alt_caixa}" stroke="{cor_min}" stroke-width="2"/>'
+         f'<line x1="{x(maximo):.1f}" y1="{y_caixa}" x2="{x(maximo):.1f}"'
+         f' y2="{y_caixa + alt_caixa}" stroke="{cor_max}" stroke-width="2"/>'
+         f'<rect x="{x(r["q1"]):.1f}" y="{y_caixa}"'
+         f' width="{max(2, x(r["q3"]) - x(r["q1"])):.1f}" height="{alt_caixa}"'
+         f' fill="var(--s1)" opacity=".22" stroke="var(--s1)"/>'
+         f'<line x1="{x(r["mediana"]):.1f}" y1="{y_caixa}"'
+         f' x2="{x(r["mediana"]):.1f}" y2="{y_caixa + alt_caixa}"'
+         f' stroke="var(--s1)" stroke-width="2.5"/>'
+         f'<circle cx="{x(r["media"]):.1f}" cy="{meio:.1f}" r="4.5"'
+         f' fill="var(--s2)"/>')
+    for v, nome, cor in ((minimo, "menor", cor_min), (r["q1"], "Q1", "var(--suave)"),
+                        (r["mediana"], "mediana", "var(--s1)"),
+                        (r["media"], "média", "var(--s2)"),
+                        (r["q3"], "Q3", "var(--suave)"),
+                        (maximo, "maior", cor_max)):
+        g += (f'<text class="rot" x="{x(v):.1f}" y="{y_caixa + alt_caixa + 16}"'
+              f' text-anchor="middle" fill="{cor}">{nome}</text>'
+              f'<text class="val" x="{x(v):.1f}" y="{y_caixa + alt_caixa + 30}"'
+              f' text-anchor="middle" fill="{cor}">{fmt(v)}</text>')
+    legenda = ('<div class="leg"><span><i style="background:var(--s1)">'
+              '</i>faixa entre Q1 e Q3</span>'
+              '<span><i style="background:var(--s2)"></i>média</span>')
+    if fora_inf or fora_sup:
+        legenda += ('<span><i style="background:var(--erro)"></i>'
+                    'fora da faixa esperada (Tukey)</span>')
+    legenda += "</div>"
+    return _svg(larg, y_caixa + alt_caixa + 40, g) + legenda
+
+
 def url_pncp(cnpj, ano, sequencial):
     """Página do processo no portal — a mesma que o programa abre na tela.
 
@@ -1245,6 +1338,7 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
 <div class="card"><div class="n">{moeda(d['total'])}</div><div class="l">total em dispensas</div></div>
 </div>
 <h2>Soma de dispensas por unidade × limite de compras/serviços</h2>
+<div class="card">{_grafico_limites(d["unidades"])}</div>
 <table><thead><tr><th>Unidade</th><th class="num">Dispensas</th>
 <th class="num">Total</th><th class="num">% do limite</th>
 <th class="ctr">Situação</th></tr></thead>
@@ -1256,7 +1350,7 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
                    f"Exercício {d['ano']} · uso interno", paisagem=True,
-                   tema=tema)
+                   tema=tema, estilo_extra=_css_painel(tema))
 
 
 def render_minuta_pca(d, municipio, uf, tema="pergaminho"):
@@ -1267,7 +1361,8 @@ def render_minuta_pca(d, municipio, uf, tema="pergaminho"):
       <td class="ctr">{_e(l['unidade'])}</td>
       <td class="num">{l['quantidade'] or 0:.2f}</td>
       <td class="num">{moeda(l['valor_unitario'])}</td>
-      <td class="num">{moeda(l['valor_total'])}</td></tr>"""
+      <td class="num">{moeda(l['valor_total'])}</td>
+      <td class="ctr">{f"<b>{l['abc']}</b>" if l['abc'] == 'A' else l['abc']}</td></tr>"""
       for i, l in enumerate(d["itens"]))
     p = d.get("parametros") or {}
     base = {"media": "média dos exercícios", "ultimo": "último exercício",
@@ -1275,6 +1370,20 @@ def render_minuta_pca(d, municipio, uf, tema="pergaminho"):
                 p.get("base"), p.get("base", "—"))
     est = {"mediana": "mediana", "media": "média", "recente": "mais recente",
            "menor": "menor"}.get(p.get("estatistica"), p.get("estatistica", "—"))
+    # curva ABC (pca_builder.classificar_abc, já calculada em listar_minuta):
+    # onde vale gastar o tempo de revisão — poucos itens costumam responder
+    # pela maior parte do valor. Achado do usuário (2026-08-08): o cálculo já
+    # existia e alimentava a tela de Montar PCA, mas não aparecia no documento
+    abc = {}
+    valor_itens = sum(l["valor_total"] for l in d["itens"]) or 1
+    for l in d["itens"]:
+        c = abc.setdefault(l["abc"], {"n": 0, "valor": 0.0})
+        c["n"] += 1
+        c["valor"] += l["valor_total"]
+    linha_abc = " · ".join(
+        f"{abc[c]['n']} {'item' if abc[c]['n'] == 1 else 'itens'} classe {c}"
+        f" = {abc[c]['valor'] / valor_itens * 100:.0f}% do valor"
+        for c in ("A", "B", "C") if c in abc)
     corpo = f"""<div class="caixa-aviso"><b>Minuta para revisão.</b> Consolidação
 automática do que o município já contratou, segundo os registros do PNCP.
 Os itens publicados <b>não trazem código de catálogo</b> (CATMAT/CATSER),
@@ -1286,12 +1395,13 @@ pela <b>{est}</b> dos valores homologados.</div>
 <div class="card"><div class="n">{d['totais']['grupos']}</div><div class="l">itens no plano</div></div>
 <div class="card"><div class="n">{moeda(d['totais']['valor'])}</div><div class="l">valor estimado</div></div>
 <div class="card"><div class="n">{p.get('margem', '—')}%</div><div class="l">margem aplicada</div></div>
-</div>
+</div>{f'<p class="disp">Curva ABC — {linha_abc}. Classe A concentra 80% do valor, B os 15% seguintes: é onde a revisão rende mais.</p>' if linha_abc else ''}
 <h2>Itens da minuta</h2>
 <table><thead><tr><th class="num">#</th><th>Descrição</th>
 <th class="ctr">Tipo</th><th class="ctr">Unid.</th><th class="num">Quantidade</th>
-<th class="num">Unitário</th><th class="num">Total</th></tr></thead>
-<tbody>{linhas or '<tr><td colspan="7">Minuta vazia.</td></tr>'}</tbody></table>"""
+<th class="num">Unitário</th><th class="num">Total</th>
+<th class="ctr" title="Curva ABC: A concentra 80% do valor, B os 15% seguintes, C o resto">ABC</th></tr></thead>
+<tbody>{linhas or '<tr><td colspan="8">Minuta vazia.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['minuta_pca']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
                    paisagem=True, tema=tema)
@@ -1382,6 +1492,9 @@ def render_precos(d, municipio, uf, tema="pergaminho"):
             f'<p class="disp">{faixa}Desvio padrão <b>{moeda(r["desvio"])}</b>'
             f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
             f' ({_LEITURA_CV(r["cv"])}).</p>')
+        grafico = _grafico_dispersao(r, val)
+        if grafico:
+            cards += f'<div class="card">{grafico}</div>'
     coluna_conteudo = d.get("por_conteudo")
     coluna_corrigido = d.get("corrigido")
     linhas = "".join(f"""<tr>
@@ -1437,7 +1550,7 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 <tbody>{linhas}</tbody></table>{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
-                   tema=tema)
+                   tema=tema, estilo_extra=_css_painel(tema))
 
 
 def render_executivo(d, municipio, uf, tema="pergaminho"):

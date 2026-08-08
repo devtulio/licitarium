@@ -286,6 +286,30 @@ fornecedores, vigências a vencer) continuam abaixo dos gráficos, sem corte —
 um documento oficial precisa do número exato, o gráfico é para o primeiro
 olhar.
 
+## Os outros três relatórios (2026-08-08)
+
+Levantamento pedido pelo usuário sobre os relatórios que ainda não tinham
+gráfico nenhum — três achados, os três corrigidos na mesma sessão:
+
+- **Fracionamento** já tinha, na tabela, tudo que o medidor de limite do
+  Painel (`grafLimites`) precisa (`%` de cada unidade sobre o teto do art.
+  75). Portado como `_grafico_limites` — mesma barra cheia = limite, mesma
+  troca de "874% do limite" (esconderia a gravidade numa barra do tamanho
+  da de 100%) por "×o limite" acima de 100%.
+- **Preços** descrevia dispersão só em texto ("desvio padrão, coeficiente
+  de variação, amostra dispersa..."). `_grafico_dispersao` é uma caixa de
+  Tukey (mín–Q1–mediana–Q3–máx, média marcada à parte) construída a partir
+  do que `resumo_estatistico` já calculava — nenhuma consulta nova, só
+  parou de esconder o número em prosa.
+- **Minuta do PCA** já calculava a curva ABC (`pca_builder.classificar_abc`,
+  dentro de `listar_minuta`, usada pela tela de Montar PCA) e nunca
+  mostrava a classe no documento — corrigido com uma coluna e um resumo,
+  sem cálculo novo nenhum.
+
+Padrão que se repete nos três: o número ou o cálculo já existia em algum
+lugar do programa (tela, consulta, ou os dois); o achado nunca foi "falta
+uma estatística", foi "a estatística existe e não aparece no documento".
+
 ## Auditoria de design (2026-08-08)
 
 Primeira auditoria completa, nível profissional: 21+ screenshots (6 abas × 3
