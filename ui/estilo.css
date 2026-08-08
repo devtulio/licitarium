@@ -145,8 +145,22 @@ main { max-width:1000px; margin:0 auto; padding:18px 22px 30px; }
 .chip.info { background:color-mix(in srgb, var(--accent) 12%, transparent);
              color:var(--accent); border-color:
              color-mix(in srgb, var(--accent) 35%, transparent); }
+/* achado da auditoria de design (2026-08-08): a área clicável seguia a
+   altura da linha de texto (~16-18px) — não é bloqueio WCAG AA (alvo
+   mínimo de 44px é critério AAA, e o programa é de mouse, não de toque),
+   mas incomoda quem usa trackpad ou tem menos precisão de mira. O padding
+   engorda a área sem mudar o layout — o label já propaga o clique ao input */
 .check-filtro { display:flex; align-items:center; gap:6px; font-size:13px;
-                color:var(--muted); white-space:nowrap; }
+                color:var(--muted); white-space:nowrap;
+                padding:4px 2px; margin:-4px -2px; }
+/* achado da auditoria (m3, 2026-08-08): "Corrigir pelo IPCA" e "Comparar
+   por conteúdo" mudam o cálculo do resumo inteiro; os demais filtros da
+   barra só recortam a lista. Um leve fundo nos dois avisa a diferença sem
+   precisar de rótulo — sempre aparecem juntos (mesma condição ehItens). */
+#cx-corrigir, #cx-conteudo {
+  background:color-mix(in srgb, var(--accent) 10%, transparent);
+  padding-left:8px; padding-right:8px; border-radius:6px;
+}
 /* filtro que veio do clique num alerta do Painel — não tem caixa própria
    (é uma lista de objetos, não um liga/desliga), então precisa dizer que
    está ativo, senão a lista parece filtrada por modalidade sozinha */
@@ -177,6 +191,11 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 #btn-limpar { white-space:nowrap; }
 
 .lista { overflow:hidden; }
+/* achado da auditoria (m2, 2026-08-08): Expandida solta o teto do <main>
+   inteiro, mas numa lista a coluna elástica (Objeto/Descrição) é quem
+   herda toda a sobra — em telas largas ela vira um vão vazio depois do
+   texto em vez de ajudar em algo. Cabo só a lista, não o resto do main. */
+[data-largura="expandida"] .lista { max-width:1400px; margin:0 auto; }
 .linha { display:grid; gap:12px; padding:11px 16px; align-items:center;
          font-size:13px; cursor:pointer; border:none; background:none;
          width:100%; text-align:left; color:var(--text); }
@@ -435,8 +454,14 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .painel .card { padding:14px 16px; }
 .painel h3 { font-size:11.5px; color:var(--muted); font-weight:600;
              letter-spacing:.05em; text-transform:uppercase; margin-bottom:10px; }
-.hero .n { font-size:40px; font-weight:700; line-height:1.05;
-           font-variant-numeric:tabular-nums; }
+/* achado da auditoria de design (2026-08-08): "R$ 19,6 mi" quebrava com o
+   "mi" sozinho numa linha na largura mínima da janela (900px) — o número
+   mais importante da tela virava o com pior tipografia bem onde sobra
+   menos espaço. clamp() encolhe a fonte antes de precisar quebrar; medido
+   a 900px (card ~193px úteis) até 1440px (card ~340px). */
+.hero .n { font-size:clamp(26px, 2.5vw + 8px, 40px); font-weight:700;
+           line-height:1.05; font-variant-numeric:tabular-nums;
+           white-space:nowrap; }
 .hero .r, .kpiv .r { font-size:12px; color:var(--muted); margin-top:2px; }
 .kpiv .v { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
 .kpiv .r { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }

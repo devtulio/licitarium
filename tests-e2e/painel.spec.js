@@ -357,6 +357,27 @@ test("chips concordam em número", async ({ page }) => {
   await expect(chips.nth(4)).toContainText("processo sem resultado");
 });
 
+test("chip de processo parado não usa o mesmo ícone dos de vencimento",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08): ⏱ (vencendo) e ⏳ (parado)
+  // liam como a mesma família — "tempo passando" — pra conceitos opostos
+  await page.evaluate(() => {
+    window.__painel = { ...window.PAINEL_DADOS,
+      alertas: { perto_do_limite: 0, acima_do_limite: 0,
+                 vencendo_contratos: 1, vencendo_atas: 0,
+                 propostas: 0, paradas: 1 } };
+  });
+  await page.locator("#p-ano").selectOption({ index: 0 });
+  const iconeVencendo = await page.locator("#painel-chips .chip")
+    .filter({ hasText: "contrato vence" }).locator("b").first()
+    .evaluate(el => el.previousSibling.textContent.trim());
+  const iconeParado = await page.locator("#painel-chips .chip")
+    .filter({ hasText: "sem resultado" }).locator("b").first()
+    .evaluate(el => el.previousSibling.textContent.trim());
+  expect(iconeParado).not.toBe(iconeVencendo);
+  expect(iconeParado).not.toBe("⏳");
+});
+
 test("chips ficam com a mesma altura mesmo quando o texto quebra linha",
     async ({ page }) => {
   // "5 objetos acima do limite anual de dispensa" quebra em duas linhas
@@ -396,6 +417,22 @@ test("os 5 alertas possíveis cabem numa linha só até a largura mínima da jan
   // .chip.aviso abaixo (esse limiar frouxo já deixou o bug passar batido
   // uma vez — se voltar, este teste tem de morder de novo)
   for (const y of ys) expect(Math.abs(y - ys[0])).toBeLessThan(10);
+});
+
+test("número do hero cabe numa linha só na largura mínima da janela",
+    async ({ page }) => {
+  // achado da auditoria (m1, 2026-08-08): a 900px (min_size do pywebview,
+  // licitarium.py) "R$ 19,6 mi" quebrava em duas linhas dentro do card.
+  // fonte virou clamp() — este teste confere que ela de fato encolheu o
+  // bastante pra caber, e não só reduziu sem resolver.
+  await page.setViewportSize({ width: 900, height: 700 });
+  const numero = page.locator(".card.hero .n");
+  const caixa = await numero.boundingBox();
+  const linha = await numero.evaluate(
+    el => parseFloat(getComputedStyle(el).lineHeight));
+  const hero = await page.locator(".card.hero").boundingBox();
+  expect(caixa.height).toBeLessThan(linha * 1.5);
+  expect(caixa.width).toBeLessThanOrEqual(hero.width - 16);
 });
 
 test("chip.aviso não herda margin-top da classe .aviso genérica",

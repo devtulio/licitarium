@@ -241,3 +241,28 @@ documento é o mesmo que está na tela — redesenhar no Python seria uma segund
 implementação para divergir da primeira. `print-color-adjust: exact` impede o
 navegador de "economizar tinta" e devolver barras cinzentas; por ser vetorial,
 a saída não tem resolução de tela, e sim a da impressora.
+
+## Auditoria de design (2026-08-08)
+
+Primeira auditoria completa, nível profissional: 21+ screenshots (6 abas × 3
+temas + estados de borda — janela mínima, densidade expandida, modal, filtros
+ativos), cada achado visual conferido contra o código-fonte antes de entrar
+no relatório (dois candidatos caíram nessa conferência: um eixo do gráfico de
+deságio "sem rótulo" que só estava cortado fora do print, e uma "borda azul"
+de KPI que era o cursor do mouse do Playwright atravessando a tela, não um
+estado de hover real). Achados, por prioridade:
+
+| # | Achado | Onde | Corrigido em |
+|---|---|---|---|
+| C1 | Rótulos da agenda se sobrepunham em dias lotados | Painel · Vigilância | 1.14.0 |
+| M1 | Fornecedor/objeto truncado sem `title` | Painel + Contratos | 1.14.0 |
+| M2 | Barra de filtros quebrava sem folga vertical | Contratações, Preços | 1.14.0 |
+| M3 | Chip "parado" com o mesmo ícone dos de vencimento | Painel · Vigilância | 1.14.1 |
+| M4 | Área clicável dos filtros de caixinha = altura do texto | barra de filtros | 1.14.1 |
+| m1 | Número do hero quebrava em duas linhas na janela mínima | Painel · Execução | 1.14.1 |
+| m2 | Coluna Objeto crescia sem limite na largura Expandida | listas de tabela | 1.14.1 |
+| m3 | Filtros que mudam o cálculo sem hierarquia visual | aba Preços | 1.14.1 |
+
+Todos os oito, corrigidos e liberados. Cada fix tem teste E2E que morde sem a
+correção (`git diff` revertido, teste roda, falha; correção volta, teste
+passa) — não só passa com a correção presente.

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.14.1 — 2026-08-08
+
+**Os cinco achados restantes da auditoria de design, corrigidos**
+
+- **Chip "processo parado" tinha o mesmo ícone dos chips de vencimento.**
+  ⏳ (ampulheta) e ⏱ (relógio, usado nos dois chips de vencimento) leem
+  como "tempo passando" à primeira vista, mas dizem coisas opostas — prazo
+  chegando vs. processo sem movimento. Trocado por ⏸.
+- **Área clicável dos filtros de caixinha seguia a altura do texto**
+  (~16-18px) — não é bloqueio de acessibilidade (alvo mínimo de 44px é
+  critério AAA, e o programa é de mouse), mas incomodava em trackpad. Um
+  padding aumenta a área sem mudar o layout visível.
+- **Número do hero do Painel quebrava em duas linhas** ("R$ 19,6" numa
+  linha, "mi" sozinho na outra) na largura mínima da janela (900px,
+  `min_size` do pywebview) — o número mais importante da tela com a pior
+  tipografia bem onde sobra menos espaço. A fonte agora encolhe com
+  `clamp()` antes de precisar quebrar.
+- **Coluna Objeto/Descrição das listas crescia sem limite na largura
+  "Expandida"**, sobrando um vão vazio depois do texto em vez de ajudar em
+  algo (medido: ~1614px de vão a 2560px de janela). A lista agora tem teto
+  próprio (1400px), independente do resto da página.
+- **"Corrigir pelo IPCA" e "Comparar por conteúdo" disputavam espaço visual
+  com filtros comuns**, sem hierarquia — um muda o cálculo do resumo
+  inteiro, o outro só filtra a lista. Um leve fundo nos dois marca a
+  diferença sem precisar de rótulo.
+
+253 pytest + 110 E2E.
+
 ## 1.14.0 — 2026-08-08
 
 **Três achados da auditoria de design, corrigidos**

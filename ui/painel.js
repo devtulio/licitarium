@@ -784,7 +784,11 @@ function mostrarChips(a) {
     a.propostas === 1 ? "processo com proposta aberta"
                       : "processos com proposta aberta",
     () => irPara("contratacoes", {orgao, propostas: true})]);
-  if (a.paradas) chips.push(["", "⏳", a.paradas,
+  // achado da auditoria de design (2026-08-08): ⏳ (ampulheta) e ⏱ (relógio,
+  // usado nos dois chips de vencimento acima) lêem como "tempo passando" a
+  // um olhar rápido, mas dizem coisas opostas — prazo chegando vs processo
+  // parado. ⏸ lê como "parado" de propósito, sem competir com relógio.
+  if (a.paradas) chips.push(["", "⏸", a.paradas,
     a.paradas === 1 ? "processo sem resultado há mais de 90 dias"
                     : "processos sem resultado há mais de 90 dias",
     () => irPara("contratacoes", {ano: P.dados.ano, orgao, parada: true})]);

@@ -93,6 +93,17 @@ test("fileira de filtros tem folga vertical maior que a horizontal",
   expect(gap.linha).toBeGreaterThan(gap.coluna);
 });
 
+test("checkbox de filtro tem alvo de clique maior que a linha de texto",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08): a área clicável seguia a
+  // altura da linha de texto (13px de fonte, ~16-18px de área) — não é
+  // bloqueio WCAG AA (alvo de 44px é AAA), mas incomodava no trackpad
+  await abrirLista(page, "contratacoes");
+  const altura = await page.locator("#cx-propostas").evaluate(
+    el => el.getBoundingClientRect().height);
+  expect(altura).toBeGreaterThanOrEqual(24);
+});
+
 test("fornecedor da lista de contratos carrega o nome completo no title",
     async ({ page }) => {
   // achado da auditoria de design (2026-08-08) — mesmo padrão do Painel
@@ -684,4 +695,36 @@ test("largura de coluna guardada antes de a aba mudar não quebra a lista",
   expect(cols.split(" ").length).toBe(8);
   // o mapa incompatível é descartado, e não reaplicado na próxima troca
   expect(await page.evaluate(() => larguras.itens)).toBeUndefined();
+});
+
+test("lista não estica sem limite na largura Expandida",
+    async ({ page }) => {
+  // achado da auditoria (m2, 2026-08-08): Expandida solta o teto do <main>
+  // inteiro; sem um teto próprio, a coluna Objeto (elástica) herdava toda
+  // a sobra e virava um vão vazio enorme em monitor largo (medido: ~1614px
+  // de vão a 2560px de janela). Com o teto na lista, o vão não cresce mais
+  // depois de um ponto — mediu 498px tanto a 1920px quanto a 2560px.
+  await page.evaluate(() => { document.documentElement.dataset.largura = "expandida"; });
+  await abrirLista(page, "contratos");
+  await page.setViewportSize({ width: 1920, height: 900 });
+  const l1920 = await page.locator("#lista").evaluate(el => el.getBoundingClientRect().width);
+  await page.setViewportSize({ width: 2560, height: 900 });
+  const l2560 = await page.locator("#lista").evaluate(el => el.getBoundingClientRect().width);
+  expect(l2560).toBeCloseTo(l1920, 0);
+});
+
+test("filtros que mudam o cálculo se destacam dos que só filtram a lista",
+    async ({ page }) => {
+  // achado da auditoria (m3, 2026-08-08): "Corrigir pelo IPCA" e "Comparar
+  // por conteúdo" trocam o resumo inteiro; "Só do meu município" só filtra
+  // a lista — mesma aparência antes, sem hierarquia entre os dois grupos.
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  const cores = await page.evaluate(() => ({
+    corrigir: getComputedStyle($("cx-corrigir")).backgroundColor,
+    conteudo: getComputedStyle($("cx-conteudo")).backgroundColor,
+    soMeu: getComputedStyle($("cx-so-meu")).backgroundColor,
+  }));
+  expect(cores.corrigir).not.toBe(cores.soMeu);
+  expect(cores.conteudo).not.toBe(cores.soMeu);
+  expect(cores.corrigir).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 });
