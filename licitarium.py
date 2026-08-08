@@ -3,6 +3,7 @@
 Entry point: janela pywebview + banco SQLite + ponte Api exposta ao JS.
 A versão vigente é a constante VERSAO, logo abaixo — e só ela.
 """
+import base64
 import csv
 import json
 import shutil
@@ -27,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.17.2"
+VERSAO = "1.18.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -820,6 +821,50 @@ class Api:
         finally:
             db.close()
 
+    _MIME_BRASAO = {".png": "image/png", ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg"}
+
+    def carregar_brasao(self):
+        """Brasão do município, impresso no lugar do estandarte do
+        Licitarium no cabeçalho dos relatórios. Diálogo nativo, não upload
+        de navegador: o Python lê o arquivo direto do disco, nenhum byte
+        cruza a ponte JS (mesmo padrão de `importar_acervo`)."""
+        escolha = self._janela.create_file_dialog(
+            DIALOGO_ABRIR, file_types=("Imagens (*.png;*.jpg;*.jpeg)",))
+        if not escolha:
+            return {"ok": False, "erro": None}
+        caminho = Path(escolha if isinstance(escolha, str) else escolha[0])
+        mime = self._MIME_BRASAO.get(caminho.suffix.lower())
+        if not mime:
+            return {"ok": False,
+                    "erro": "formato não suportado — use PNG ou JPG"}
+        dados = caminho.read_bytes()
+        if len(dados) > 3 * 1024 * 1024:
+            return {"ok": False, "erro": "imagem muito grande (máx. 3 MB)"}
+        dataurl = f"data:{mime};base64,{base64.b64encode(dados).decode()}"
+        db = abrir_db()
+        try:
+            pncp._config(db, "brasao", dataurl)
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def remover_brasao(self):
+        db = abrir_db()
+        try:
+            db.execute("DELETE FROM config WHERE chave='brasao'")
+            db.commit()
+            return {"ok": True}
+        finally:
+            db.close()
+
+    def brasao(self):
+        db = abrir_db()
+        try:
+            return {"dataurl": pncp._config(db, "brasao")}
+        finally:
+            db.close()
+
     # ── listagem e detalhe ──────────────────────────────────────────────
 
     def listar(self, tipo, filtros=None, pagina=1):
@@ -1371,11 +1416,12 @@ class Api:
             municipio = pncp._config(db, "municipio_nome") or "Município"
             uf = pncp._config(db, "municipio_uf") or ""
             tema = pncp._config(db, "tema") or "portal"
+            brasao = pncp._config(db, "brasao")
         finally:
             db.close()
         html = relatorios.render_painel(
             [(str(n), str(h)) for n, h in (vistas or [])],
-            municipio, uf, ano or date.today().year, tema)
+            municipio, uf, ano or date.today().year, tema, brasao=brasao)
         destino = DIR_DADOS / "relatorios"
         destino.mkdir(parents=True, exist_ok=True)
         arquivo = destino / f"painel_{ano or date.today().year}.html"

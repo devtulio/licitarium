@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.17.2</title>
+<title>Manual Operacional — Licitarium v1.18.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.17.2 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.18.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -150,7 +150,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.17.2</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.18.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -165,7 +165,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.17.2.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.18.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -649,6 +649,14 @@ sincronização depois da remoção, quando o banco é compactado.</p>
 banco de preços. Contratos, atas e o PCA desses municípios não são baixados, e
 os órgãos deles não entram na lista de órgãos monitorados. Seus relatórios
 oficiais continuam sendo exclusivamente do seu município.</div>
+
+<h3>Brasão do município</h3>
+<p>Em Configurações, <b>Selecionar imagem</b> escolhe um arquivo PNG ou JPG
+de até 3 MB do computador (o Licitarium é programa de mesa: a escolha abre
+pelo diálogo nativo do Windows, não por upload de navegador). A partir daí,
+o brasão passa a aparecer no cabeçalho de <b>todo</b> relatório gerado — no
+lugar do estandarte romano do Licitarium, que continua assinando o rodapé
+do documento. <b>Remover</b> volta o cabeçalho ao estandarte.</p>
 
 <h3>Órgãos monitorados</h3>
 <p>Os órgãos do município (prefeitura, câmara, fundos, autarquias) são

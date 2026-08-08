@@ -1317,15 +1317,20 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
 
 
 def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
-            tema="pergaminho", papel="A4", estilo_extra=""):
+            tema="pergaminho", papel="A4", estilo_extra="", brasao=None):
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    # o brasão do município (Configurações) toma o lugar do estandarte do
+    # Licitarium na frente do documento — o produto continua assinado no
+    # rodapé ("LICITARIVM · SVB HASTA PVBLICA"), só quem imprime muda
+    marca = (f'<img src="{_e(brasao)}" alt="Brasão do município"'
+             f' style="height:88px;width:auto">' if brasao else ESTANDARTE)
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>{_e(titulo_doc)}</title>
 <style>{_css(paisagem, tema, papel)}{estilo_extra}</style></head><body>
 <div class="no-print"><button onclick="print()">🖨 Imprimir</button></div>
 <div class="pagina">
-<header>{ESTANDARTE}
+<header>{marca}
   <div><h1>{_e(titulo_doc)}</h1>
   <div class="meta">{_e(municipio)} — {_e(uf)} · {_e(periodo_txt)}<br>
   Fonte: Portal Nacional de Contratações Públicas (PNCP) · Lei 14.133/2021<br>
@@ -1337,7 +1342,8 @@ def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
 </div></body></html>"""
 
 
-def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho"):
+def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho",
+                        brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="ctr">{_e(l['modalidade_nome'])}</td>
@@ -1362,10 +1368,11 @@ def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho"):
 <td class="num">{moeda(t['homologado'])}</td><td></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratacoes']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema)
+                   tema=tema, brasao=brasao)
 
 
-def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho"):
+def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho",
+                     brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
                           or l['numero_controle'])}</td>
@@ -1386,10 +1393,11 @@ def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho"):
 <td class="num">{moeda(t['valor'])}</td><td colspan="2"></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratos']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema)
+                   tema=tema, brasao=brasao)
 
 
-def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho"):
+def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho",
+                brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
       <td class="ctr">{_e(l['contratacao_controle'])}</td>
@@ -1404,10 +1412,10 @@ def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho"):
 <tfoot><tr><td colspan="5">Total: {d['totais']['n']} atas</td></tr></tfoot></table>"""
     titulo = f"{TITULOS['atas']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema)
+                   tema=tema, brasao=brasao)
 
 
-def render_fracionamento(d, municipio, uf, tema="pergaminho"):
+def render_fracionamento(d, municipio, uf, tema="pergaminho", brasao=None):
     def farol(pct):
         if pct >= 100:
             return '<span class="farol-alerta">ACIMA DO LIMITE</span>'
@@ -1449,10 +1457,10 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
                    f"Exercício {d['ano']} · uso interno", paisagem=True,
-                   tema=tema, estilo_extra=_css_painel(tema))
+                   tema=tema, estilo_extra=_css_painel(tema), brasao=brasao)
 
 
-def render_minuta_pca(d, municipio, uf, tema="pergaminho"):
+def render_minuta_pca(d, municipio, uf, tema="pergaminho", brasao=None):
     linhas = "".join(f"""<tr>
       <td class="num">{i+1}</td>
       <td class="obj">{_e(l['descricao'])}</td>
@@ -1503,7 +1511,7 @@ pela <b>{est}</b> dos valores homologados.</div>
 <tbody>{linhas or '<tr><td colspan="8">Minuta vazia.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['minuta_pca']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
-                   paisagem=True, tema=tema)
+                   paisagem=True, tema=tema, brasao=brasao)
 
 
 def _desconsiderados_html(d):
@@ -1561,14 +1569,15 @@ def _LEITURA_CV(cv):
     return "amostra muito dispersa; confira a comparabilidade dos itens"
 
 
-def render_precos(d, municipio, uf, tema="pergaminho"):
+def render_precos(d, municipio, uf, tema="pergaminho", brasao=None):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
     if not r:
         corpo = (f'<div class="caixa-aviso">Nenhum item homologado encontrado '
                  f'para <b>{_e(d["termo"])}</b> no acervo local.</div>')
         return _pagina(f"{TITULOS['precos']} — {_e(d['termo'])}", corpo,
-                       municipio, uf, periodo, paisagem=True, tema=tema)
+                       municipio, uf, periodo, paisagem=True, tema=tema,
+                       brasao=brasao)
     # no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
     val = moeda_fina if d.get("por_conteudo") else moeda
     # "mediana por unidade" no modo por conteúdo; fora dele, os de sempre
@@ -1649,10 +1658,10 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 <tbody>{linhas}</tbody></table>{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
-                   tema=tema, estilo_extra=_css_painel(tema))
+                   tema=tema, estilo_extra=_css_painel(tema), brasao=brasao)
 
 
-def render_executivo(d, municipio, uf, tema="pergaminho"):
+def render_executivo(d, municipio, uf, tema="pergaminho", brasao=None):
     """Reformulado (2026-08-08, pedido do usuário) para usar os mesmos
     gráficos do Painel — hero com sparkline, colunas mensais pareadas e
     barras por modalidade — em vez de só tabelas. `d` é o retorno de
@@ -1768,10 +1777,11 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
 <tbody>{venc or '<tr><td colspan="5">Nada vence nos próximos 90 dias.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['executivo']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
-                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema))
+                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema),
+                   brasao=brasao)
 
 
-def render_economia(d, municipio, uf, tema="pergaminho"):
+def render_economia(d, municipio, uf, tema="pergaminho", brasao=None):
     """Quanto foi economizado no ano, por modalidade, família de item e
     categoria do PNCP. `d` é o retorno de `dados_painel` — mesmos números
     da vista Economia do Painel, num documento que se gera sem abrir o
@@ -1851,7 +1861,8 @@ def render_economia(d, municipio, uf, tema="pergaminho"):
 {_tabela("Economia por categoria (PNCP)", "Categoria", e["por_categoria"])}"""
     titulo = f"{TITULOS['economia']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
-                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema))
+                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema),
+                   brasao=brasao)
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
@@ -1939,7 +1950,7 @@ TITULOS_PAINEL = {"execucao": "Execução do exercício",
                   "economia": "Economia e comparativos"}
 
 
-def render_painel(vistas, municipio, uf, ano, tema="pergaminho"):
+def render_painel(vistas, municipio, uf, ano, tema="pergaminho", brasao=None):
     """Monta o painel impresso a partir do que a tela desenhou.
 
     Os gráficos não são redesenhados aqui: o SVG que vai ao papel é o mesmo
@@ -1952,7 +1963,7 @@ def render_painel(vistas, municipio, uf, ano, tema="pergaminho"):
         for nome, html in vistas if html)
     return _pagina(f"Painel — {municipio} — {ano}", corpo, municipio, uf,
                    f"Exercício {ano}", paisagem=True, tema=tema, papel="A3",
-                   estilo_extra=_css_painel(tema))
+                   estilo_extra=_css_painel(tema), brasao=brasao)
 
 
 def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
@@ -1966,18 +1977,23 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
     if orgao and params.get("orgao_nome"):
         municipio = f"{municipio} · {params['orgao_nome']}"
     destino.mkdir(parents=True, exist_ok=True)
+    # brasão do município (Configurações) — toma o lugar do estandarte no
+    # cabeçalho de todo documento gerado aqui, se tiver sido enviado
+    linha_brasao = db.execute(
+        "SELECT valor FROM config WHERE chave='brasao'").fetchone()
+    brasao = linha_brasao[0] if linha_brasao else None
     if tipo == "executivo":
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_executivo(d, municipio, uf, tema)
+        conteudo = render_executivo(d, municipio, uf, tema, brasao=brasao)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
     elif tipo == "economia":
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_economia(d, municipio, uf, tema)
+        conteudo = render_economia(d, municipio, uf, tema, brasao=brasao)
         nome = f"economia_comparativo_{ano}"
         linhas_csv = d["economia"]["por_familia"]
     elif tipo == "minuta_pca":
@@ -1990,7 +2006,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         d = {"ano": ano, "itens": itens,
              "totais": pca_builder.totais(itens),
              "parametros": json.loads(cfg[0]) if cfg else {}}
-        conteudo = render_minuta_pca(d, municipio, uf, tema)
+        conteudo = render_minuta_pca(d, municipio, uf, tema, brasao=brasao)
         nome = f"minuta_pca_{ano}"
         linhas_csv = [{k: i[k] for k in ("descricao", "unidade", "categoria",
                                          "quantidade", "valor_unitario",
@@ -2004,7 +2020,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
                          params.get("excluidos"),
                          params.get("por_conteudo"),
                          params.get("corrigir_ipca"))
-        conteudo = render_precos(d, municipio, uf, tema)
+        conteudo = render_precos(d, municipio, uf, tema, brasao=brasao)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"
         linhas_csv = d["linhas"]
@@ -2012,7 +2028,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         if not ano:
             ano = date.today().year
         d = dados_fracionamento(db, ano, orgao, params.get("limites"))
-        conteudo = render_fracionamento(d, municipio, uf, tema)
+        conteudo = render_fracionamento(d, municipio, uf, tema, brasao=brasao)
         nome = f"alerta_fracionamento_{ano}"
         linhas_csv = d["dispensas"]
     else:
@@ -2020,13 +2036,16 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
             if vigentes else (f"Exercício {ano}" if ano else "Todo o período")
         if tipo == "contratacoes":
             d = dados_contratacoes(db, ano, params.get("modalidade"), orgao)
-            conteudo = render_contratacoes(d, municipio, uf, periodo_txt, tema)
+            conteudo = render_contratacoes(d, municipio, uf, periodo_txt, tema,
+                                           brasao=brasao)
         elif tipo == "contratos":
             d = dados_contratos(db, ano, vigentes, orgao)
-            conteudo = render_contratos(d, municipio, uf, periodo_txt, tema)
+            conteudo = render_contratos(d, municipio, uf, periodo_txt, tema,
+                                        brasao=brasao)
         elif tipo == "atas":
             d = dados_atas(db, ano, vigentes, orgao)
-            conteudo = render_atas(d, municipio, uf, periodo_txt, tema)
+            conteudo = render_atas(d, municipio, uf, periodo_txt, tema,
+                                   brasao=brasao)
         else:
             raise ValueError(f"tipo de relatório desconhecido: {tipo}")
         sufixo = "vigentes" if vigentes else (str(ano) if ano else "completo")

@@ -300,6 +300,18 @@ function scriptPonte(temaBanco = "portal") {
       set_titulo: async t => {
         window.__chamadas.push({ metodo: "set_titulo", t }); return true; },
       listar_orgaos: async () => [],
+      brasao: async () => ({ dataurl: window.__brasao ?? null }),
+      carregar_brasao: async () => {
+        window.__chamadas.push({ metodo: "carregar_brasao" });
+        const r = window.__respostaCarregarBrasao ?? { ok: true };
+        if (r.ok) window.__brasao = "data:image/png;base64,QQ==";
+        return r;
+      },
+      remover_brasao: async () => {
+        window.__chamadas.push({ metodo: "remover_brasao" });
+        window.__brasao = null;
+        return { ok: true };
+      },
       listar_municipios_referencia: async () => window.__referencia,
       estimar_municipio_referencia: async (c) => {
         window.__chamadas.push({ metodo: "estimar_municipio_referencia", c });

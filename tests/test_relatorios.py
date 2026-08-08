@@ -114,6 +114,25 @@ def test_gerar_economia_com_itens_traz_familia_no_documento_e_no_csv(db, tmp_pat
     assert "Alimentação" in html            # tabela por categoria
 
 
+def test_sem_brasao_configurado_mantem_o_estandarte(db, tmp_path):
+    r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert 'viewBox="0 0 64 64"' in html          # o estandarte, sem trocar
+    assert "<img" not in html
+
+
+def test_com_brasao_configurado_ele_substitui_o_estandarte(db, tmp_path):
+    db.execute("INSERT INTO config (chave, valor) VALUES"
+               " ('brasao', 'data:image/png;base64,QQ==')")
+    db.commit()
+    r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert ('<img src="data:image/png;base64,QQ==" alt="Brasão do '
+            'município"') in html
+    assert 'viewBox="0 0 64 64"' not in html      # estandarte saiu do cabeçalho
+    assert "LICITARIVM" in html                   # mas segue no rodapé
+
+
 def test_filtro_orgao_nos_relatorios(db, tmp_path):
     db.execute("UPDATE contratacoes SET orgao_cnpj='111'")
     db.execute("UPDATE contratacoes SET orgao_cnpj='222'"

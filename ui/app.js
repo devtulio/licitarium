@@ -1649,6 +1649,8 @@ $("btn-config").addEventListener("click", async () => {
   const e = await api.get_estado();
   $("cfg-municipio").innerHTML = `${esc(e.municipio)} — ${esc(e.uf)}
     <small class="dim">(IBGE ${esc(e.ibge)})</small>`;
+  const brasao = await api.brasao();
+  mostrarBrasao(brasao.dataurl);
   const orgaos = await api.listar_orgaos();
   $("cfg-orgaos").innerHTML = orgaos.map(o =>
     `<div class="orgrow"><span>${esc(o.razao_social ?? o.cnpj)}
@@ -1670,6 +1672,26 @@ $("btn-config").addEventListener("click", async () => {
        : `<span style="color:var(--warn)">erro: ${esc(l.erro)}</span>`}</div>`)
     .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
   abrirModal("veu-config");
+});
+function mostrarBrasao(dataurl) {
+  const preview = $("cfg-brasao-preview");
+  preview.src = dataurl || "";
+  preview.classList.toggle("oculto", !dataurl);
+  $("btn-brasao-remover").classList.toggle("oculto", !dataurl);
+}
+$("btn-brasao-carregar").addEventListener("click", async () => {
+  const botao = $("btn-brasao-carregar");
+  botao.disabled = true;
+  $("brasao-status").textContent = "";
+  const r = await api.carregar_brasao();
+  botao.disabled = false;
+  if (r.ok) mostrarBrasao((await api.brasao()).dataurl);
+  else if (r.erro) $("brasao-status").textContent = r.erro;
+});
+$("btn-brasao-remover").addEventListener("click", async () => {
+  await api.remover_brasao();
+  mostrarBrasao(null);
+  $("brasao-status").textContent = "";
 });
 // máscara de dinheiro: digita só dígitos, exibe R$ formatado,
 // salva o valor numérico puro (dataset.valor)

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.18.0 — 2026-08-08
+
+**Brasão do município nos relatórios**
+
+Pedido do usuário, no espírito de deixar o sistema "mais institucional":
+em Configurações, subir o brasão do município (PNG/JPG, até 3 MB) e vê-lo
+impresso no cabeçalho de todo relatório gerado — no lugar do estandarte
+romano do Licitarium, que continua assinando o rodapé.
+
+- **Upload pelo diálogo nativo** (`create_file_dialog`, o mesmo mecanismo
+  de exportar/importar acervo) — programa de mesa não tem
+  `<input type="file">` de navegador; o Python lê o arquivo direto do
+  disco, nenhum byte cruza a ponte JS.
+- Guardado como Data URL no `config` (mesma tabela chave/valor de
+  tema/densidade/etc — nenhuma tabela nova), sem redimensionar.
+- **`brasao` atravessa toda `render_*` como `tema` já atravessa** —
+  qualquer relatório, e também o Painel A3 inteiro, mostra o brasão
+  quando configurado.
+
+308 pytest + 130 E2E. Cada método novo com teste que morde sem ele.
+
 ## 1.17.2 — 2026-08-08
 
 **Economia ganha o comparativo de 3 exercícios**

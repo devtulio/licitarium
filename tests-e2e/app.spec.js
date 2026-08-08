@@ -646,6 +646,63 @@ test("municípios de referência: lista, adiciona e remove", async ({ page }) =>
   await expect(secao).toContainText("Paulo de Faria");
 });
 
+test("brasão: sem upload, a tela abre sem preview nem botão de remover",
+    async ({ page }) => {
+  await page.locator("#btn-config").click();
+  await expect(page.locator("#cfg-brasao-preview")).toBeHidden();
+  await expect(page.locator("#btn-brasao-remover")).toBeHidden();
+});
+
+test("brasão: já configurado, a tela abre com a preview visível",
+    async ({ page }) => {
+  await page.evaluate(() => {
+    window.__brasao = "data:image/png;base64,QQ==";
+  });
+  await page.locator("#btn-config").click();
+  const preview = page.locator("#cfg-brasao-preview");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("src", "data:image/png;base64,QQ==");
+  await expect(page.locator("#btn-brasao-remover")).toBeVisible();
+});
+
+test("brasão: carregar mostra a preview e liga o botão de remover",
+    async ({ page }) => {
+  await page.locator("#btn-config").click();
+  await page.locator("#btn-brasao-carregar").click();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "carregar_brasao").pop());
+  expect(chamada).toBeTruthy();
+  await expect(page.locator("#cfg-brasao-preview")).toBeVisible();
+  await expect(page.locator("#btn-brasao-remover")).toBeVisible();
+});
+
+test("brasão: remover esconde a preview e o próprio botão",
+    async ({ page }) => {
+  await page.evaluate(() => {
+    window.__brasao = "data:image/png;base64,QQ==";
+  });
+  await page.locator("#btn-config").click();
+  await page.locator("#btn-brasao-remover").click();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "remover_brasao").pop());
+  expect(chamada).toBeTruthy();
+  await expect(page.locator("#cfg-brasao-preview")).toBeHidden();
+  await expect(page.locator("#btn-brasao-remover")).toBeHidden();
+});
+
+test("brasão: erro ao carregar aparece na tela, sem preview",
+    async ({ page }) => {
+  await page.evaluate(() => {
+    window.__respostaCarregarBrasao =
+      { ok: false, erro: "imagem muito grande (máx. 3 MB)" };
+  });
+  await page.locator("#btn-config").click();
+  await page.locator("#btn-brasao-carregar").click();
+  await expect(page.locator("#brasao-status"))
+    .toContainText("imagem muito grande");
+  await expect(page.locator("#cfg-brasao-preview")).toBeHidden();
+});
+
 test("municípios de referência: seletor de ordem reordena a lista",
     async ({ page }) => {
   // pedido do usuário (2026-08-08): tamanho é o padrão, mas nome e nº de
