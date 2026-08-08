@@ -158,6 +158,21 @@ test("execução mostra hero, colunas mensais e modalidades",
   await expect(v).toContainText("Por modalidade");
 });
 
+test("fornecedor truncado carrega o nome completo no title",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08): as duas tabelas cortam o
+  // nome com CSS ellipsis, mas sem title o nome completo não aparecia nem
+  // passando o mouse — a aba Preços já fazia certo, faltava aqui.
+  const v = page.locator("#p-execucao");
+  const linhaVencendo = v.locator("table").first().locator("td").first();
+  await expect(linhaVencendo).toHaveAttribute("title",
+    /RHC PRODUTOS E SERVIÇO LTDA/);
+  const linhaFornecedor = v.locator('table:has-text("Contratos")')
+    .locator("td").first();
+  await expect(linhaFornecedor).toHaveAttribute("title",
+    /RHC PRODUTOS E SERVIÇO LTDA/);
+});
+
 test("análise traz as três séries e o mapa de calor", async ({ page }) => {
   await page.locator('.subabas button[data-vista="analise"]').click();
   const v = page.locator("#p-analise");
@@ -404,6 +419,27 @@ test("chip.aviso não herda margin-top da classe .aviso genérica",
     els => els.map(el => Math.round(el.getBoundingClientRect().y)));
   // todos exatamente na mesma linha — sem a folga de 10px do teste acima
   for (const y of ys) expect(y).toBe(ys[0]);
+});
+
+test("rótulos da agenda nunca se sobrepõem, mesmo com vizinhos lotados",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08): o acervo de exemplo tem
+  // grupos de 11 e 12 fornecedores em dias vizinhos (8 e 23) — os dois
+  // rótulos, cada um já longo por causa do "+N", entravam um no outro.
+  // Medindo a caixa real de cada <text>, não só contando quantos apareceram.
+  await page.locator('.subabas button[data-vista="vigilancia"]').click();
+  await page.waitForTimeout(150);
+  const rotulos = page.locator('[data-graf="agenda"] svg text.val');
+  const caixas = await rotulos.evaluateAll(els => els
+    // só os rótulos de nome (o número dentro do círculo também é .val,
+    // mas tem font-weight:600 e y diferente — filtra pelo texto)
+    .filter(el => !/^\d+$/.test(el.textContent.trim()))
+    .map(el => el.getBoundingClientRect())
+    .map(r => ({ left: r.left, right: r.right, texto: "" }))
+    .sort((a, b) => a.left - b.left));
+  expect(caixas.length).toBeGreaterThan(1);
+  for (let i = 1; i < caixas.length; i++)
+    expect(caixas[i].left).toBeGreaterThanOrEqual(caixas[i - 1].right);
 });
 
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {

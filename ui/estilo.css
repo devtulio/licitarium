@@ -166,7 +166,13 @@ nav.abas button { padding:9px 16px; color:var(--muted); background:none; border:
 nav.abas button.on { color:var(--accent); font-weight:600;
                      border-bottom-color:var(--accent); }
 
-.filtros { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+/* achado da auditoria de design (2026-08-08): com muitos filtros (Contratações,
+   Preços) a fileira quebra em duas linhas em larguras comuns de janela, e a
+   segunda linha — que sobra com poucos itens — parecia desalinhada por estar
+   colada na primeira. gap vertical maior faz a quebra ler como duas fileiras
+   deliberadas, não como um acidente de largura. */
+.filtros { display:flex; column-gap:8px; row-gap:14px; margin-bottom:12px;
+           flex-wrap:wrap; align-items:center; }
 .filtros input[type=search] { flex:1; min-width:170px; }
 #btn-limpar { white-space:nowrap; }
 

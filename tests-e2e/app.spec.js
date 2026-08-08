@@ -79,6 +79,32 @@ test("lista renderiza e ordenação por clique manda ord/dir à ponte",
   expect(chamadas[1].filtros.dir).toBe("desc");
 });
 
+test("fileira de filtros tem folga vertical maior que a horizontal",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08): quando a barra quebra em
+  // duas linhas (Contratações, Preços — muitos filtros), a segunda linha
+  // colava na primeira e parecia um acidente de largura, não uma fileira
+  // deliberada. row-gap maior que column-gap separa as duas visualmente.
+  await abrirLista(page, "contratacoes");
+  const gap = await page.locator("#filtros-lista").evaluate(el => {
+    const s = getComputedStyle(el);
+    return { linha: parseFloat(s.rowGap), coluna: parseFloat(s.columnGap) };
+  });
+  expect(gap.linha).toBeGreaterThan(gap.coluna);
+});
+
+test("fornecedor da lista de contratos carrega o nome completo no title",
+    async ({ page }) => {
+  // achado da auditoria de design (2026-08-08) — mesmo padrão do Painel
+  await page.locator('nav.abas button[data-tipo="contratos"]').click();
+  // .dim aparece 3x por linha (nº do contrato, fornecedor, vigência) — o
+  // fornecedor é o segundo, dentro do mesmo span que o objeto
+  const fornecedor = page.locator(".linha:not(.cab)").first()
+    .locator(".dim").nth(1);
+  await expect(fornecedor).toHaveAttribute("title",
+    "DANILO HENRIQUE NUNES CONSULTORIA");
+});
+
 test("abas trocam colunas e detalhe abre ao clicar na linha",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="contratos"]').click();

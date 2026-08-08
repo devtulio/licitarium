@@ -476,8 +476,10 @@ function renderLinha(tipo, d) {
       <span style="justify-self:center">${badgeSituacao(d.situacao)}</span>`;
   if (tipo === "contratos")
     return `<span class="dim">${esc(numContrato(d))}</span>
-      <span><span class="obj">${esc(d.objeto ?? "–")}</span><br>
-        <span class="dim">${esc(d.fornecedor_nome ?? "")}</span></span>
+      <span><span class="obj" title="${esc(d.objeto ?? "")}">${
+        esc(d.objeto ?? "–")}</span><br>
+        <span class="dim" title="${esc(d.fornecedor_nome ?? "")}">${
+          esc(d.fornecedor_nome ?? "")}</span></span>
       <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
   if (tipo === "itens") {

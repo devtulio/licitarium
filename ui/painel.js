@@ -501,26 +501,40 @@ function grafAgenda(itens, larg = 1000) {
   [0, 30, 60, 90].forEach(d =>
     g += `<text class="rot" x="${x(d)}" y="${y + 30}" text-anchor="middle"
            >${d ? `+${d} dias` : "hoje"}</text>`);
-  let ultimoRotulo = -999;
+  // Largura estimada de cada caractere do rótulo (.val, 11px, maiúsculas —
+  // texto em caixa alta é mais largo por caractere que caixa mista comum).
+  // O rótulo é centralizado no ponto (text-anchor:middle), então a borda
+  // esquerda fica em cx - largura/2: é essa borda que não pode invadir a
+  // direita do rótulo anterior.
+  const PX_POR_CHAR = 6.4, MARGEM = 6;
+  let direitaUltimoRotulo = -Infinity;
   dias.forEach(d => {
     const grupo = porDia.get(d);
     const cor = d <= 15 ? "var(--erro)" : d <= 60 ? "var(--warn)" : "var(--s3)";
     const raio = Math.min(11, 6 + grupo.length);
     const lista = grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ");
-    g += `<circle cx="${x(d)}" cy="${y}" r="${raio}" fill="${cor}"
+    const cx = x(d);
+    g += `<circle cx="${cx}" cy="${y}" r="${raio}" fill="${cor}"
             ${dtip(`vence${grupo.length > 1 ? "m" : ""} em ${d} ${
               d === 1 ? "dia" : "dias"}`,
               `${lista} · ${dataBr(grupo[0].vigencia_fim)}`)}/>`;
     if (grupo.length > 1)
-      g += `<text class="val" x="${x(d)}" y="${y + 4}" text-anchor="middle"
+      g += `<text class="val" x="${cx}" y="${y + 4}" text-anchor="middle"
               fill="var(--accent-fg)" font-weight="600">${grupo.length}</text>`;
-    // um rótulo por vizinhança: sem isso os nomes se sobrepõem e nenhum se lê
-    if (x(d) - ultimoRotulo > 120) {
-      ultimoRotulo = x(d);
-      const nome = fornecedorCurto(grupo[0].nome) ?? grupo[0].tipo;
-      g += `<text class="val" x="${x(d)}" y="${y - raio - 8}"
-              text-anchor="middle">${esc(nome.slice(0, 22))}${
-                grupo.length > 1 ? ` +${grupo.length - 1}` : ""}</text>`;
+    // corta o nome no que couber sem tocar o rótulo anterior — em vez de um
+    // limiar fixo de pixels que não sabia quanto texto vinha depois, e por
+    // isso deixava nomes longos vizinhos se sobreporem e virarem ruído
+    const sufixo = grupo.length > 1 ? ` +${grupo.length - 1}` : "";
+    const espacoLivre = cx - direitaUltimoRotulo;
+    const larguraMax = 2 * (espacoLivre - MARGEM);
+    const charsCabem = Math.min(22,
+      Math.floor(larguraMax / PX_POR_CHAR) - sufixo.length);
+    if (charsCabem >= 3) {
+      const bruto = fornecedorCurto(grupo[0].nome) ?? grupo[0].tipo;
+      const nome = bruto.slice(0, charsCabem) + sufixo;
+      g += `<text class="val" x="${cx}" y="${y - raio - 8}"
+              text-anchor="middle">${esc(nome)}</text>`;
+      direitaUltimoRotulo = cx + (nome.length * PX_POR_CHAR) / 2;
     }
   });
   return svg(larg, y + 40, g);
@@ -634,8 +648,10 @@ function tabelaVencendo(itens) {
   return `<table><tr><th>Fornecedor / ata</th><th>Objeto</th>
     <th class="num">Vence</th></tr>` + itens.slice(0, 6).map(v => {
       const cls = (v.dias ?? 0) <= 15 ? "b" : (v.dias ?? 0) <= 60 ? "a" : "c";
-      return `<tr><td>${esc(fornecedorCurto(v.nome) ?? "–")}</td>
-        <td>${esc((v.objeto ?? "–").slice(0, 40))}</td>
+      return `<tr><td title="${esc(v.nome ?? "")}">${
+        esc(fornecedorCurto(v.nome) ?? "–")}</td>
+        <td title="${esc(v.objeto ?? "")}">${
+          esc((v.objeto ?? "–").slice(0, 40))}</td>
         <td class="num"><span class="badge ${cls === "b" ? "err"
           : cls === "a" ? "warn" : "ok"}">${v.dias} dias</span></td></tr>`;
     }).join("") + `</table>`;
@@ -647,7 +663,8 @@ function tabelaFornecedores(itens) {
   const topo4 = itens.slice(0, 4).reduce((s, f) => s + (f.total || 0), 0);
   return `<table><tr><th>Fornecedor</th><th class="num">Contratos</th>
     <th class="num">Total</th></tr>` + itens.slice(0, 5).map(f =>
-    `<tr><td>${esc(fornecedorCurto(f.fornecedor_nome) ?? "–")}</td>
+    `<tr><td title="${esc(f.fornecedor_nome ?? "")}">${
+      esc(fornecedorCurto(f.fornecedor_nome) ?? "–")}</td>
       <td class="num">${f.n}</td><td class="num">${compacto(f.total)}</td></tr>`
   ).join("") + `</table>` + (total ? `<div class="nota">Os quatro primeiros
     somam ${pct(topo4 / total * 100, 0)} do valor contratado.</div>` : "");

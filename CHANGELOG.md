@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.14.0 — 2026-08-08
+
+**Três achados da auditoria de design, corrigidos**
+
+- **Agenda dos próximos 90 dias não sobrepõe mais rótulos.** Quando dois
+  vencimentos caíam perto (grupos de 11-12 fornecedores em dias vizinhos, no
+  acervo real), os nomes se sobrepunham e viravam ruído ilegível. O corte de
+  caracteres agora respeita o espaço livre até o rótulo vizinho, em vez de um
+  limiar fixo de pixels que não sabia quanto texto vinha depois.
+- **Nome de fornecedor cortado ganha o nome completo ao passar o mouse** em
+  três lugares que não tinham: as duas tabelas do Painel ("Onde o dinheiro
+  foi" e "Vence nos próximos 90 dias") e a lista de Contratos. A aba Preços
+  já fazia isso — o padrão só precisava chegar aos outros três.
+- **Barra de filtros com folga vertical maior que a horizontal** quando
+  quebra em duas linhas (Contratações, Preços) — a segunda linha, que sobra
+  com poucos itens, parava colada na primeira e parecia acidente de largura.
+
+253 pytest + 105 E2E.
+
 ## 1.13.3 — 2026-08-08
 
 **Chips de vencimento 8px mais baixos que os irmãos**

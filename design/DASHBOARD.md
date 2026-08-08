@@ -89,6 +89,21 @@ prova alinhamento; teste teria de medir `y`, não só `height` — o de
 altura ficou como está (pega quebra de linha), o de posição é novo
 ("chip.aviso não herda margin-top...").
 
+**Auditoria de design completa (2026-08-08) achou colisão de texto na
+Agenda.** `grafAgenda` já tinha anti-colisão (limiar fixo de 120px entre
+centros de rótulo), mas não contava a largura real do texto — um nome de até
+22 caracteres, mais o sufixo " +N" de grupo, passa dos 120px sozinho, então
+dois vizinhos "aprovados" pelo limiar ainda se tocavam. No acervo real, os
+grupos de 11 e 12 fornecedores em dias 8 e 23 reproduziam isso toda vez.
+Trocado por rastrear a borda direita real do último rótulo desenhado
+(`direitaUltimoRotulo`) e calcular quantos caracteres cabem no espaço livre
+até ali, cortando mais quando o vizinho está perto e pulando o rótulo (nunca
+desenhando um coto ilegível) quando não sobra espaço para pelo menos 3
+caracteres. `PX_POR_CHAR = 6.4` é estimativa para maiúsculas em 11px — não é
+medição de DOM (o gerador produz string, não manipula nós vivos), então o
+teste mede a caixa real renderizada (`getBoundingClientRect()` de cada
+`text.val`), não o número de caracteres.
+
 ## Regras dos gráficos
 
 Seguem o método de `dataviz` (skill), com a paleta validada pelo script de seis
