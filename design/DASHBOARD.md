@@ -242,6 +242,19 @@ implementação para divergir da primeira. `print-color-adjust: exact` impede o
 navegador de "economizar tinta" e devolver barras cinzentas; por ser vetorial,
 a saída não tem resolução de tela, e sim a da impressora.
 
+**Achado do usuário (2026-08-08, corrigido na v1.14.4): a impressão sempre
+saía em pergaminho**, mesmo com outro tema ativo. Três overrides
+independentes forçavam isso: um `@media print` em `_css()` que sobrescrevia
+`:root` inteiro com a paleta do Pergaminho (afetava todos os relatórios
+tabulares); `background:#fff`/`#faf6ec` hardcoded no `@media print` de
+`_pagina()`; e `CSS_PAINEL` com as cores de série (`--s1`..`--s4`,
+`--seq1`..`--seq5`) e a superfície dos cards fixas no Pergaminho, ignorando o
+`tema` recebido. O motivo original — "tema escuro não faz sentido impresso"
+— não se sustentava: Portal também é claro e saía errado. Correção: os três
+pontos agora derivam do `tema` passado (`_css_painel(tema)` substituiu a
+constante `CSS_PAINEL`); a impressão acompanha o que está na tela, inclusive
+o Observatório escuro, se for essa a escolha do usuário.
+
 ## Auditoria de design (2026-08-08)
 
 Primeira auditoria completa, nível profissional: 21+ screenshots (6 abas × 3

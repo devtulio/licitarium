@@ -921,8 +921,9 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
 
 # ── render ──────────────────────────────────────────────────────────────────
 
-# paletas espelham os temas do app; impressão força sempre a "pergaminho"
-# (tinta sobre papel — tema escuro não faz sentido impresso)
+# paletas espelham os temas do app; achado do usuário (2026-08-08): a
+# impressão saía sempre em pergaminho mesmo com Portal ativo — o relatório
+# tem de sair no tema que está na tela no momento, sem override.
 PALETAS = {
     "pergaminho": dict(bg="#f5efe2", superficie="#fbf7ee", zebra="#faf6ec",
                        cabecalho="#efe6d2", texto="#2b2115", suave="#6f5b3e",
@@ -952,7 +953,6 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
     p = PALETAS.get(tema) or PALETAS["pergaminho"]
     return f"""
   :root {{ {_vars(p)} }}
-  @media print {{ :root {{ {_vars(PALETAS["pergaminho"])} }} }}
   @page {{
     size: {papel} {"landscape" if paisagem else "portrait"}; margin: 1.6cm 1.4cm;
     @top-center {{ content: string(titulo); font-size: 8pt; color: #6f5b3e; }}
@@ -1024,8 +1024,8 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
   .no-print button {{ font-size:14px; padding:8px 14px; cursor:pointer;
     background:var(--acento); color:var(--superficie); border:none;
     border-radius:3px; }}
-  @media print {{ body {{ background:#fff; font-size:10pt; }}
-    tbody tr:nth-child(even) td {{ background:#faf6ec; }}
+  @media print {{ body {{ background:var(--bg); font-size:10pt; }}
+    tbody tr:nth-child(even) td {{ background:var(--zebra); }}
     .pagina {{ max-width:none; padding:0; }} .no-print {{ display:none; }} }}
 """
 
@@ -1401,19 +1401,26 @@ def render_executivo(d, municipio, uf, tema="pergaminho"):
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
 
+# cores de série do painel — espelham ui/estilo.css (não vêm do tema: foram
+# validadas para daltonismo e contraste sobre cada superfície, ver
+# design/DASHBOARD.md). SVG copiado da tela usa var(--s1)/(--seq1) etc.
+SERIES_PAINEL = {
+    "portal": dict(s1="#2a78d6", s2="#eb6834", s3="#1baf7a", s4="#eda100",
+                   seq1="#cde2fb", seq2="#9ec5f4", seq3="#5598e7",
+                   seq4="#2a78d6", seq5="#1c5cab"),
+    "pergaminho": dict(s1="#a03521", s2="#c98a00", s3="#1f8a52", s4="#3f5fa8",
+                       seq1="#f0e2c6", seq2="#ddc294", seq3="#c19d5c",
+                       seq4="#96702c", seq5="#5d4415"),
+    "observatorio": dict(s1="#3987e5", s2="#d95926", s3="#199e70", s4="#c98500",
+                         seq1="#123a6e", seq2="#1c5cab", seq3="#2a78d6",
+                         seq4="#5598e7", seq5="#b7d3f6"),
+}
+
+
 # Estilo do painel impresso. As cores de série são as mesmas da tela — foram
 # validadas para daltonismo e contraste —, e `print-color-adjust: exact` é o
 # que impede o navegador de "economizar tinta" e devolver barras cinzentas.
-CSS_PAINEL = """
-  /* o documento imprime no pergaminho (papel é papel), então as séries são
-     as daquele tema — validadas contra a superfície #fbf7ee */
-  :root { --s1:#a03521; --s2:#c98a00; --s3:#1f8a52; --s4:#3f5fa8;
-          --seq1:#f0e2c6; --seq2:#ddc294; --seq3:#c19d5c; --seq4:#96702c;
-          --seq5:#5d4415; --surface:#fbf7ee; --surface2:#efe6d2;
-          --muted:var(--suave); --text:var(--texto); --border:var(--borda);
-          --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);
-          --warn:var(--atencao); --ok:#2f7d32; --pill:99px;
-          --font-ui:'Segoe UI',system-ui,sans-serif; }
+_CSS_PAINEL_RESTO = """
   * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .vista { display:grid; gap:12px; }
   .faixa { display:grid; gap:12px; }
@@ -1453,6 +1460,23 @@ CSS_PAINEL = """
           border:1px solid var(--borda); background:var(--superficie); }
 """
 
+
+def _css_painel(tema):
+    s = SERIES_PAINEL.get(tema) or SERIES_PAINEL["pergaminho"]
+    p = PALETAS.get(tema) or PALETAS["pergaminho"]
+    cabecalho = (
+        ":root { --s1:" + s["s1"] + "; --s2:" + s["s2"] + "; --s3:" + s["s3"]
+        + "; --s4:" + s["s4"] + "; --seq1:" + s["seq1"] + "; --seq2:"
+        + s["seq2"] + "; --seq3:" + s["seq3"] + "; --seq4:" + s["seq4"]
+        + "; --seq5:" + s["seq5"] + "; --surface:" + p["superficie"]
+        + "; --surface2:" + p["cabecalho"] + "; --muted:var(--suave);"
+        " --text:var(--texto); --border:var(--borda);"
+        " --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);"
+        " --warn:var(--atencao); --ok:#2f7d32; --pill:99px;"
+        " --font-ui:'Segoe UI',system-ui,sans-serif; }")
+    return cabecalho + _CSS_PAINEL_RESTO
+
+
 TITULOS_PAINEL = {"execucao": "Execução do exercício",
                   "analise": "Análise comparativa",
                   "vigilancia": "Vigilância e prazos"}
@@ -1471,7 +1495,7 @@ def render_painel(vistas, municipio, uf, ano, tema="pergaminho"):
         for nome, html in vistas if html)
     return _pagina(f"Painel — {municipio} — {ano}", corpo, municipio, uf,
                    f"Exercício {ano}", paisagem=True, tema=tema, papel="A3",
-                   estilo_extra=CSS_PAINEL)
+                   estilo_extra=_css_painel(tema))
 
 
 def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):

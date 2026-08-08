@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.14.4 — 2026-08-08
+
+**Relatórios e painel impresso saíam sempre em pergaminho**
+
+- Achado do usuário: com o tema Portal ativo, a impressão de qualquer
+  relatório (Contratações, Contratos, Atas, PCA, Preços, Executivo) saía
+  sempre com a paleta do Pergaminho. Havia um `@media print` que forçava
+  as cores do Pergaminho por cima do tema escolhido, mais dois lugares que
+  hardcodavam fundo branco/`#faf6ec` na impressão.
+- O painel impresso (A3) tinha o mesmo problema num terceiro lugar: as
+  cores de série dos gráficos e o fundo dos cards ficavam sempre no
+  Pergaminho, mesmo com o SVG da tela já vindo no tema certo.
+- Removidos os três overrides — a impressão agora usa o tema que está
+  ativo no momento, os três (Portal, Pergaminho, Observatório).
+
+255 pytest + 111 E2E.
+
 ## 1.14.3 — 2026-08-08
 
 **Municípios de referência: ordem escolhível**

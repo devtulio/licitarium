@@ -419,6 +419,26 @@ def test_documento_sai_em_a3_paisagem(tmp_path, monkeypatch):
     assert "break-after:page" in html            # uma vista por página
 
 
+def test_painel_impresso_segue_o_tema_ativo(tmp_path, monkeypatch):
+    """Achado do usuário (2026-08-08): o painel impresso saía sempre com as
+    cores de série e o fundo de card do pergaminho, mesmo com outro tema
+    ativo — agora acompanha o tema salvo em config, como o resto do app."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    licitarium.abrir_db().close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    api = licitarium.Api()
+    api.set_config("tema", "observatorio")
+    r = api.imprimir_painel(
+        [["execucao", "<div class='card'>gráfico</div>"]], ANO)
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert "#3987e5" in html               # --s1 do Observatório...
+    assert "#1a212b" in html               # ...e a superfície de card dele
+    assert "#a03521" not in html           # nada do pergaminho vazou junto
+    assert "#fbf7ee" not in html
+
+
 def test_impressao_ignora_vista_vazia(tmp_path, monkeypatch):
     monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
     monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")

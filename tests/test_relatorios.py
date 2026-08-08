@@ -164,12 +164,17 @@ def test_fracionamento(db, tmp_path):
     assert r["csv"] and Path(r["csv"]).exists()
 
 
-def test_relatorio_segue_tema_mas_imprime_claro(db, tmp_path):
+def test_relatorio_imprime_no_mesmo_tema_da_tela(db, tmp_path):
+    """Achado do usuário (2026-08-08): o relatório saía sempre em pergaminho
+    na impressão, mesmo com outro tema ativo na tela (ex.: Portal). Agora
+    acompanha o tema passado sem override — inclusive o Observatório, que
+    antes virava claro só no papel."""
     r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP",
                          tmp_path, tema="observatorio")
     html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "#10151c" in html                      # paleta escura na tela
-    assert "@media print" in html and "#f5efe2" in html  # impressão clara
+    assert "#10151c" in html               # paleta escura na tela...
+    assert "#f5efe2" not in html           # ...e nenhum override pergaminho
+    assert "#faf6ec" not in html           # zebra também não força claro
 
 
 def test_tipo_desconhecido(db, tmp_path):
