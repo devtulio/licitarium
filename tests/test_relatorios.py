@@ -1,5 +1,6 @@
 """Testes dos relatórios (consultas + geração de arquivos)."""
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -250,17 +251,33 @@ def test_fracionamento_tem_o_medidor_de_limite(db, tmp_path):
     assert "var(--erro)" in html        # cor de estouro
 
 
-def test_relatorio_imprime_no_mesmo_tema_da_tela(db, tmp_path):
-    """Achado do usuário (2026-08-08): o relatório saía sempre em pergaminho
-    na impressão, mesmo com outro tema ativo na tela (ex.: Portal). Agora
-    acompanha o tema passado sem override — inclusive o Observatório, que
-    antes virava claro só no papel."""
-    r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP",
-                         tmp_path, tema="observatorio")
-    html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "#10151c" in html               # paleta escura na tela...
-    assert "#f5efe2" not in html           # ...e nenhum override pergaminho
-    assert "#faf6ec" not in html           # zebra também não força claro
+def test_relatorio_sai_neutro_seja_qual_for_o_tema(db, tmp_path):
+    """Documento oficial não tem tema (reversão consciente da v1.14.4).
+
+    Lá o relatório passou a seguir o tema da tela porque forçava pergaminho
+    e ignorava a escolha do usuário. Aqui a regra passou a ser mais forte: o
+    papel que vai ao Tribunal de Contas é peça do município, e sai igual nos
+    três temas — branco, grafite, sem ouro nem vinho.
+    """
+    saidas = []
+    for tema in ("pergaminho", "portal", "observatorio"):
+        r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP",
+                             tmp_path, tema=tema)
+        saidas.append(Path(r["html"]).read_text(encoding="utf-8"))
+    # os três documentos são idênticos a menos do carimbo de hora
+    sem_hora = [re.sub(r"\d\d/\d\d/\d{4} \d\d:\d\d", "", s) for s in saidas]
+    assert sem_hora[0] == sem_hora[1] == sem_hora[2]
+    html = saidas[0]
+    # a paleta é o que muda; o estandarte tem cores próprias cravadas no SVG
+    # (design/IDENTIDADE.md: marca não troca de cor com a pele), então a
+    # varredura é só no bloco de variáveis
+    paleta = re.search(r":root \{(.*?)\}", html, re.S).group(1)
+    assert "--bg:#ffffff" in paleta        # papel branco
+    assert "#10151c" not in paleta         # nada do Observatório
+    assert "#f5efe2" not in paleta         # nem do pergaminho
+    assert "#8b2e2e" not in paleta         # nem o vinho do acento antigo
+    assert "#b08d3e" not in paleta         # nem o dourado das réguas
+    assert "double" not in html            # régua dupla de diploma saiu
 
 
 def test_todos_os_relatorios_saem_em_paisagem(db, tmp_path):

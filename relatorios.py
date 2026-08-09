@@ -1242,6 +1242,18 @@ PALETAS = {
 }
 
 
+# O documento impresso NÃO segue o tema da tela (mudança consciente da
+# v1.20.0; a v1.14.4 tinha feito o contrário, ver CHANGELOG). Papel que vai
+# ao Tribunal de Contas é peça institucional do município, não vitrine da
+# ferramenta: fundo branco, grafite no lugar do vinho/dourado, réguas
+# discretas. Os três temas continuam valendo integralmente na tela.
+PALETA_DOCUMENTO = dict(
+    bg="#ffffff", superficie="#ffffff", zebra="#f6f7f8",
+    cabecalho="#eef0f2", texto="#17181a", suave="#5b6066",
+    borda="#d3d6da", acento="#1f2933", detalhe="#b8bec4",
+    alerta="#a6231b", atencao="#7a5c0e")
+
+
 def _vars(p):
     return (f"--bg:{p['bg']}; --superficie:{p['superficie']};"
             f" --zebra:{p['zebra']}; --cabecalho:{p['cabecalho']};"
@@ -1252,7 +1264,9 @@ def _vars(p):
 
 
 def _css(paisagem, tema="pergaminho", papel="A4"):
-    p = PALETAS.get(tema) or PALETAS["pergaminho"]
+    # `tema` continua na assinatura porque atravessa todas as `render_*`,
+    # mas o documento tem paleta própria: ver PALETA_DOCUMENTO.
+    p = PALETA_DOCUMENTO
     return f"""
   :root {{ {_vars(p)} }}
   @page {{
@@ -1268,7 +1282,7 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
              margin:0 auto;
              padding:26px 30px 50px; }}
   header {{ display:flex; align-items:center; gap:18px; padding-bottom:14px;
-            border-bottom:3px double var(--detalhe); margin-bottom:16px; }}
+            border-bottom:1px solid var(--borda); margin-bottom:16px; }}
   h1 {{ font-family:Georgia,serif; font-size:21px; font-weight:400;
         string-set: titulo content(); }}
   .meta {{ font-size:11.5px; color:var(--suave); margin-top:3px; }}
@@ -1319,7 +1333,7 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
   .farol-alerta {{ color:var(--alerta); font-weight:600; }}
   .farol-atencao {{ color:var(--atencao); font-weight:600; }}
   footer {{ margin-top:22px; padding-top:10px;
-            border-top:3px double var(--detalhe);
+            border-top:1px solid var(--borda);
             font-size:10.5px; color:var(--suave); display:flex;
             justify-content:space-between; }}
   .no-print {{ position:fixed; top:14px; right:14px; }}
@@ -1960,14 +1974,19 @@ _CSS_PAINEL_RESTO = """
 
 
 def _css_painel(tema):
-    s = SERIES_PAINEL.get(tema) or SERIES_PAINEL["pergaminho"]
-    p = PALETAS.get(tema) or PALETAS["pergaminho"]
+    # Série fixa no conjunto do Portal, não no do tema ativo: cada conjunto
+    # foi calibrado para o fundo do seu tema, e o documento agora é sempre
+    # branco. Medido contra papel branco, as rampas do Observatório caem a
+    # 2,99 e 1,54 de contraste (seq4/seq5) e as do Pergaminho a 1,28-2,55 —
+    # invisíveis no papel. As do Portal são as que nasceram para superfície
+    # branca. As cores em si não mudaram: mudou qual conjunto o papel usa.
+    s = SERIES_PAINEL["portal"]
     cabecalho = (
         ":root { --s1:" + s["s1"] + "; --s2:" + s["s2"] + "; --s3:" + s["s3"]
         + "; --s4:" + s["s4"] + "; --seq1:" + s["seq1"] + "; --seq2:"
         + s["seq2"] + "; --seq3:" + s["seq3"] + "; --seq4:" + s["seq4"]
-        + "; --seq5:" + s["seq5"] + "; --surface:" + p["superficie"]
-        + "; --surface2:" + p["cabecalho"] + "; --muted:var(--suave);"
+        + "; --seq5:" + s["seq5"] + "; --surface:var(--superficie);"
+        " --surface2:var(--cabecalho); --muted:var(--suave);"
         " --text:var(--texto); --border:var(--borda);"
         " --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);"
         " --warn:var(--atencao); --ok:#2f7d32; --pill:99px;"

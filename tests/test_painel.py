@@ -419,10 +419,17 @@ def test_documento_sai_em_a3_paisagem(tmp_path, monkeypatch):
     assert "break-after:page" in html            # uma vista por página
 
 
-def test_painel_impresso_segue_o_tema_ativo(tmp_path, monkeypatch):
-    """Achado do usuário (2026-08-08): o painel impresso saía sempre com as
-    cores de série e o fundo de card do pergaminho, mesmo com outro tema
-    ativo — agora acompanha o tema salvo em config, como o resto do app."""
+def test_painel_impresso_nao_segue_o_tema_da_tela(tmp_path, monkeypatch):
+    """O painel impresso é peça institucional, não vitrine do tema.
+
+    Reversão consciente da v1.14.4 (pedido do usuário em 2026-08-08): lá o
+    documento passou a seguir o tema porque saía sempre pergaminho e isso
+    ignorava a escolha da tela. Agora a regra é outra e mais forte —
+    documento oficial não tem tema: papel branco, grafite, réguas
+    discretas, qualquer que seja a tela. Imprimir no Observatório (tema
+    escuro) gerava documento de fundo escuro, que nunca ia parecer peça de
+    Tribunal de Contas.
+    """
     monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
     monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
     licitarium.abrir_db().close()
@@ -433,10 +440,13 @@ def test_painel_impresso_segue_o_tema_ativo(tmp_path, monkeypatch):
     r = api.imprimir_painel(
         [["execucao", "<div class='card'>gráfico</div>"]], ANO)
     html = Path(r["arquivo"]).read_text(encoding="utf-8")
-    assert "#3987e5" in html               # --s1 do Observatório...
-    assert "#1a212b" in html               # ...e a superfície de card dele
-    assert "#a03521" not in html           # nada do pergaminho vazou junto
-    assert "#fbf7ee" not in html
+    assert "#ffffff" in html               # papel branco, sempre
+    assert "#1a212b" not in html           # nada da superfície escura
+    assert "#10151c" not in html           # nem do fundo do Observatório
+    assert "#f5efe2" not in html           # nem do bege do pergaminho
+    # as séries do papel são as do Portal, calibradas para fundo branco
+    assert "#2a78d6" in html
+    assert "#b7d3f6" not in html           # rampa clara do Observatório sai
 
 
 def test_impressao_ignora_vista_vazia(tmp_path, monkeypatch):

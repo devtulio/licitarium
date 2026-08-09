@@ -493,3 +493,41 @@ gráfico novo em Python foi escrito para isso. Só o relatório avulso
 ("Economia e Comparativos", gerável sem abrir o Painel) precisou de porte
 próprio, reaproveitando `_grafico_barras` — já genérico o bastante para
 os três agrupamentos, sem nenhum SVG novo.
+
+## Documento impresso não tem tema (2026-08-08)
+
+Reversão consciente da v1.14.4 — vale registrar o porquê, senão daqui a
+meses parece bug reintroduzido.
+
+**O que a v1.14.4 corrigiu:** o relatório forçava a paleta pergaminho em
+três overrides independentes, ignorando o tema que o usuário tinha
+escolhido. Isso era errado e foi corrigido: o documento passou a seguir o
+tema.
+
+**Por que agora é o contrário:** seguir o tema resolveu o sintoma
+(ignorar a escolha) mas trouxe outro — imprimir no Observatório gera
+documento de fundo escuro, e nenhum papel de Tribunal de Contas é escuro.
+A regra que substitui as duas é mais forte que ambas: **documento oficial
+não tem tema**. O papel é peça institucional do município, sai sempre
+branco/grafite; os três temas continuam valendo integralmente na tela.
+
+**Cores de série:** fixadas no conjunto do Portal, não no do tema ativo.
+Cada conjunto foi calibrado para o fundo do seu tema, e o papel agora é
+branco fixo. Medido contra branco (WCAG 1.4.11 pede 3.0 para elemento
+gráfico): Observatório cai a 2,99 (seq4) e 1,54 (seq5); Pergaminho, a
+1,28–2,55 (seq1-seq3). O Portal é o que nasceu para superfície branca —
+sua superfície de card já é `#ffffff`. As cores não mudaram: mudou qual
+conjunto o papel usa.
+
+**Pendência anotada, não corrigida:** mesmo no conjunto do Portal, `s3`
+(#1baf7a, 2,82) e `s4` (#eda100, 2,17) ficam abaixo de 3.0 sobre branco.
+Isso é **pré-existente** — quem usa o tema padrão já imprimia assim —, e
+mexer nas cores de série exige revalidar daltonismo, que é o que
+`design/DASHBOARD.md` protege desde o início. Fica registrado para uma
+rodada própria.
+
+**O que NÃO mudou:** o estandarte e o lema do rodapé mantêm as cores
+cravadas no SVG da marca (`IDENTIDADE.md` §4: marca não troca de cor com
+a pele). Por isso o teste que confere a sobriedade varre só o bloco
+`:root {...}`, não o documento inteiro — o primeiro assert que escrevi
+falhou justamente por pegar o dourado do estandarte.

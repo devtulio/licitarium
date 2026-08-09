@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.20.0 — 2026-08-08
+
+**Documento impresso fica sóbrio — e deixa de seguir o tema da tela**
+
+Pedido do usuário, fechando o brainstorm de "mais institucional": o papel
+que vai ao Tribunal de Contas é peça do município, não vitrine da
+ferramenta.
+
+- **Paleta própria do documento** (`PALETA_DOCUMENTO`): fundo branco,
+  texto grafite, réguas cinza discretas. Saíram o bege do pergaminho, o
+  vinho do acento e o dourado das réguas.
+- **Régua dupla de diploma virou linha simples** no cabeçalho e no rodapé.
+- **Reversão consciente da v1.14.4**: lá o documento passou a seguir o
+  tema da tela porque forçava pergaminho e ignorava a escolha do usuário.
+  Agora a regra é outra e mais forte — documento oficial não tem tema, sai
+  igual nos três. Imprimir no Observatório gerava documento de fundo
+  escuro, que nunca ia parecer peça de Tribunal.
+- **Cores de série fixadas no conjunto do Portal**, que é o calibrado para
+  superfície branca. As cores não mudaram; mudou qual dos três conjuntos
+  já existentes o papel usa. Medido: sobre branco, as rampas do
+  Observatório caíam a 2,99 e 1,54 de contraste e as do Pergaminho a
+  1,28–2,55 — invisíveis no papel.
+- O lema no rodapé e o estandarte seguem como estão: marca não troca de
+  cor com a pele (`design/IDENTIDADE.md`). A tela mantém os três temas
+  integralmente.
+
+312 pytest + 131 E2E. Os dois testes que travavam o comportamento da
+v1.14.4 foram reescritos para o contrato novo, com o histórico no
+docstring.
+
 ## 1.19.0 — 2026-08-08
 
 **Ranking de fornecedores por deságio**
