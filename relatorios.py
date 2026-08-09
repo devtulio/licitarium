@@ -85,6 +85,25 @@ def moeda_fina(v):
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
 
 
+def quantidade(v):
+    """Quantidade na coluna numérica: número formatado, ou travessão.
+
+    A coluna `itens.quantidade_homologada` é REAL, mas afinidade do SQLite
+    **não converte** texto não-numérico — ele fica gravado como TEXT e
+    chegava cru ao HTML do relatório, que é aberto no navegador real do
+    usuário (achado da auditoria de segurança, 2026-08-09). A coluna
+    promete número; o que não for número não é exibido.
+    """
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return "–"
+    if n == int(n):
+        return f"{int(n):,}".replace(",", ".")
+    inteiro, decimal = f"{n:,.2f}".split(".")
+    return inteiro.replace(",", ".") + "," + decimal
+
+
 def compacto(v):
     """Número curto pra rótulo de gráfico — mesma régua de ui/painel.js."""
     if v is None:
@@ -845,11 +864,25 @@ def marcar_amostra_reduzida(resumo, sem_indice):
 
 
 def mes_por_extenso(competencia_):
-    """"2026-06" vira "jun/2026", que é como o documento fala."""
+    """"2026-06" vira "jun/2026", que é como o documento fala.
+
+    O ano é validado como número junto com o mês: antes só o mês passava
+    por `int()`, e um ano com marcação HTML saía inteiro na prosa do
+    relatório — que é aberto no navegador real (auditoria de segurança,
+    2026-08-09). Competência fora do formato não vira texto: some.
+    """
     if not competencia_:
         return None
-    ano, mes = competencia_.split("-")
-    return f"{MESES_NOME[int(mes) - 1]}/{ano}"
+    partes = str(competencia_).split("-")
+    if len(partes) != 2:
+        return None
+    try:
+        ano, mes = int(partes[0]), int(partes[1])
+    except ValueError:
+        return None
+    if not 1 <= mes <= 12:
+        return None
+    return f"{MESES_NOME[mes - 1]}/{ano}"
 
 
 # ── quanto vem dentro da embalagem ──────────────────────────────────────────
@@ -1558,7 +1591,7 @@ def _desconsiderados_html(d):
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
-      <td class="num">{l['quantidade_homologada'] or '–'}</td>
+      <td class="num">{quantidade(l['quantidade_homologada'])}</td>
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>
       <td class="forn">{_e(l['fornecedor_nome'])}</td>
       <td class="ctr proc">{_processo(l)}</td>
@@ -1638,7 +1671,7 @@ def render_precos(d, municipio, uf, tema="pergaminho", brasao=None):
     linhas = "".join(f"""<tr>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
-      <td class="num">{l['quantidade_homologada'] or '–'}</td>
+      <td class="num">{quantidade(l['quantidade_homologada'])}</td>
       <td class="num">{moeda(l['valor_unitario_homologado'])}</td>{
         f'<td class="num">{moeda(l["corrigido"])}</td>'
         if coluna_corrigido else ''}{

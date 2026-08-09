@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.20.1 — 2026-08-09
+
+**Dois sinks de XSS armazenado nos relatórios (auditoria de segurança)**
+
+O relatório é aberto com `webbrowser.open` no **navegador real** do
+usuário (origem `file://`), não dentro do WebView — marcação que sai dali
+executa fora da janela do programa. Vetor confirmado: `importar_acervo`
+troca o banco inteiro por um `.zip` de terceiro, validado só por
+`quick_check`, sem conferência de tipo de coluna.
+
+- **`quantidade_homologada` saía crua** no `<td class="num">` (dois
+  pontos: tabela de preços e itens desconsiderados). A coluna é `REAL`,
+  mas afinidade do SQLite não converte texto não-numérico — ele fica
+  gravado como TEXT. Novo `quantidade()` formata número e devolve
+  travessão para o que não for número, que é o que a coluna promete.
+- **`mes_por_extenso` validava só o mês** e devolvia o ano cru:
+  `"<marcação>-06"` virava `"jun/<marcação>"` na prosa da correção pelo
+  IPCA. Agora ano e mês são validados como número, e competência fora do
+  formato some em vez de virar texto.
+
+314 pytest + 131 E2E. Os dois com teste que morde sem a correção.
+
 ## 1.20.0 — 2026-08-08
 
 **Documento impresso fica sóbrio — e deixa de seguir o tema da tela**

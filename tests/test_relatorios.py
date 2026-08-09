@@ -400,3 +400,60 @@ def test_relatorio_de_precos_liga_o_processo_ao_pncp(db):
     # município e unidade em coluna que não quebra
     assert '<td class="muni">' in html and '<td class="unid">' in html
     assert "white-space:nowrap" in html
+
+
+# ── auditoria de segurança (2026-08-09): dois sinks de XSS armazenado ────────
+# O relatório é aberto com `webbrowser.open` no navegador REAL do usuário
+# (origem file://), não dentro do WebView — script que sai daqui executa fora
+# da janela do programa. Vetor confirmado: `importar_acervo` troca o banco
+# inteiro por um .zip de terceiro, validado só por `quick_check`, sem
+# conferência de tipo de coluna.
+
+def test_quantidade_nao_numerica_nao_vira_html(db):
+    """`quantidade_homologada` é REAL, mas afinidade do SQLite não converte
+    texto — ele fica gravado como TEXT e saía cru no `<td class="num">`."""
+    payload = "<script>alert(1)</script>"
+    for i in range(6):
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
+            " unidade, valor_unitario_homologado, quantidade_homologada,"
+            " data_resultado, referencia)"
+            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,?,'2026-01-01',0)",
+            (f"Q#{i}", 10.0 + i, payload))
+    db.commit()
+    html = relatorios.render_precos(
+        relatorios.dados_precos(db, "papel"), "T", "SP")
+    assert payload not in html
+    assert "<script>" not in html
+
+    # a coluna promete número: o que não é número vira travessão
+    assert relatorios.quantidade(payload) == "–"
+    assert relatorios.quantidade(None) == "–"
+    assert relatorios.quantidade(300.0) == "300"
+    assert relatorios.quantidade(1500.5) == "1.500,50"
+
+
+def test_competencia_do_ipca_com_marcacao_nao_vira_html(db):
+    """`mes_por_extenso` validava só o mês; o ano voltava cru na prosa da
+    correção monetária — "<payload>-06" virava "jun/<payload>"."""
+    payload = "<script>alert(1)</script>"
+    assert relatorios.mes_por_extenso(f"{payload}-06") is None
+    # competência fora do formato some, em vez de virar texto
+    assert relatorios.mes_por_extenso("2026-13") is None
+    assert relatorios.mes_por_extenso("2026") is None
+    assert relatorios.mes_por_extenso("2026-06") == "jun/2026"
+
+    db.execute("INSERT INTO ipca (competencia, variacao) VALUES (?, 0.5)",
+               (f"{payload}-06",))
+    for i in range(6):
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
+            " unidade, valor_unitario_homologado, quantidade_homologada,"
+            " data_resultado, referencia)"
+            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,10,"
+            " '2026-01-01',0)", (f"I#{i}", 10.0 + i))
+    db.commit()
+    html = relatorios.render_precos(
+        relatorios.dados_precos(db, "papel", corrigir_ipca=True), "T", "SP")
+    assert payload not in html
+    assert "<script>" not in html
