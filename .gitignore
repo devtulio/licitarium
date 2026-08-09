@@ -4,6 +4,8 @@ node_modules/
 test-results/
 playwright-report/
 .pytest_cache/
+.coverage
+htmlcov/
 build/
 dist/
 *.pyc

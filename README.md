@@ -237,8 +237,9 @@ ansata, a divisa *sub hasta publica*): [design/IDENTIDADE.md](design/IDENTIDADE.
 ## Desenvolvimento
 
 ```bash
-pip install -r requirements.txt pytest
+pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest tests/              # motor de sync, API e relatórios
+python -m pytest tests/ --cov=. --cov-report=term-missing   # cobertura
 npm install && npx playwright test   # interface (Chromium)
 pyinstaller --clean Licitarium.spec  # gera dist/"Licitarium vX.Y.Z.exe"
 ```
