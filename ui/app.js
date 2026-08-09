@@ -153,6 +153,18 @@ window.addEventListener("pywebviewready", async () => {
   iniciarApp(e);
 });
 
+// Aba selecionada: a classe pinta, o aria-selected conta. Sem o segundo, o
+// leitor de tela anuncia N abas e nenhuma marcada — achado da auditoria de
+// acessibilidade (2026-08-09). Um ponto só para as abas de topo e as
+// subabas do Painel, que erravam do mesmo jeito.
+function marcarAba(botoes, selecionado) {
+  botoes.forEach(b => {
+    const ativo = selecionado(b);
+    b.classList.toggle("on", ativo);
+    b.setAttribute("aria-selected", String(ativo));
+  });
+}
+
 function aplicarTema(tema, salvar = true) {
   document.documentElement.dataset.theme = tema;
   try { localStorage.setItem("tema", tema); } catch { /* sem storage: ok */ }
@@ -492,8 +504,9 @@ function renderLinha(tipo, d) {
           do edital">${dinheiro(d.valor_unitario_estimado)} <small>est.</small></span>`;
     return `<span class="sel"><input type="checkbox" data-item="${esc(d.id)}"
         ${precosIncluidos.has(String(d.id)) ? "checked" : ""}
-        aria-label="Usar este preço na pesquisa"></span>
-      <span class="obj">${esc(d.descricao ?? "–")}</span>
+        aria-label="Usar na pesquisa: ${esc(d.descricao ?? "item")}"></span>
+      <span class="obj" role="button" tabindex="0">${
+        esc(d.descricao ?? "–")}</span>
       <span class="dim">${esc(d.unidade ?? "–")}</span>
       <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
       <span class="num">${unit}</span>
@@ -691,6 +704,11 @@ async function mostrarResumoPrecos() {
   // esta função (a corrida entre desenhar as linhas e ler o Set de
   // seleção era real — ver comentário lá); aqui só falta ler o termo atual
   const caixa = $("precos-resumo");
+  // esta função reescreve a caixa inteira, e os controles de seleção por
+  // critério moram dentro dela: sem guardar o foco, quem usa teclado era
+  // jogado para o topo da página a cada seleção em lote (auditoria de
+  // acessibilidade, 2026-08-09)
+  const focado = document.activeElement?.id || null;
   const termo = $("f-busca").value.trim();
   if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
     caixa.classList.add("oculto");
@@ -703,8 +721,11 @@ async function mostrarResumoPrecos() {
   if (!s) { caixa.classList.add("oculto"); return; }
   // "X de Y selecionados" — Y é a busca inteira, sem olhar seleção nem
   // descarte (pedido do usuário, item 1: contador visível)
+  // role="status": é o único retorno das seleções em lote ("Selecionar
+  // todos", faixa, texto) — sem ele o leitor de tela não sabe se marcou 0
+  // ou 400 (auditoria de acessibilidade, 2026-08-09)
   const contador = s.total != null
-    ? `<div class="dim" style="font-size:12px; margin:-4px 0 8px">${
+    ? `<div class="dim" role="status" style="font-size:12px; margin:-4px 0 8px">${
         s.nada_selecionado ? 0 : s.n} de ${s.total} selecionados</div>` : "";
   if (s.nada_selecionado) {
     caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
@@ -717,6 +738,7 @@ async function mostrarResumoPrecos() {
     caixa.classList.remove("oculto");
     $("btn-selecionar-todos-resumo").addEventListener("click", selecionarTodosPrecos);
     ligarToolbarSelecaoPrecos(termo, ano, origemVal);
+    if (focado) $(focado)?.focus();
     return;
   }
   if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
@@ -767,6 +789,7 @@ async function mostrarResumoPrecos() {
     atualizarSelecaoPrecos();
   });
   ligarToolbarSelecaoPrecos(termo, ano, origemVal);
+  if (focado) $(focado)?.focus();
 }
 
 // ── largura das colunas: arrastar ajusta, duplo clique dá autofit ─────────
@@ -917,8 +940,15 @@ async function carregarLista() {
   const selecionavel = estado.tipo === "itens";
   const linhas = r.itens.map(d => {
     const nc = esc(d.numero_controle ?? d.id);
+    // A linha selecionável é um <div> porque precisa aninhar o checkbox —
+    // <input> dentro de <button> é HTML inválido. Mas ela também NÃO leva
+    // role="button" (auditoria de acessibilidade, 2026-08-09): filho de
+    // botão é apresentacional, então o checkbox perdia o estado marcado e
+    // seu rótulo virava o nome da linha. Quem carrega o papel de botão é a
+    // célula da descrição — o keydown continua sendo tratado aqui em cima,
+    // porque o evento borbulha da célula para a linha.
     return selecionavel
-      ? `<div class="linha ${g}" data-nc="${nc}" role="button" tabindex="0">`
+      ? `<div class="linha ${g}" data-nc="${nc}">`
         + renderLinha(estado.tipo, d) + `</div>`
       : `<button class="linha ${g}" data-nc="${nc}">`
         + renderLinha(estado.tipo, d) + `</button>`;
@@ -995,8 +1025,8 @@ async function carregarLista() {
 // vez de duas chamadas concorrentes disputando qual pinta a tela por último
 // (a de trás, sem filtro nenhum, ganhava a corrida às vezes).
 function mudarAba(tipo) {
-  document.querySelectorAll("nav.abas button").forEach(x =>
-    x.classList.toggle("on", x.dataset.tipo === tipo));
+  marcarAba(document.querySelectorAll("nav.abas button"),
+            x => x.dataset.tipo === tipo);
   estado.tipo = tipo;
   estado.pagina = 1;
   // o Painel não é uma lista: troca a tela em vez de trocar as colunas

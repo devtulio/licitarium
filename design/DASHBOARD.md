@@ -531,3 +531,31 @@ cravadas no SVG da marca (`IDENTIDADE.md` §4: marca não troca de cor com
 a pele). Por isso o teste que confere a sobriedade varre só o bloco
 `:root {...}`, não o documento inteiro — o primeiro assert que escrevi
 falhou justamente por pegar o dourado do estandarte.
+
+## Nome acessível do gráfico, e por que sem role="img" (2026-08-09)
+
+Auditoria de acessibilidade. O helper `svg()` emitia `role="img"` **sem
+nome acessível**: todo gráfico entrava como uma imagem anônima.
+
+O reflexo seria acrescentar `aria-label` e pronto. Não é o certo aqui, e a
+razão é uma regra que já está neste arquivo: **"cor nunca sozinha — toda
+série tem rótulo direto"**. Os rótulos e os valores destes gráficos moram
+em `<text>` DENTRO do SVG. E `role="img"` torna os filhos apresentacionais
+— com ele, o leitor de tela ouviria o nome do gráfico e perderia
+exatamente os números.
+
+Então: `role="img"` saiu, e o nome entra como `<title>`, que é o nome
+acessível de um SVG embutido. O leitor de tela ouve o título e ainda
+alcança os rótulos.
+
+A injeção acontece em `desenharGraficos`, não nas 12 entradas de `DESENHO`:
+é o ponto único por onde todo gráfico passa, e `cartaoGraf` já tem o
+título do cartão, que é a melhor descrição que existe do desenho. Passar o
+nome por parâmetro obrigaria a repetir a string em cada entrada.
+
+**Contraste da série — pendente, não corrigido.** Medido contra a
+superfície de cada tema (WCAG 1.4.11 pede 3.0 para elemento gráfico):
+Portal `s3` 2,82 e `s4` 2,17; Pergaminho `s2` 2,76; Observatório passa. É
+**pré-existente** e vale na tela, não só no papel — o Portal é o tema
+padrão. Corrigir exige revalidar daltonismo pelo script de seis checks,
+que é o que esta paleta protege desde o início; fica como rodada própria.

@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.20.3 — 2026-08-09
+
+**Acessibilidade: o que um leitor de tela recebia (auditoria WCAG 2.1 AA)**
+
+A última passagem de acessibilidade era da v0.4.0 e cobria contraste e
+diálogos. Desde então entraram a 4ª vista do Painel, o card do Brasão, o
+ranking de fornecedores e a aba Preços opt-in inteira — nada disso tinha
+sido checado.
+
+- **Gráfico era imagem sem nome e sem conteúdo.** O helper `svg()` emitia
+  `role="img"` sem nome acessível — e `role="img"` torna os filhos
+  apresentacionais, então os rótulos de dentro do desenho **também**
+  sumiam. Agora o nome entra como `<title>`, num ponto único
+  (`desenharGraficos`), e o `role` saiu: estes gráficos põem rótulo direto
+  dentro do desenho por regra de projeto, e é lá que moram os números.
+- **Aba dizia `role="tab"` e nunca dizia qual estava selecionada** — só
+  alternava a classe `.on`, que não diz nada a leitor de tela. Novo
+  `marcarAba()` cuida das abas de topo e das subabas do Painel de uma vez.
+- **Nada dinâmico era anunciado**: `#sync-msg`, `#brasao-status`,
+  `#economia-status` e o contador "X de Y selecionados" — o único retorno
+  das seleções em lote e das mensagens de erro — ganharam `role="status"`.
+- **Checkbox da linha era filho de `role="button"`**, o que tornava o
+  estado marcado não confiável e fazia o rótulo dele virar o nome da
+  linha. O papel de botão passou para a célula da descrição; os handlers
+  seguem na linha, porque o evento borbulha.
+- **Foco não se perdia mais** a cada seleção em lote, e o rótulo de cada
+  checkbox passou a dizer de qual item ele é.
+
+Corrigidos em helpers compartilhados, então valem também para os gráficos
+e as abas anteriores. Novo `tests-e2e/acessibilidade.spec.js` trava os
+cinco no navegador.
+
+326 pytest + 137 E2E.
+
+**Pendente, item próprio:** a série de cores dos gráficos fica abaixo do
+mínimo de 3.0 (WCAG 1.4.11) contra a superfície — `s3` 2,82 e `s4` 2,17 no
+Portal (tema padrão), `s2` 2,76 no Pergaminho. É pré-existente e mexer nas
+cores exige revalidar daltonismo, que é o que a paleta protege.
+
 ## 1.20.2 — 2026-08-09
 
 **Dois defeitos críticos da auditoria de falha silenciosa**

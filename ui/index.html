@@ -45,7 +45,7 @@
     </div>
     <div class="info-topo">
       <div id="sync-status"><span class="dot" id="sync-dot"></span>
-        <span id="sync-msg">–</span></div>
+        <span id="sync-msg" role="status">–</span></div>
       <div id="rodape-versao">PNCP · dados públicos</div>
     </div>
     <div style="display:flex; gap:8px">
@@ -72,7 +72,7 @@
     </div>
     <div class="alertas oculto" id="alertas"></div>
     <nav class="abas" role="tablist">
-      <button data-tipo="painel" class="on" role="tab">Painel</button>
+      <button data-tipo="painel" class="on" role="tab" aria-selected="true">Painel</button>
       <button data-tipo="contratacoes" role="tab">Contratações</button>
       <button data-tipo="contratos" role="tab">Contratos</button>
       <button data-tipo="atas" role="tab">Atas</button>
@@ -83,7 +83,7 @@
       <div class="chips oculto" id="painel-chips"></div>
       <div class="painel-topo">
         <div class="subabas" role="tablist" aria-label="Visões do painel">
-          <button data-vista="execucao" class="on" role="tab">Execução</button>
+          <button data-vista="execucao" class="on" role="tab" aria-selected="true">Execução</button>
           <button data-vista="analise" role="tab">Análise</button>
           <button data-vista="vigilancia" role="tab">Vigilância</button>
           <button data-vista="economia" role="tab">Economia</button>
@@ -338,7 +338,7 @@
           imagem</button>
         <button class="btn ghost oculto" id="btn-brasao-remover">✕
           Remover</button>
-        <span class="dim" id="brasao-status"></span>
+        <span class="dim" id="brasao-status" role="status"></span>
       </div>
     </div>
     <div class="card cfg">

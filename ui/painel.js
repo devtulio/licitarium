@@ -38,9 +38,16 @@ function escala(maximo) {
   return { topo: maximo, passo: maximo / 4 };
 }
 
+// Sem role="img", de propósito (auditoria de acessibilidade, 2026-08-09):
+// role="img" torna os filhos apresentacionais, e estes gráficos põem o
+// rótulo direto DENTRO do desenho — é regra do projeto, ver
+// design/DASHBOARD.md ("cor nunca sozinha: toda série tem rótulo direto").
+// Com role="img" o leitor de tela ouvia um nome e perdia justamente os
+// números. O nome acessível entra como <title> em `desenharGraficos`, que
+// é o ponto único por onde todo gráfico passa.
 function svg(largura, altura, dentro) {
   return `<svg viewBox="0 0 ${largura} ${altura}" width="100%"
-    height="${altura}" role="img" preserveAspectRatio="xMidYMid meet"
+    height="${altura}" preserveAspectRatio="xMidYMid meet"
     >${dentro}</svg>`;
 }
 
@@ -551,7 +558,10 @@ function cartao(titulo, corpo, nota) {
 // Com viewBox fixo o SVG escalava mantendo proporção e sobrava faixa vazia
 // dos dois lados — em tela larga, metade do cartão era espaço morto.
 function cartaoGraf(titulo, chave, nota) {
-  return cartao(titulo, `<div class="graf" data-graf="${chave}"></div>`, nota);
+  // data-titulo vira o <title> do SVG em `desenharGraficos` — o título do
+  // cartão já é a melhor descrição do gráfico, não vale repetir à mão
+  return cartao(titulo, `<div class="graf" data-graf="${chave}"
+    data-titulo="${esc(titulo)}"></div>`, nota);
 }
 
 // Cada chave sabe se desenhar em qualquer largura. O redesenho acontece
@@ -603,6 +613,15 @@ function desenharGraficos(raiz) {
     } else {
       el.innerHTML = saida.html;
       saida.ligar?.(el);
+    }
+    // nome acessível do gráfico, num ponto só: sem isto o SVG entrava sem
+    // nenhum nome (auditoria de acessibilidade, 2026-08-09)
+    const desenho = el.querySelector("svg");
+    if (desenho && el.dataset.titulo && !desenho.querySelector("title")) {
+      const titulo = document.createElementNS(
+        "http://www.w3.org/2000/svg", "title");
+      titulo.textContent = el.dataset.titulo;
+      desenho.insertBefore(titulo, desenho.firstChild);
     }
   });
 }
@@ -761,7 +780,7 @@ function vistaEconomia(d) {
   <div class="macoes">
     <button class="btn ghost" id="economia-relatorio">Relatório de economia
       e comparativos</button>
-    <span class="dim" id="economia-status"></span>
+    <span class="dim" id="economia-status" role="status"></span>
   </div>`;
 }
 
@@ -878,8 +897,7 @@ ligarTooltips();
 $("painel").querySelectorAll(".subabas button").forEach(b =>
   b.addEventListener("click", () => {
     P.vista = b.dataset.vista;
-    $("painel").querySelectorAll(".subabas button").forEach(x =>
-      x.classList.toggle("on", x === b));
+    marcarAba($("painel").querySelectorAll(".subabas button"), x => x === b);
     // a subaba fica lembrada: quem usa o painel para vigiar abre nela
     api.set_config?.("painel_vista", P.vista);
     // as três vistas já estão montadas: trocar é mostrar, não recarregar —
@@ -894,10 +912,10 @@ $("painel").querySelectorAll(".subabas button").forEach(b =>
 // do acervo, órgãos monitorados.
 async function prepararPainel(estadoInicial) {
   const vista = estadoInicial?.painel_vista;
-  if (vista && ["execucao", "analise", "vigilancia", "economia"].includes(vista)) {
+  if (vista && VISTAS[vista]) {          // VISTAS é a lista, não uma cópia
     P.vista = vista;
-    $("painel").querySelectorAll(".subabas button").forEach(b =>
-      b.classList.toggle("on", b.dataset.vista === vista));
+    marcarAba($("painel").querySelectorAll(".subabas button"),
+              b => b.dataset.vista === vista);
   }
   const f = await api.filtros_disponiveis();
   const ano = $("p-ano");
