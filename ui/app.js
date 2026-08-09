@@ -44,7 +44,7 @@ const SELO = `
   <text x="32" y="40.5" font-family="Georgia, 'Times New Roman', serif"
         font-size="21" fill="#f5efe2" text-anchor="middle">L</text>`;
 
-const estado = { tipo:"contratacoes", pagina:1, total:0, municipio:null,
+const estado = { tipo:"contratacoes", pagina:1, municipio:null,
                  ord:null, dir:"desc", objetosAlvo:null };
 // há município de referência? decide se a aba Preços mostra a origem
 let temReferencia = false;
@@ -317,7 +317,7 @@ function renderKpis(k) {
 
 async function carregarFiltros() {
   const f = await api.filtros_disponiveis();
-  const preencher = (sel, itens, rotulo) => {
+  const preencher = (sel, itens) => {
     const atual = sel.value;
     sel.length = 1;
     itens.forEach(i => sel.add(typeof i === "object"
@@ -640,7 +640,7 @@ async function toolbarSelecaoPrecos(termo, ano, origemVal) {
   const opcoesForn = fornecedores.map(f =>
     `<option value="${esc(f.ni)}">${esc(f.nome ?? f.ni)} (${f.n})</option>`
   ).join("");
-  return `<div class="filtros" id="precos-selecao-criterio">
+  return `<div class="filtros">
     <select id="sel-fornecedor-preco" aria-label="Selecionar por fornecedor">
       <option value="">Selecionar por fornecedor…</option>${opcoesForn}
     </select>
@@ -903,7 +903,6 @@ async function carregarLista() {
   }
   mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
-  estado.total = r.total;
   const g = `g-${estado.tipo}`
     + (estado.tipo === "itens" && porConteudo ? " conteudo" : "")
     + (estado.tipo === "itens" && corrigirIpca ? " corrigido" : "");
@@ -1141,7 +1140,7 @@ const ROTULOS = {
   quantidade:"Quantidade estimada", valor_total:"Valor total",
   id_pca:"Plano (id PNCP)", ano:"Ano",
   modalidade_nome:"Modalidade", situacao:"Situação", orgao_nome:"Órgão",
-  unidade:"Unidade", valor_estimado:"Valor estimado",
+  valor_estimado:"Valor estimado",
   valor_homologado:"Valor homologado", valor_global:"Valor global",
   fornecedor_nome:"Fornecedor", fornecedor_ni:"CNPJ/CPF fornecedor",
   data_publicacao:"Publicação", data_atualizacao:"Última atualização",

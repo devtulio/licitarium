@@ -1067,24 +1067,6 @@ class Api:
         finally:
             db.close()
 
-    def restaurar_preco(self, busca, item_id=None):
-        """Devolve um item à pesquisa — ou todos, se não vier item."""
-        termo = relatorios.chave_termo(busca)
-        if not termo:
-            return {"ok": False}
-        db = abrir_db()
-        try:
-            if item_id:
-                db.execute("DELETE FROM precos_descartes"
-                           " WHERE termo=? AND item_id=?", (termo, str(item_id)))
-            else:
-                db.execute("DELETE FROM precos_descartes WHERE termo=?",
-                           (termo,))
-            db.commit()
-            return {"ok": True}
-        finally:
-            db.close()
-
     def classificar_por_unidade(self, busca, unidade, ano=None, origem=None):
         """Seleciona os itens da unidade escolhida — soma à seleção atual,
         não substitui (pedido do usuário, 2026-08-08: escolher "Maço" e
@@ -1415,13 +1397,12 @@ class Api:
         try:
             municipio = pncp._config(db, "municipio_nome") or "Município"
             uf = pncp._config(db, "municipio_uf") or ""
-            tema = pncp._config(db, "tema") or "portal"
             brasao = pncp._config(db, "brasao")
         finally:
             db.close()
         html = relatorios.render_painel(
             [(str(n), str(h)) for n, h in (vistas or [])],
-            municipio, uf, ano or date.today().year, tema, brasao=brasao)
+            municipio, uf, ano or date.today().year, brasao=brasao)
         destino = DIR_DADOS / "relatorios"
         destino.mkdir(parents=True, exist_ok=True)
         arquivo = destino / f"painel_{ano or date.today().year}.html"
@@ -1645,9 +1626,8 @@ class Api:
                 params["limites"] = {
                     "compras": pncp._config(db, "limite_dispensa_compras"),
                     "obras": pncp._config(db, "limite_dispensa_obras")}
-            tema = pncp._config(db, "tema") or "pergaminho"
             resultado = relatorios.gerar(db, tipo, params, municipio, uf,
-                                         DIR_DADOS / "relatorios", tema)
+                                         DIR_DADOS / "relatorios")
         except ValueError as e:
             return {"ok": False, "erro": str(e)}
         finally:

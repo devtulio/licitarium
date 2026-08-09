@@ -67,17 +67,6 @@ def test_razao_pode_vir_depois_do_descarte(api):
     assert len(d) == 1 and d[0]["motivo"] == "embalagem"
 
 
-def test_restaurar_devolve_um_item_ou_todos(api):
-    for item in ("I2", "I3"):
-        api.descartar_preco("papel a4", item, "nao_comparavel")
-
-    api.restaurar_preco("papel a4", "I3")
-    assert [d["item_id"] for d in api.descartes("papel a4")] == ["I2"]
-
-    api.restaurar_preco("papel a4")
-    assert api.descartes("papel a4") == []
-
-
 def test_motivos_da_tela_sao_os_mesmos_do_documento(api):
     ids = [m["id"] for m in api.motivos_descarte()]
     assert ids == list(relatorios.MOTIVOS_DESCARTE)

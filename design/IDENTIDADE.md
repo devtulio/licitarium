@@ -157,8 +157,12 @@ Tokens: `--bg --surface --surface2 --text --muted --border --accent --accent-fg
 --ok --warn --radius --pill --shadow --mark-v`. KPIs na tela inicial em todos os
 temas (herança da direção Observatório, promovida a recurso do produto).
 
-As três peles valem também para os **relatórios** (`relatorios.py:PALETAS`) e,
-desde a 1.1.0, para o **MANUAL.html** — que, por ser documento avulso, traz
+As três peles valem na tela e, desde a 1.1.0, no **MANUAL.html**. **Nos
+relatórios não**: desde a v1.20.0 o documento impresso tem paleta própria e
+fixa (`relatorios.py:PALETA_DOCUMENTO`) — papel que vai ao Tribunal de
+Contas é peça institucional do município, não vitrine do tema; e desde a
+v1.20.1 nem existe parâmetro de tema para segui-lo. O MANUAL, por ser
+documento avulso, traz
 seletor próprio e guarda a escolha na mesma chave (`localStorage.tema`), de
 modo que o programa possa um dia abri-lo já no tema certo (`?tema=`). Em
 Portal e Observatório o corpo do manual troca a serifa por fonte de sistema;

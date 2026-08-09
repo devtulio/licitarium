@@ -251,25 +251,25 @@ def test_fracionamento_tem_o_medidor_de_limite(db, tmp_path):
     assert "var(--erro)" in html        # cor de estouro
 
 
-def test_relatorio_sai_neutro_seja_qual_for_o_tema(db, tmp_path):
+def test_documento_sai_com_a_paleta_institucional(db, tmp_path):
     """Documento oficial não tem tema (reversão consciente da v1.14.4).
 
     Lá o relatório passou a seguir o tema da tela porque forçava pergaminho
-    e ignorava a escolha do usuário. Aqui a regra passou a ser mais forte: o
-    papel que vai ao Tribunal de Contas é peça do município, e sai igual nos
-    três temas — branco, grafite, sem ouro nem vinho.
+    e ignorava a escolha do usuário. Aqui a regra é mais forte: o papel que
+    vai ao Tribunal de Contas é peça do município — branco, grafite, sem
+    ouro nem vinho.
+
+    Que ele não siga a tela virou garantia **estrutural** na v1.20.1: não
+    existe mais parâmetro de tema em `gerar`/`render_*`/`_pagina` para
+    seguir. O que sobra a testar é a paleta em si.
     """
-    saidas = []
-    for tema in ("pergaminho", "portal", "observatorio"):
-        r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP",
-                             tmp_path, tema=tema)
-        saidas.append(Path(r["html"]).read_text(encoding="utf-8"))
-    # os três documentos são idênticos a menos do carimbo de hora
-    sem_hora = [re.sub(r"\d\d/\d\d/\d{4} \d\d:\d\d", "", s) for s in saidas]
-    assert sem_hora[0] == sem_hora[1] == sem_hora[2]
-    html = saidas[0]
-    # a paleta é o que muda; o estandarte tem cores próprias cravadas no SVG
-    # (design/IDENTIDADE.md: marca não troca de cor com a pele), então a
+    import inspect
+    assert "tema" not in inspect.signature(relatorios.gerar).parameters
+
+    r = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    # a paleta é o que importa; o estandarte tem cores próprias cravadas no
+    # SVG (design/IDENTIDADE.md: marca não troca de cor com a pele), então a
     # varredura é só no bloco de variáveis
     paleta = re.search(r":root \{(.*?)\}", html, re.S).group(1)
     assert "--bg:#ffffff" in paleta        # papel branco

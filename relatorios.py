@@ -1172,7 +1172,7 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
             args += g
     sql_where = " WHERE " + " AND ".join(where)
     linhas = [dict(r) for r in db.execute(
-        f"""SELECT descricao, unidade, quantidade_homologada, unidade,
+        f"""SELECT descricao, unidade, quantidade_homologada,
                    valor_unitario_homologado, valor_total_homologado,
                    fornecedor_nome, fornecedor_ni, data_resultado,
                    sequencial, ano, contratacao_controle, orgao_cnpj,
@@ -1256,52 +1256,25 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
 
 # ── render ──────────────────────────────────────────────────────────────────
 
-# paletas espelham os temas do app; achado do usuário (2026-08-08): a
-# impressão saía sempre em pergaminho mesmo com Portal ativo — o relatório
-# tem de sair no tema que está na tela no momento, sem override.
-PALETAS = {
-    "pergaminho": dict(bg="#f5efe2", superficie="#fbf7ee", zebra="#faf6ec",
-                       cabecalho="#efe6d2", texto="#2b2115", suave="#6f5b3e",
-                       borda="#d9cbaa", acento="#8b2e2e", detalhe="#b08d3e",
-                       alerta="#8b2e2e", atencao="#8a6d1f"),
-    "portal": dict(bg="#f8f9fa", superficie="#ffffff", zebra="#f8f9fa",
-                   cabecalho="#f1f3f5", texto="#1b1b1b", suave="#5c6670",
-                   borda="#e3e6e8", acento="#1351b4", detalhe="#1351b4",
-                   alerta="#b00020", atencao="#a26a00"),
-    "observatorio": dict(bg="#10151c", superficie="#1a212b", zebra="#161d27",
-                         cabecalho="#141a23", texto="#dce3ec", suave="#8b97a7",
-                         borda="#232c38", acento="#f0a836", detalhe="#f0a836",
-                         alerta="#ff8a80", atencao="#f0a836"),
-}
-
-
 # O documento impresso NÃO segue o tema da tela (mudança consciente da
 # v1.20.0; a v1.14.4 tinha feito o contrário, ver CHANGELOG). Papel que vai
 # ao Tribunal de Contas é peça institucional do município, não vitrine da
 # ferramenta: fundo branco, grafite no lugar do vinho/dourado, réguas
-# discretas. Os três temas continuam valendo integralmente na tela.
+# discretas. Os três temas continuam valendo integralmente na tela — e por
+# isso não existe parâmetro de tema aqui: o documento não tem como seguir a
+# tela nem por engano.
 PALETA_DOCUMENTO = dict(
     bg="#ffffff", superficie="#ffffff", zebra="#f6f7f8",
     cabecalho="#eef0f2", texto="#17181a", suave="#5b6066",
     borda="#d3d6da", acento="#1f2933", detalhe="#b8bec4",
     alerta="#a6231b", atencao="#7a5c0e")
 
-
-def _vars(p):
-    return (f"--bg:{p['bg']}; --superficie:{p['superficie']};"
-            f" --zebra:{p['zebra']}; --cabecalho:{p['cabecalho']};"
-            f" --texto:{p['texto']}; --suave:{p['suave']};"
-            f" --borda:{p['borda']}; --acento:{p['acento']};"
-            f" --detalhe:{p['detalhe']}; --alerta:{p['alerta']};"
-            f" --atencao:{p['atencao']};")
+_VARS = " ".join(f"--{chave}:{cor};" for chave, cor in PALETA_DOCUMENTO.items())
 
 
-def _css(paisagem, tema="pergaminho", papel="A4"):
-    # `tema` continua na assinatura porque atravessa todas as `render_*`,
-    # mas o documento tem paleta própria: ver PALETA_DOCUMENTO.
-    p = PALETA_DOCUMENTO
+def _css(paisagem, papel="A4"):
     return f"""
-  :root {{ {_vars(p)} }}
+  :root {{ {_VARS} }}
   @page {{
     size: {papel} {"landscape" if paisagem else "portrait"}; margin: 1.6cm 1.4cm;
     @top-center {{ content: string(titulo); font-size: 8pt; color: #6f5b3e; }}
@@ -1380,7 +1353,7 @@ def _css(paisagem, tema="pergaminho", papel="A4"):
 
 
 def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
-            tema="pergaminho", papel="A4", estilo_extra="", brasao=None):
+            papel="A4", estilo_extra="", brasao=None):
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     # o brasão do município (Configurações) toma o lugar do estandarte do
     # Licitarium na frente do documento — o produto continua assinado no
@@ -1390,7 +1363,7 @@ def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>{_e(titulo_doc)}</title>
-<style>{_css(paisagem, tema, papel)}{estilo_extra}</style></head><body>
+<style>{_css(paisagem, papel)}{estilo_extra}</style></head><body>
 <div class="no-print"><button onclick="print()">🖨 Imprimir</button></div>
 <div class="pagina">
 <header>{marca}
@@ -1405,8 +1378,7 @@ def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
 </div></body></html>"""
 
 
-def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho",
-                        brasao=None):
+def render_contratacoes(d, municipio, uf, periodo_txt, brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="ctr">{_e(l['modalidade_nome'])}</td>
@@ -1431,11 +1403,10 @@ def render_contratacoes(d, municipio, uf, periodo_txt, tema="pergaminho",
 <td class="num">{moeda(t['homologado'])}</td><td></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratacoes']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema, brasao=brasao)
+                   brasao=brasao)
 
 
-def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho",
-                     brasao=None):
+def render_contratos(d, municipio, uf, periodo_txt, brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
                           or l['numero_controle'])}</td>
@@ -1456,11 +1427,10 @@ def render_contratos(d, municipio, uf, periodo_txt, tema="pergaminho",
 <td class="num">{moeda(t['valor'])}</td><td colspan="2"></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratos']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema, brasao=brasao)
+                   brasao=brasao)
 
 
-def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho",
-                brasao=None):
+def render_atas(d, municipio, uf, periodo_txt, brasao=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
       <td class="ctr">{_e(l['contratacao_controle'])}</td>
@@ -1475,10 +1445,10 @@ def render_atas(d, municipio, uf, periodo_txt, tema="pergaminho",
 <tfoot><tr><td colspan="5">Total: {d['totais']['n']} atas</td></tr></tfoot></table>"""
     titulo = f"{TITULOS['atas']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   tema=tema, brasao=brasao)
+                   brasao=brasao)
 
 
-def render_fracionamento(d, municipio, uf, tema="pergaminho", brasao=None):
+def render_fracionamento(d, municipio, uf, brasao=None):
     def farol(pct):
         if pct >= 100:
             return '<span class="farol-alerta">ACIMA DO LIMITE</span>'
@@ -1520,10 +1490,10 @@ obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
                    f"Exercício {d['ano']} · uso interno", paisagem=True,
-                   tema=tema, estilo_extra=_css_painel(tema), brasao=brasao)
+                   estilo_extra=CSS_PAINEL, brasao=brasao)
 
 
-def render_minuta_pca(d, municipio, uf, tema="pergaminho", brasao=None):
+def render_minuta_pca(d, municipio, uf, brasao=None):
     linhas = "".join(f"""<tr>
       <td class="num">{i+1}</td>
       <td class="obj">{_e(l['descricao'])}</td>
@@ -1574,7 +1544,7 @@ pela <b>{est}</b> dos valores homologados.</div>
 <tbody>{linhas or '<tr><td colspan="8">Minuta vazia.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['minuta_pca']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
-                   paisagem=True, tema=tema, brasao=brasao)
+                   paisagem=True, brasao=brasao)
 
 
 def _desconsiderados_html(d):
@@ -1632,14 +1602,14 @@ def _LEITURA_CV(cv):
     return "amostra muito dispersa; confira a comparabilidade dos itens"
 
 
-def render_precos(d, municipio, uf, tema="pergaminho", brasao=None):
+def render_precos(d, municipio, uf, brasao=None):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
     if not r:
         corpo = (f'<div class="caixa-aviso">Nenhum item homologado encontrado '
                  f'para <b>{_e(d["termo"])}</b> no acervo local.</div>')
         return _pagina(f"{TITULOS['precos']} — {_e(d['termo'])}", corpo,
-                       municipio, uf, periodo, paisagem=True, tema=tema,
+                       municipio, uf, periodo, paisagem=True,
                        brasao=brasao)
     # no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
     val = moeda_fina if d.get("por_conteudo") else moeda
@@ -1721,10 +1691,10 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 <tbody>{linhas}</tbody></table>{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
-                   tema=tema, estilo_extra=_css_painel(tema), brasao=brasao)
+                   estilo_extra=CSS_PAINEL, brasao=brasao)
 
 
-def render_executivo(d, municipio, uf, tema="pergaminho", brasao=None):
+def render_executivo(d, municipio, uf, brasao=None):
     """Reformulado (2026-08-08, pedido do usuário) para usar os mesmos
     gráficos do Painel — hero com sparkline, colunas mensais pareadas e
     barras por modalidade — em vez de só tabelas. `d` é o retorno de
@@ -1840,11 +1810,11 @@ def render_executivo(d, municipio, uf, tema="pergaminho", brasao=None):
 <tbody>{venc or '<tr><td colspan="5">Nada vence nos próximos 90 dias.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['executivo']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
-                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema),
+                   paisagem=True, estilo_extra=CSS_PAINEL,
                    brasao=brasao)
 
 
-def render_economia(d, municipio, uf, tema="pergaminho", brasao=None):
+def render_economia(d, municipio, uf, brasao=None):
     """Quanto foi economizado no ano, por modalidade, família de item e
     categoria do PNCP. `d` é o retorno de `dados_painel` — mesmos números
     da vista Economia do Painel, num documento que se gera sem abrir o
@@ -1939,26 +1909,20 @@ de bom fornecedor: pode ser estimativa inflada na origem.</div></div>"""
                           f"<small>{_e(documento(f['ni']))}</small>")}"""
     titulo = f"{TITULOS['economia']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
-                   paisagem=True, tema=tema, estilo_extra=_css_painel(tema),
+                   paisagem=True, estilo_extra=CSS_PAINEL,
                    brasao=brasao)
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
 
-# cores de série do painel — espelham ui/estilo.css (não vêm do tema: foram
-# validadas para daltonismo e contraste sobre cada superfície, ver
-# design/DASHBOARD.md). SVG copiado da tela usa var(--s1)/(--seq1) etc.
-SERIES_PAINEL = {
-    "portal": dict(s1="#2a78d6", s2="#eb6834", s3="#1baf7a", s4="#eda100",
-                   seq1="#cde2fb", seq2="#9ec5f4", seq3="#5598e7",
-                   seq4="#2a78d6", seq5="#1c5cab"),
-    "pergaminho": dict(s1="#a03521", s2="#c98a00", s3="#1f8a52", s4="#3f5fa8",
-                       seq1="#f0e2c6", seq2="#ddc294", seq3="#c19d5c",
-                       seq4="#96702c", seq5="#5d4415"),
-    "observatorio": dict(s1="#3987e5", s2="#d95926", s3="#199e70", s4="#c98500",
-                         seq1="#123a6e", seq2="#1c5cab", seq3="#2a78d6",
-                         seq4="#5598e7", seq5="#b7d3f6"),
-}
+# Cores de série do papel. São as do tema Portal de ui/estilo.css — o único
+# conjunto calibrado para superfície branca, que é a do documento desde a
+# v1.20.0. Os conjuntos do Pergaminho e do Observatório continuam existindo
+# na tela (ui/estilo.css); aqui não entram porque, medidos contra papel
+# branco, caem a 1,28-2,99 de contraste. Detalhe em design/DASHBOARD.md.
+SERIE_DOCUMENTO = dict(s1="#2a78d6", s2="#eb6834", s3="#1baf7a", s4="#eda100",
+                       seq1="#cde2fb", seq2="#9ec5f4", seq3="#5598e7",
+                       seq4="#2a78d6", seq5="#1c5cab")
 
 
 # Estilo do painel impresso. As cores de série são as mesmas da tela — foram
@@ -2006,25 +1970,15 @@ _CSS_PAINEL_RESTO = """
 """
 
 
-def _css_painel(tema):
-    # Série fixa no conjunto do Portal, não no do tema ativo: cada conjunto
-    # foi calibrado para o fundo do seu tema, e o documento agora é sempre
-    # branco. Medido contra papel branco, as rampas do Observatório caem a
-    # 2,99 e 1,54 de contraste (seq4/seq5) e as do Pergaminho a 1,28-2,55 —
-    # invisíveis no papel. As do Portal são as que nasceram para superfície
-    # branca. As cores em si não mudaram: mudou qual conjunto o papel usa.
-    s = SERIES_PAINEL["portal"]
-    cabecalho = (
-        ":root { --s1:" + s["s1"] + "; --s2:" + s["s2"] + "; --s3:" + s["s3"]
-        + "; --s4:" + s["s4"] + "; --seq1:" + s["seq1"] + "; --seq2:"
-        + s["seq2"] + "; --seq3:" + s["seq3"] + "; --seq4:" + s["seq4"]
-        + "; --seq5:" + s["seq5"] + "; --surface:var(--superficie);"
-        " --surface2:var(--cabecalho); --muted:var(--suave);"
-        " --text:var(--texto); --border:var(--borda);"
-        " --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);"
-        " --warn:var(--atencao); --ok:#2f7d32; --pill:99px;"
-        " --font-ui:'Segoe UI',system-ui,sans-serif; }")
-    return cabecalho + _CSS_PAINEL_RESTO
+# As chaves de SERIE_DOCUMENTO já são os nomes das variáveis CSS (s1…seq5).
+CSS_PAINEL = (
+    ":root { "
+    + " ".join(f"--{chave}:{cor};" for chave, cor in SERIE_DOCUMENTO.items())
+    + " --surface:var(--superficie); --surface2:var(--cabecalho);"
+    " --muted:var(--suave); --text:var(--texto); --border:var(--borda);"
+    " --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);"
+    " --warn:var(--atencao); --ok:#2f7d32; --pill:99px;"
+    " --font-ui:'Segoe UI',system-ui,sans-serif; }") + _CSS_PAINEL_RESTO
 
 
 TITULOS_PAINEL = {"execucao": "Execução do exercício",
@@ -2033,7 +1987,7 @@ TITULOS_PAINEL = {"execucao": "Execução do exercício",
                   "economia": "Economia e comparativos"}
 
 
-def render_painel(vistas, municipio, uf, ano, tema="pergaminho", brasao=None):
+def render_painel(vistas, municipio, uf, ano, brasao=None):
     """Monta o painel impresso a partir do que a tela desenhou.
 
     Os gráficos não são redesenhados aqui: o SVG que vai ao papel é o mesmo
@@ -2045,11 +1999,11 @@ def render_painel(vistas, municipio, uf, ano, tema="pergaminho", brasao=None):
         f'</h2>{html}</section>'
         for nome, html in vistas if html)
     return _pagina(f"Painel — {municipio} — {ano}", corpo, municipio, uf,
-                   f"Exercício {ano}", paisagem=True, tema=tema, papel="A3",
-                   estilo_extra=_css_painel(tema), brasao=brasao)
+                   f"Exercício {ano}", paisagem=True, papel="A3",
+                   estilo_extra=CSS_PAINEL, brasao=brasao)
 
 
-def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
+def gerar(db, tipo, params, municipio, uf, destino):
     """Gera o relatório e retorna {"html": caminho, "csv": caminho|None}."""
     params = params or {}
     ano = params.get("ano")
@@ -2069,18 +2023,17 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_executivo(d, municipio, uf, tema, brasao=brasao)
+        conteudo = render_executivo(d, municipio, uf, brasao=brasao)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
     elif tipo == "economia":
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_economia(d, municipio, uf, tema, brasao=brasao)
+        conteudo = render_economia(d, municipio, uf, brasao=brasao)
         nome = f"economia_comparativo_{ano}"
         linhas_csv = d["economia"]["por_familia"]
     elif tipo == "minuta_pca":
-        import pca_builder
         if not ano:
             ano = date.today().year + 1
         itens = pca_builder.listar_minuta(db, ano, so_incluidos=True)
@@ -2089,7 +2042,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         d = {"ano": ano, "itens": itens,
              "totais": pca_builder.totais(itens),
              "parametros": json.loads(cfg[0]) if cfg else {}}
-        conteudo = render_minuta_pca(d, municipio, uf, tema, brasao=brasao)
+        conteudo = render_minuta_pca(d, municipio, uf, brasao=brasao)
         nome = f"minuta_pca_{ano}"
         linhas_csv = [{k: i[k] for k in ("descricao", "unidade", "categoria",
                                          "quantidade", "valor_unitario",
@@ -2103,7 +2056,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
                          params.get("excluidos"),
                          params.get("por_conteudo"),
                          params.get("corrigir_ipca"))
-        conteudo = render_precos(d, municipio, uf, tema, brasao=brasao)
+        conteudo = render_precos(d, municipio, uf, brasao=brasao)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"
         linhas_csv = d["linhas"]
@@ -2111,7 +2064,7 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
         if not ano:
             ano = date.today().year
         d = dados_fracionamento(db, ano, orgao, params.get("limites"))
-        conteudo = render_fracionamento(d, municipio, uf, tema, brasao=brasao)
+        conteudo = render_fracionamento(d, municipio, uf, brasao=brasao)
         nome = f"alerta_fracionamento_{ano}"
         linhas_csv = d["dispensas"]
     else:
@@ -2119,15 +2072,15 @@ def gerar(db, tipo, params, municipio, uf, destino, tema="pergaminho"):
             if vigentes else (f"Exercício {ano}" if ano else "Todo o período")
         if tipo == "contratacoes":
             d = dados_contratacoes(db, ano, params.get("modalidade"), orgao)
-            conteudo = render_contratacoes(d, municipio, uf, periodo_txt, tema,
+            conteudo = render_contratacoes(d, municipio, uf, periodo_txt,
                                            brasao=brasao)
         elif tipo == "contratos":
             d = dados_contratos(db, ano, vigentes, orgao)
-            conteudo = render_contratos(d, municipio, uf, periodo_txt, tema,
+            conteudo = render_contratos(d, municipio, uf, periodo_txt,
                                         brasao=brasao)
         elif tipo == "atas":
             d = dados_atas(db, ano, vigentes, orgao)
-            conteudo = render_atas(d, municipio, uf, periodo_txt, tema,
+            conteudo = render_atas(d, municipio, uf, periodo_txt,
                                    brasao=brasao)
         else:
             raise ValueError(f"tipo de relatório desconhecido: {tipo}")

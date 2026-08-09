@@ -22,6 +22,26 @@ troca o banco inteiro por um `.zip` de terceiro, validado só por
 
 314 pytest + 131 E2E. Os dois com teste que morde sem a correção.
 
+**Limpeza (auditoria de over-engineering) — −83 linhas**
+
+- **O parâmetro `tema` sumiu** de `gerar`, das 9 `render_*` e de `_pagina`.
+  Desde a v1.20.0 o documento tem paleta própria, então ele atravessava
+  11 funções sem alterar nada. Agora o documento não segue a tela **por
+  construção**: não há parâmetro para seguir.
+- **`PALETAS` deletado** (3 paletas, zero leitores) e `SERIES_PAINEL`
+  reduzido ao único conjunto que o papel usa, agora `SERIE_DOCUMENTO`.
+  `_vars()` e a concatenação manual de `_css_painel` viraram compreensão
+  sobre o próprio dicionário — as chaves já eram os nomes das variáveis
+  CSS.
+- **`restaurar_preco` deletado.** Sem chamador na interface desde que a
+  seleção virou opt-in, e no modelo atual fazia meia operação: limpava o
+  descarte sem repor o item na seleção — o defeito que `DASHBOARD.md` já
+  registrava. Método, teste e stub saíram juntos.
+- Miudezas: `estado.total` (escrito, nunca lido), 3º parâmetro de
+  `preencher()`, chave `unidade` duplicada em `ROTULOS`, id
+  `precos-selecao-criterio`, `import pca_builder` dentro de `gerar()` (já
+  era módulo) e `unidade` selecionada duas vezes no mesmo `SELECT`.
+
 ## 1.20.0 — 2026-08-08
 
 **Documento impresso fica sóbrio — e deixa de seguir o tema da tela**

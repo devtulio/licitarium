@@ -218,10 +218,6 @@ function scriptPonte(temaBanco = "portal") {
                                  motivo });
         return { ok: true };
       },
-      restaurar_preco: async (busca, item_id) => {
-        window.__chamadas.push({ metodo: "restaurar_preco", busca, item_id });
-        return { ok: true };
-      },
       classificar_por_unidade: async (busca, unidade, ano, origem) => {
         window.__chamadas.push({ metodo: "classificar_por_unidade", busca,
                                  unidade, ano, origem });
