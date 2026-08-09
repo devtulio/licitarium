@@ -4,6 +4,17 @@
 
 ![Versão](https://img.shields.io/github/v/release/devtulio/licitarium?label=vers%C3%A3o&color=blue) ![Lei](https://img.shields.io/badge/Lei-14.133%2F2021-green) ![Fonte](https://img.shields.io/badge/fonte-PNCP-informational) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Acesso](https://img.shields.io/badge/acesso-desktop%20offline-blueviolet) ![Plataforma](https://img.shields.io/badge/plataforma-Windows-lightgrey) [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21682535-1682D4)](https://doi.org/10.5281/zenodo.21682535) [![CI](https://github.com/devtulio/licitarium/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/licitarium/actions/workflows/ci.yml)
 
+---
+
+**📌 Aviso (agosto/2026):** o Licitarium desktop está em **modo estável**: a
+versão 1.21.x continua funcionando e recebendo correções críticas, mas o
+desenvolvimento ativo migrou para a
+**[plataforma Rationarium](https://github.com/devtulio/rationarium)** — mesma
+aplicação, agora multiusuário e hospedável, código AGPL-3.0. Quem preferir
+rodar gratuitamente por conta própria encontra lá as instruções de self-host.
+
+---
+
 ## Descrição
 
 O **Licitarium** espelha, no computador do órgão, tudo o que o município publica
