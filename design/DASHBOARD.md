@@ -559,3 +559,39 @@ Portal `s3` 2,82 e `s4` 2,17; Pergaminho `s2` 2,76; Observatório passa. É
 **pré-existente** e vale na tela, não só no papel — o Portal é o tema
 padrão. Corrigir exige revalidar daltonismo pelo script de seis checks,
 que é o que esta paleta protege desde o início; fica como rodada própria.
+
+## A paleta foi validada, não avaliada (2026-08-09)
+
+Rodado o validador de seis checks da skill `dataviz` nas três paletas de
+série. **As três passam**: banda de luminosidade, piso de croma, separação
+sob daltonismo, piso de visão normal e contraste.
+
+| tema | separação CVD (pior par adjacente) | contraste |
+|---|---|---|
+| portal | ΔE 9,1 protan · 27,0 tritan | aviso: s3 2,74 · s4 2,11 |
+| pergaminho | ΔE 8,2 protan · 7,9 tritan | aviso: s2 2,87 |
+| observatorio | ΔE 8,4 protan · 24,4 tritan | passa |
+
+**O aviso de contraste não pede troca de cor.** Pelo critério da skill ele
+é satisfeito por "rótulo visível ou tabela" — e esse alívio já existe aqui
+desde sempre, pela regra "cor nunca sozinha: toda série tem rótulo
+direto". Conferido gráfico por gráfico: todo uso de cor em aviso tem
+rótulo e valor na própria barra, e no relatório vem a tabela completa
+embaixo.
+
+**Não mexer na paleta por causa disso.** A separação sob daltonismo passa
+perto do piso (8,2 no pergaminho); re-escalonar as cores para ganhar
+contraste arriscaria justamente o check que mais importa. O caminho certo,
+quando o contraste incomodar, é usar o slot mais escuro — não inventar
+cor nova.
+
+**Foi o que se fez no relatório de economia.** Os quatro gráficos de lá
+usavam s1/s2/s3/s4, enquanto na tela os mesmos quatro usam o padrão s1.
+São de série única: a cor não codifica nada, o título é que identifica.
+Alinhados no s1 — segue o método ("one series → one color, slot 1"),
+restaura a leitura igual entre tela e papel, e resolve o aviso de graça,
+porque s1 é a única do conjunto acima de 3.0 contra papel branco.
+
+**`tabular-nums` saiu dos números de exibição** (`.hero .n`, `.kpiv .v`,
+`.kpi .n`). Largura fixa de dígito é para número que alinha na vertical —
+tabela, eixo, onde continua. Em display, deixa o valor frouxo.

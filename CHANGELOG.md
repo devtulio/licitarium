@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.20.4 — 2026-08-09
+
+**Gráficos: método dataviz (auditoria visual)**
+
+A paleta foi validada rodando o script de seis checks, não a olho. **Os
+três temas passam em tudo** — banda de luminosidade, piso de croma,
+separação sob daltonismo (ΔE 8,2–9,1), piso de visão normal e contraste.
+Os avisos de contraste que restam são satisfeitos pelo alívio que a regra
+do projeto já exige — rótulo direto em toda barra, mais a tabela completa
+no relatório. **A paleta não foi mexida**: mudá-la arriscaria a separação
+sob daltonismo, que passa perto do piso.
+
+- **O papel deixou de divergir da tela.** Os quatro gráficos de economia
+  do relatório usavam quatro cores diferentes, enquanto na tela os mesmos
+  quatro usam a cor padrão. São gráficos de série única — a cor não
+  codifica nada ali, quem diz de que é cada um é o título. Agora todos
+  usam a mesma, o que também tira o aviso de contraste (a cor escolhida é
+  a única do conjunto acima de 3.0 contra papel branco).
+- **Número grande deixou de usar largura fixa de dígito.** `tabular-nums`
+  em número de exibição deixa o valor "frouxo"; ele serve para onde
+  números se alinham na vertical (tabela, eixo), e lá continua.
+
+326 pytest + 136 E2E.
+
 ## 1.20.3 — 2026-08-09
 
 **Acessibilidade: o que um leitor de tela recebia (auditoria WCAG 2.1 AA)**

@@ -1877,18 +1877,18 @@ def render_economia(d, municipio, uf, brasao=None):
         e["por_familia"], valor=lambda f: f["economizado"] or 0,
         rotulo=lambda f: f["nome"] or "–",
         sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'}",
-        cor="var(--s2)", larg=300)
+        cor="var(--s1)", larg=300)
     graf_cat = _grafico_barras(
         e["por_categoria"], valor=lambda c: c["economizado"] or 0,
         rotulo=lambda c: c["nome"] or "–",
         sub=lambda c: f"{c['n']} {'item' if c['n'] == 1 else 'itens'}",
-        cor="var(--s3)", larg=300)
+        cor="var(--s1)", larg=300)
     graf_forn = _grafico_barras(
         e["por_fornecedor"], valor=lambda f: f["economizado"] or 0,
         rotulo=lambda f: f["nome"] or "–",
         sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'} · "
                       f"{f['pct']:.0f}%",
-        cor="var(--s4)", larg=900)
+        cor="var(--s1)", larg=900)
     charts = f"""<div class="faixa f-3">
 <div class="card"><h3>Por modalidade</h3>{graf_mod}</div>
 <div class="card"><h3>Por família de item</h3>{graf_fam}</div>
