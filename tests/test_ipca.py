@@ -219,9 +219,10 @@ def test_por_conteudo_usa_o_valor_ja_corrigido(api):
 
 # ── no documento ────────────────────────────────────────────────────────
 
-def test_documento_corrigido_declara_indice_e_data(api, tmp_path):
+def test_documento_corrigido_declara_indice_e_data(api, tmp_path, selecionar_tudo):
     db = _db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos",
                              {"termo": "papel a4", "corrigir_ipca": True},
                              "Orindiúva", "SP", tmp_path / "rel")
@@ -235,9 +236,10 @@ def test_documento_corrigido_declara_indice_e_data(api, tmp_path):
     assert ">Corrigido</th>" in html
 
 
-def test_documento_normal_nao_menciona_correcao(api, tmp_path):
+def test_documento_normal_nao_menciona_correcao(api, tmp_path, selecionar_tudo):
     db = _db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")

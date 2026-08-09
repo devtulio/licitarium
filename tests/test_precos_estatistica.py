@@ -108,13 +108,14 @@ def test_estatisticas_de_preco_trazem_dispersao_e_apontam_o_extremo(api):
     assert s["maximo"] > s["limite_sup"]
 
 
-def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path):
+def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path, selecionar_tudo):
     """Pedido do usuário (2026-08-08): os 6 números (mín/Q1/mediana/média/
     Q3/máx) já apareciam em texto — o gráfico (caixa de Tukey) mostra a
     distância entre mediana e média num olhar só, sem obrigar a ler os
     números e fazer a conta de cabeça. I7 (R$ 1.490,00) é o extremo real
     desta fixture, então tem de acender o aviso de "fora da faixa"."""
     db = licitarium.abrir_db()
+    selecionar_tudo(db, "papel a4")
     r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                          "T", "SP", tmp_path)
     db.close()
@@ -303,7 +304,12 @@ def test_desselecionar_todos_zera_a_selecao(api):
 
 def test_relatorio_de_precos_segue_a_selecao_da_tela(api, tmp_path):
     """O documento tem de sair sobre a mesma seleção que a tela mostrava —
-    não sobre tudo que a busca trouxe (achado do usuário, 2026-08-08)."""
+    não sobre tudo que a busca trouxe (achado do usuário, 2026-08-08).
+
+    Este teste NÃO usa a fixture `selecionar_tudo` de propósito: quem faz a
+    seleção aqui é `classificar_por_unidade`, e selecionar tudo por cima
+    apagaria justamente o que ele verifica.
+    """
     api.classificar_por_unidade("papel a4", "Caixa")
     db = licitarium.abrir_db()
     r = relatorios.gerar(db, "precos", {"termo": "papel a4"},

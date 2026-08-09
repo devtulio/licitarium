@@ -1123,13 +1123,19 @@ def resumo_estatistico(valores):
 
 
 def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
-                 por_conteudo=False, corrigir_ipca=False):
+                 por_conteudo=False, corrigir_ipca=False,
+                 exigir_selecao=False):
     """Histórico de preços unitários homologados para um termo de busca.
 
     Os itens desconsiderados saem do cálculo mas não do documento: eles
     reaparecem numa seção própria, com a razão de cada um. A pesquisa de
     preços é peça de processo, e desprezar um preço coletado sem dizer por
     quê é o que o art. 23 e a IN SEGES 65/2021 não admitem.
+
+    `exigir_selecao` distingue duas coisas que a tabela vazia confundia
+    (achado da auditoria de 2026-08-09): "ninguém selecionou nada" e
+    "chamada que não passa pela tela". Quem gera documento passa True e
+    recebe erro em vez de um relatório sobre a busca inteira.
     """
     where = ["valor_unitario_homologado IS NOT NULL"]
     args = []
@@ -1159,8 +1165,7 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
         args += grupo
     # a busca abre com tudo desmarcado (pedido do usuário, 2026-08-08); o
     # documento tem de sair sobre a mesma seleção que a tela mostrava, não
-    # sobre tudo que a busca trouxe. Seleção vazia = chamada antiga/direta
-    # (testes, uso de antes desta tabela existir) — sem filtro extra
+    # sobre tudo que a busca trouxe.
     selecionados = [r[0] for r in db.execute(
         "SELECT item_id FROM precos_selecionados WHERE termo=?",
         (chave_termo(termo),))]
@@ -1179,6 +1184,18 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
                    referencia, municipio_ibge
             FROM itens{sql_where}
             ORDER BY valor_unitario_homologado""", args)]
+    # Sem esta guarda, gerar o documento com a tela dizendo "Nenhum item
+    # selecionado ainda" produzia um relatório sobre a busca INTEIRA — com
+    # mediana e máximo de uma série que o usuário nunca curou, e nenhum
+    # aviso no papel. Número errado em peça de processo é o pior defeito
+    # que este programa pode ter.
+    # A checagem vem DEPOIS da consulta de propósito: busca que não achou
+    # nada já tem documento próprio ("nenhum item encontrado"), e mandar
+    # selecionar o que não existe seria pior que o silêncio.
+    if exigir_selecao and not selecionados and linhas:
+        raise ValueError(
+            "selecione na aba Preços os itens que entram na pesquisa antes "
+            "de gerar o documento")
     # de onde veio cada preço: o documento tem de dizer, porque parâmetro
     # de outro ente é admitido pelo art. 23, §1º, I, mas precisa estar claro
     nomes = {r["ibge"]: r["nome"] for r in
@@ -2055,7 +2072,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
         d = dados_precos(db, termo, ano, orgao,
                          params.get("excluidos"),
                          params.get("por_conteudo"),
-                         params.get("corrigir_ipca"))
+                         params.get("corrigir_ipca"),
+                         exigir_selecao=True)
         conteudo = render_precos(d, municipio, uf, brasao=brasao)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"

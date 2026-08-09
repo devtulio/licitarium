@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.20.2 — 2026-08-09
+
+**Dois defeitos críticos da auditoria de falha silenciosa**
+
+- **A pesquisa de preços saía sobre a busca inteira quando nada estava
+  selecionado.** A tela dizia *"Nenhum item selecionado ainda"*; o
+  documento saía pronto, com mediana e máximo de uma série que o usuário
+  nunca curou — incluindo preço de município de referência — e sem
+  nenhum aviso no papel. Medido numa amostra: mediana R$ 17,50 e máximo
+  R$ 500,00 sem seleção, contra R$ 12,00 e R$ 15,00 com os itens
+  escolhidos. Gerar agora recusa e explica. Busca que não acha nada segue
+  gerando o documento de "nenhum item encontrado" — mandar selecionar o
+  que não existe seria pior.
+- **"Lembrar onde o usuário estava" nunca funcionou.** A allowlist de
+  `set_config` é da 0.1.0; `aba` chegou na v1.12.0 e `painel_vista`
+  depois, e nenhuma das duas foi acrescentada — `set_config` devolvia
+  `False` em silêncio e `get_estado` caía no padrão. Corrigido, mais
+  recusa de valor nulo (que também fingia ter gravado).
+
+Por que nenhum teste pegou o segundo: os E2E que cobrem a persistência
+batem no mock do harness, que aceita qualquer chave. Eles provam que a
+interface **envia** a chamada certa, não que o backend **aceita**. O novo
+`tests/test_config.py` fecha o outro lado — grava pela ponte e lê de volta
+por `get_estado`, sem mock no meio, e ainda confere que toda chave enviada
+pela interface consta da allowlist.
+
+326 pytest (era 314) + 131 E2E. Os onze testes que geravam o documento sem
+seleção passaram a selecionar antes, pela fixture nova `selecionar_tudo`.
+
 ## 1.20.1 — 2026-08-09
 
 **Dois sinks de XSS armazenado nos relatórios (auditoria de segurança)**

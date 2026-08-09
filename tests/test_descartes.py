@@ -78,7 +78,7 @@ def test_motivos_da_tela_sao_os_mesmos_do_documento(api):
     assert relatorios.rotulo_motivo(None) is None
 
 
-def test_documento_tira_do_calculo_e_mostra_na_secao_propria(api, tmp_path):
+def test_documento_tira_do_calculo_e_mostra_na_secao_propria(api, tmp_path, selecionar_tudo):
     api.descartar_preco("papel a4", "I3", "nao_comparavel")
     db = _db()
     try:
@@ -88,6 +88,7 @@ def test_documento_tira_do_calculo_e_mostra_na_secao_propria(api, tmp_path):
         assert d["resumo"]["n"] == 2
         assert [l["id"] for l in d["desconsiderados"]] == ["I3"]
 
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")
@@ -99,11 +100,12 @@ def test_documento_tira_do_calculo_e_mostra_na_secao_propria(api, tmp_path):
     assert "Item não comparável ao objeto pesquisado" in fora
 
 
-def test_documento_acusa_o_que_ficou_sem_justificativa(api, tmp_path):
+def test_documento_acusa_o_que_ficou_sem_justificativa(api, tmp_path, selecionar_tudo):
     api.descartar_preco("papel a4", "I3")          # sem razão
     api.descartar_preco("papel a4", "I2", "embalagem")
     db = _db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")
@@ -114,9 +116,10 @@ def test_documento_acusa_o_que_ficou_sem_justificativa(api, tmp_path):
     assert "registre a razão antes de juntar este" in html
 
 
-def test_pesquisa_sem_descarte_nao_ganha_secao(api, tmp_path):
+def test_pesquisa_sem_descarte_nao_ganha_secao(api, tmp_path, selecionar_tudo):
     db = _db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")

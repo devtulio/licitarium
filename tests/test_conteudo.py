@@ -194,9 +194,10 @@ def test_lista_traz_o_valor_por_conteudo_de_cada_item(api):
 # ── e no documento ──────────────────────────────────────────────────────
 
 def test_documento_por_conteudo_declara_a_base_e_quem_ficou_de_fora(
-        api, tmp_path):
+        api, tmp_path, selecionar_tudo):
     db = licitarium.abrir_db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos",
                              {"termo": "papel a4", "por_conteudo": True},
                              "Orindiúva", "SP", tmp_path / "rel")
@@ -209,9 +210,10 @@ def test_documento_por_conteudo_declara_a_base_e_quem_ficou_de_fora(
     assert "não entrou nesta comparação" in html
 
 
-def test_documento_normal_nao_ganha_coluna_nem_aviso(api, tmp_path):
+def test_documento_normal_nao_ganha_coluna_nem_aviso(api, tmp_path, selecionar_tudo):
     db = licitarium.abrir_db()
     try:
+        selecionar_tudo(db, "papel a4")
         r = relatorios.gerar(db, "precos", {"termo": "papel a4"},
                              "Orindiúva", "SP", tmp_path / "rel")
         html = Path(r["html"]).read_text(encoding="utf-8")

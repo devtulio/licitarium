@@ -261,7 +261,7 @@ def test_ordenacao_por_municipio_usa_o_nome_e_nao_o_codigo(api):
     assert [i["municipio_nome"] for i in desc] == ["Orindiúva", "Barretos"]
 
 
-def test_descarte_de_item_nao_entra_no_resumo_nem_no_relatorio(api, tmp_path):
+def test_descarte_de_item_nao_entra_no_resumo_nem_no_relatorio(api, tmp_path, selecionar_tudo):
     """A pesquisa do art. 23 só vale sobre itens comparáveis.
 
     Buscar "papel higiênico" traz suporte de papel e locação de banheiro
@@ -279,6 +279,7 @@ def test_descarte_de_item_nao_entra_no_resumo_nem_no_relatorio(api, tmp_path):
         d = relatorios.dados_precos(db, "papel sulfite",
                                     excluidos=["REF-1#1"])
         assert len(d["linhas"]) == 1
+        selecionar_tudo(db, "papel sulfite")
         r = relatorios.gerar(db, "precos",
                              {"termo": "papel sulfite",
                               "excluidos": ["REF-1#1"]},

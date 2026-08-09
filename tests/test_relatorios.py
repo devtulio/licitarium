@@ -172,7 +172,7 @@ def test_filtro_orgao_nos_relatorios(db, tmp_path):
     assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
 
 
-def test_precos_estatisticas_e_relatorio(db, tmp_path):
+def test_precos_estatisticas_e_relatorio(db, tmp_path, selecionar_tudo):
     db.executemany(
         "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
         " numero_item, descricao, unidade, quantidade_homologada,"
@@ -195,6 +195,7 @@ def test_precos_estatisticas_e_relatorio(db, tmp_path):
     assert [l["valor_unitario_homologado"] for l in d["linhas"]] == [10., 20., 30.]
     # filtro por exercício
     assert relatorios.dados_precos(db, "papel", ano=2025)["resumo"]["n"] == 1
+    selecionar_tudo(db, "papel A4")
     r = relatorios.gerar(db, "precos", {"termo": "papel A4"}, "T", "SP", tmp_path)
     html = Path(r["html"]).read_text(encoding="utf-8")
     assert "Pesquisa de Preços" in html and "art. 23" in html
@@ -457,3 +458,39 @@ def test_competencia_do_ipca_com_marcacao_nao_vira_html(db):
         relatorios.dados_precos(db, "papel", corrigir_ipca=True), "T", "SP")
     assert payload not in html
     assert "<script>" not in html
+
+
+def test_documento_de_precos_recusa_sair_sem_selecao(db, tmp_path):
+    """Achado da auditoria de 2026-08-09 — o pior defeito que apareceu.
+
+    Com a tela dizendo "Nenhum item selecionado ainda", gerar o documento
+    produzia um relatório sobre a busca INTEIRA: mediana e máximo de uma
+    série que o usuário nunca curou, incluindo preço de município de
+    referência, e sem nenhum aviso no papel. Pesquisa de preços é peça de
+    processo — número errado ali é o pior defeito possível.
+    """
+    for i, valor in enumerate((10.0, 12.0, 15.0, 400.0, 500.0, 600.0)):
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
+            " unidade, valor_unitario_homologado, quantidade_homologada,"
+            " data_resultado, referencia)"
+            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,10,"
+            " '2026-01-01',0)", (f"S#{i}", valor))
+    db.commit()
+
+    with pytest.raises(ValueError, match="selecione"):
+        relatorios.gerar(db, "precos", {"termo": "papel"}, "T", "SP", tmp_path)
+
+    # com seleção, sai — e sobre o que foi selecionado, não sobre tudo
+    for i in range(3):
+        db.execute("INSERT INTO precos_selecionados (termo, item_id,"
+                   " criado_em) VALUES (?,?,'x')",
+                   (relatorios.chave_termo("papel"), f"S#{i}"))
+    db.commit()
+    r = relatorios.gerar(db, "precos", {"termo": "papel"}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "R$ 12,00" in html                 # mediana dos 3 selecionados
+    assert "R$ 600,00" not in html            # o que ficou de fora, ficou
+
+    # a chamada direta (teste, uso fora da tela) segue sem exigir seleção
+    assert relatorios.dados_precos(db, "papel")["resumo"]["n"] == 3

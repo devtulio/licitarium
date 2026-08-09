@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.20.1"
+VERSAO = "1.20.2"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -645,10 +645,19 @@ class Api:
             self._janela.set_title(texto)
         return True
 
+    # Allowlist: a ponte é chamável por qualquer JS da página, então só
+    # estas chaves podem ser gravadas. Quem acrescentar preferência nova
+    # PRECISA vir aqui — `aba` e `painel_vista` ficaram de fora quando
+    # nasceram (v1.12.0 e depois) e as duas funcionalidades de "lembrar
+    # onde o usuário estava" nunca funcionaram: `set_config` devolvia False
+    # em silêncio e `get_estado` caía no padrão. Achado da auditoria de
+    # 2026-08-09; `tests/test_config.py` fecha o contrato de ida e volta.
+    CHAVES_CONFIG = ("tema", "largura", "fonte", "densidade", "colunas",
+                     "maximizar", "limite_dispensa_compras",
+                     "limite_dispensa_obras", "aba", "painel_vista")
+
     def set_config(self, chave, valor):
-        if chave not in ("tema", "largura", "fonte", "densidade",
-                         "colunas", "maximizar", "limite_dispensa_compras",
-                         "limite_dispensa_obras"):
+        if chave not in self.CHAVES_CONFIG or valor is None:
             return False
         db = abrir_db()
         try:
