@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.21.0 — 2026-08-09
+
+**Fecha as correções em aberto das auditorias**
+
+- **A ponte com o Python ganhou rede.** O pywebview *rejeita* a promise
+  quando o Python levanta, e no exe sem console o traceback não vai a
+  lugar nenhum: uma chamada que falhava deixava os números **velhos** na
+  tela — marcar "corrigir pelo IPCA", a chamada falhar, e o resumo seguir
+  mostrando os valores não corrigidos com a caixa marcada. Um `Proxy` no
+  ponto único onde a ponte é ligada, em vez de `try/catch` em ~50 lugares.
+- **Seleção que não grava não fica muda.** A tela mostra um conjunto em
+  memória; o documento sai da tabela do banco. Se a gravação não pegava e
+  ninguém lia o retorno, os dois divergiam sem sintoma — a mediana da tela
+  deixava de ser a do papel. Agora a caixa volta atrás, o usuário é
+  avisado e a lista é relida do banco. Saiu também o `?.` dos seis pontos
+  de gravação: os métodos existem, e o `?.` só esconderia uma renomeação.
+- **Cópia do acervo que falha avisa.** Disco cheio deixava um `.zip`
+  truncado, de nome plausível, e a tela presa em "Salvando cópia…". Na
+  restauração a ordem estava pior: o acervo era renomeado **antes** da
+  cópia, então uma falha no meio deixava o usuário sem banco nenhum, o
+  dele sob um nome que ninguém contou. Agora a parte demorada acontece
+  primeiro e, se a troca falhar, o acervo volta ao lugar.
+- **404 do PNCP deixou de virar "não tem itens".** Um 404 sob carga é
+  portal ocupado; tratá-lo como ausência carimbava a contratação como
+  resolvida e ela **nunca mais** era revisitada — os preços dela sumiam do
+  banco calados. Agora fica pendente para a próxima coleta, e o aviso
+  aparece em Configurações → Sincronizações recentes.
+- **Largura de coluna por modo na aba Preços.** "Corrigir pelo IPCA" e
+  "comparar por conteúdo" acrescentam uma coluna cada; tudo era guardado
+  sob a mesma chave, e a guarda só rejeitava mapa faltando entrada, nunca
+  sobrando — voltar ao modo base aplicava as 8 primeiras larguras de um
+  layout de 9 e desalinhava. As variantes também liam variáveis CSS que
+  nada definia, então arrastar ali não aplicava nada.
+
+**Dívida técnica, fase 1:** teto no `pywebview` (`<7` — a API já derivou
+uma vez e o CI instalava sem trava), Node 24 no CI (o 20 está depreciado)
+e o piso de Python declarado no README.
+
+330 pytest + 139 E2E. Cada correção com teste que morde sem ela.
+
 ## 1.20.4 — 2026-08-09
 
 **Gráficos: método dataviz (auditoria visual)**

@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.20.4"
+VERSAO = "1.21.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1829,21 +1829,36 @@ class Api:
         manifesto = {"_sgx": "LICITARIUM", "schema": ACERVO_SCHEMA,
                      "exportedAt": agora.isoformat(), "versao": VERSAO,
                      "municipio": municipio, "contagens": contagens}
-        with tempfile.TemporaryDirectory() as tmp:
-            copia = Path(tmp) / "licitarium.db"
-            origem = abrir_db()
-            try:
-                destino_db = sqlite3.connect(copia)
+        # Cópia que falha calada é pior que cópia que não existe: o usuário
+        # fica com um .zip truncado, de nome plausível, achando que tem
+        # backup. Disco cheio ou pasta sem permissão levantam OSError aqui
+        # (achado da auditoria de falha silenciosa, 2026-08-09).
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                copia = Path(tmp) / "licitarium.db"
+                origem = abrir_db()
                 try:
-                    origem.backup(destino_db)
+                    destino_db = sqlite3.connect(copia)
+                    try:
+                        origem.backup(destino_db)
+                    finally:
+                        destino_db.close()
                 finally:
-                    destino_db.close()
-            finally:
-                origem.close()
-            with zipfile.ZipFile(caminho, "w", zipfile.ZIP_DEFLATED) as z:
-                z.write(copia, "licitarium.db")
-                z.writestr("manifesto.json",
-                           json.dumps(manifesto, ensure_ascii=False, indent=2))
+                    origem.close()
+                with zipfile.ZipFile(caminho, "w", zipfile.ZIP_DEFLATED) as z:
+                    z.write(copia, "licitarium.db")
+                    z.writestr("manifesto.json",
+                               json.dumps(manifesto, ensure_ascii=False,
+                                          indent=2))
+        except (OSError, sqlite3.Error) as e:
+            # o arquivo pela metade não pode ficar no disco passando por
+            # cópia boa
+            try:
+                Path(caminho).unlink(missing_ok=True)
+            except OSError:
+                pass
+            return {"ok": False,
+                    "erro": f"não consegui gravar a cópia em {caminho}: {e}"}
         return {"ok": True, "arquivo": caminho,
                 "mb": round(Path(caminho).stat().st_size / 1e6, 1),
                 "contagens": contagens}
@@ -1890,14 +1905,40 @@ class Api:
             finally:
                 conferencia.close()
             carimbo = datetime.now().strftime("%Y%m%d-%H%M%S")
-            if ARQUIVO_DB.exists():
-                ARQUIVO_DB.rename(ARQUIVO_DB.with_name(
-                    f"{ARQUIVO_DB.name}.substituido-{carimbo}"))
-            for sufixo in ("-wal", "-shm"):
-                f = Path(str(ARQUIVO_DB) + sufixo)
-                if f.exists():
-                    f.unlink()
-            shutil.move(str(novo), str(ARQUIVO_DB))
+            # A ordem importa (auditoria de falha silenciosa, 2026-08-09):
+            # antes o acervo era renomeado ANTES da cópia, então uma falha
+            # no meio deixava o usuário sem `licitarium.db` nenhum — o
+            # dele guardado sob um nome que ninguém contou, e o programa
+            # criando um banco vazio na abertura seguinte. Agora a parte
+            # demorada e que pode faltar espaço (copiar de outro sistema
+            # de arquivos) acontece primeiro, num nome de passagem na
+            # pasta final; só depois vêm as duas renomeações rápidas.
+            passagem = ARQUIVO_DB.with_name(
+                f"{ARQUIVO_DB.name}.novo-{carimbo}")
+            try:
+                shutil.move(str(novo), str(passagem))
+            except OSError as e:
+                return {"ok": False,
+                        "erro": f"não consegui gravar o acervo novo: {e}"}
+            guardado = None
+            try:
+                if ARQUIVO_DB.exists():
+                    guardado = ARQUIVO_DB.with_name(
+                        f"{ARQUIVO_DB.name}.substituido-{carimbo}")
+                    ARQUIVO_DB.rename(guardado)
+                for sufixo in ("-wal", "-shm"):
+                    f = Path(str(ARQUIVO_DB) + sufixo)
+                    if f.exists():
+                        f.unlink()
+                passagem.replace(ARQUIVO_DB)
+            except OSError as e:
+                # devolve o acervo ao lugar antes de sair
+                if guardado and guardado.exists() and not ARQUIVO_DB.exists():
+                    guardado.rename(ARQUIVO_DB)
+                passagem.unlink(missing_ok=True)
+                return {"ok": False,
+                        "erro": f"a troca falhou e o acervo anterior foi "
+                                f"devolvido ao lugar: {e}"}
         return {"ok": True, "itens": itens,
                 "municipio": manifesto.get("municipio"),
                 "exportado_em": manifesto.get("exportedAt")}

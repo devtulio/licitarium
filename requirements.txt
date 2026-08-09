@@ -1,1 +1,5 @@
-pywebview>=5.0
+# Teto de maior: a API do pywebview já derivou uma vez (webview.SAVE_DIALOG
+# virou FileDialog.SAVE na 6.x — ver o getattr duplo em licitarium.py), e o
+# CI instala sem trava. Sem o teto, um pywebview 7 quebraria o build sem
+# aviso nenhum (auditoria de dívida técnica, 2026-08-09).
+pywebview>=5.0,<7

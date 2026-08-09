@@ -899,7 +899,9 @@ $("painel").querySelectorAll(".subabas button").forEach(b =>
     P.vista = b.dataset.vista;
     marcarAba($("painel").querySelectorAll(".subabas button"), x => x === b);
     // a subaba fica lembrada: quem usa o painel para vigiar abre nela
-    api.set_config?.("painel_vista", P.vista);
+    // (a chave ficou fora da allowlist por versões a fio e isso passava em
+    // silêncio — ver tests/test_config.py)
+    api.set_config("painel_vista", P.vista);
     // as três vistas já estão montadas: trocar é mostrar, não recarregar —
     // antes cada clique refazia a consulta inteira ao banco
     mostrarVista();

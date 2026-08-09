@@ -200,7 +200,11 @@ function scriptPonte(temaBanco = "portal") {
         const foraSaiu = (excluidos || []).includes("X-3#10")
           || (incluidos && !incluidos.includes("X-3#10"));
         const fora = foraSaiu ? [] : ["X-3#10"];
-        return { n: 7, minimo: 15.4, maximo: 249.8, media: 53.63,
+        // n é subconjunto de total: devolver 7 com total 6 fazia a tela
+        // renderizar "7 de 6 selecionados" e o teste do contador ser
+        // afrouxado para tolerar (auditoria, 2026-08-09)
+        return { n: incluidos ? incluidos.length : 5,
+                 minimo: 15.4, maximo: 249.8, media: 53.63,
                  mediana: 18.75, fornecedores: 2,
                  desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
                  limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,

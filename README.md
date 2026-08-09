@@ -207,6 +207,10 @@ Requisitos: Windows 10/11 com WebView2 (já incluído no Windows 11; no Windows 
 A única dependência externa é o `pywebview` — todo o resto é biblioteca padrão
 do Python.
 
+**Python: use 3.12.** É a versão que o CI exercita e a que empacota o exe. O
+código não usa sintaxe posterior ao 3.8, então versões mais antigas provavelmente
+rodam — mas ninguém testa, então não são suportadas.
+
 Manual completo do usuário: [MANUAL.html](MANUAL.html) (abra no navegador; o
 botão 🖨 gera o PDF).
 

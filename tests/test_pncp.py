@@ -402,3 +402,56 @@ def test_sync_da_abertura_respeita_intervalo_minimo(tmp_path, monkeypatch):
         assert chamou
     finally:
         db.close()
+
+
+def test_404_na_listagem_de_itens_nao_vira_ausencia(tmp_path, monkeypatch):
+    """404 sob carga é portal ocupado, não "esta contratação não tem item".
+
+    Antes o 404 virava lista vazia, `itens_versao` era carimbado e a
+    contratação NUNCA MAIS era revisitada — os preços dela sumiam do banco
+    em silêncio (auditoria de falha silenciosa, 2026-08-09).
+    """
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO contratacoes (numero_controle, orgao_cnpj, ano,"
+               " sequencial, data_atualizacao, objeto)"
+               " VALUES ('C','111',2026,7,'2026-01-01','x')")
+    db.commit()
+
+    def so_404(caminho, params, **kw):
+        if "/itens" in caminho:
+            raise pncp.ItensIndisponiveis("HTTP 404 em " + caminho)
+        return None
+    monkeypatch.setattr(pncp, "_get", so_404)
+
+    assert pncp.sync_itens(db) == 0
+    # a contratação continua pendente: itens_versao não foi carimbado
+    versao = db.execute("SELECT itens_versao FROM contratacoes"
+                        " WHERE numero_controle='C'").fetchone()[0]
+    assert versao is None
+    # e o usuário fica sabendo, em Configurações → Sincronizações recentes
+    log = db.execute("SELECT status, erro FROM sync_log"
+                     " WHERE tipo='itens'").fetchone()
+    assert log[0] == "aviso" and "404" in log[1]
+    db.close()
+
+
+def test_listagem_vazia_de_verdade_carimba_normalmente(tmp_path, monkeypatch):
+    """O contrário do teste acima: 204/lista vazia É ausência, e aí a
+    contratação tem de ser dada por resolvida — senão o sync revisita ela
+    para sempre."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t2.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO contratacoes (numero_controle, orgao_cnpj, ano,"
+               " sequencial, data_atualizacao, objeto)"
+               " VALUES ('C','111',2026,7,'2026-01-01','x')")
+    db.commit()
+    monkeypatch.setattr(pncp, "_get", lambda c, p, **kw: None)
+
+    pncp.sync_itens(db)
+    versao = db.execute("SELECT itens_versao FROM contratacoes"
+                        " WHERE numero_controle='C'").fetchone()[0]
+    assert versao == "2026-01-01"
+    db.close()

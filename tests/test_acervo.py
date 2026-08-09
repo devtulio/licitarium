@@ -156,3 +156,50 @@ def test_copia_leva_o_que_ainda_esta_no_diario_de_transacoes(api, tmp_path):
         assert gravado == "Recem gravada"
     finally:
         copia.close()
+
+
+# ── falha na gravação não pode ficar muda (auditoria, 2026-08-09) ─────────
+
+def test_exportar_avisa_e_nao_deixa_zip_pela_metade(api, tmp_path,
+                                                    monkeypatch):
+    """Disco cheio deixava um .zip truncado, de nome plausível, e a tela
+    presa em "Salvando cópia…" — o usuário achava que tinha backup."""
+    destino = tmp_path / "copia.zip"
+    api._janela.resposta = str(destino)
+
+    def sem_espaco(*a, **k):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(licitarium.zipfile, "ZipFile", sem_espaco)
+
+    r = api.exportar_acervo()
+    assert r["ok"] is False
+    assert "não consegui gravar" in r["erro"]
+    assert not destino.exists()          # o arquivo pela metade não fica
+
+
+def test_importar_devolve_o_acervo_quando_a_troca_falha(api, tmp_path,
+                                                        monkeypatch):
+    """Antes o acervo era renomeado ANTES da cópia: uma falha no meio
+    deixava o usuário sem banco nenhum, o dele sob um nome que ninguém
+    contou, e o programa criando um vazio na abertura seguinte."""
+    copia = tmp_path / "copia.zip"
+    api._janela.resposta = str(copia)
+    assert api.exportar_acervo()["ok"]
+
+    antes = licitarium.ARQUIVO_DB.read_bytes()
+    api._janela.resposta = str(copia)
+
+    original = licitarium.Path.replace
+
+    def falhar(self, alvo):
+        if str(alvo) == str(licitarium.ARQUIVO_DB):
+            raise OSError(13, "Permission denied")
+        return original(self, alvo)
+    monkeypatch.setattr(licitarium.Path, "replace", falhar)
+
+    r = api.importar_acervo()
+    assert r["ok"] is False
+    assert "devolvido ao lugar" in r["erro"]
+    # o acervo do usuário continua onde estava, e intacto
+    assert licitarium.ARQUIVO_DB.exists()
+    assert licitarium.ARQUIVO_DB.read_bytes() == antes

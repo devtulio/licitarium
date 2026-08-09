@@ -52,6 +52,17 @@ class PncpErro(Exception):
     """Falha de comunicação com o PNCP após esgotar as tentativas."""
 
 
+class ItensIndisponiveis(PncpErro):
+    """O portal respondeu 404 na listagem de itens de uma contratação.
+
+    Não é o mesmo que "esta contratação não tem item nenhum". Um 404 sob
+    carga é portal ocupado, e tratá-lo como ausência fazia `itens_versao`
+    ser carimbado — a contratação nunca mais era revisitada e os preços
+    dela sumiam do banco em silêncio (auditoria de falha silenciosa,
+    2026-08-09; a mesma lição de "falha ≠ ausência" que já mordeu antes).
+    """
+
+
 _INTERVALO_MIN = 0.5  # s entre requisições — o PNCP tem throttling agressivo
 _ultima_req = 0.0
 _trava_pacing = threading.Lock()
@@ -110,7 +121,8 @@ def _espera(tentativa):
     return 2 ** tentativa + random.uniform(0, 0.5)
 
 
-def _get(caminho, params, tentativas=5, base=None, pacing=True):
+def _get(caminho, params, tentativas=5, base=None, pacing=True,
+         erro_404=False):
     """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados.
 
     Com pacing=False a espera entre chamadas é dispensada: quem controla o
@@ -136,6 +148,10 @@ def _get(caminho, params, tentativas=5, base=None, pacing=True):
                 # quando não há registros na janela
                 return json.loads(corpo) if corpo.strip() else None
         except urllib.error.HTTPError as e:
+            if e.code == 404 and erro_404:
+                # quem passa erro_404 não pode confundir "não achei" com
+                # "não existe" — ver ItensIndisponiveis
+                raise ItensIndisponiveis(f"HTTP 404 em {caminho}") from e
             if e.code == 204 or e.code == 404:
                 return None  # sem registros para o filtro
             if e.code == 429 and tentativa < tentativas - 1:
@@ -522,7 +538,8 @@ def _itens_da_compra(cnpj, ano, sequencial):
     pagina = 1
     while True:
         lote = _get(f"/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens",
-                    {"pagina": pagina, "tamanhoPagina": 100}, base=BASE_PNCP)
+                    {"pagina": pagina, "tamanhoPagina": 100}, base=BASE_PNCP,
+                    erro_404=True)
         if not lote:
             return
         yield from lote
@@ -623,7 +640,7 @@ def sync_itens(db, progresso=None, limite=None):
            ORDER BY data_publicacao DESC""")]
     if limite:
         pendentes = pendentes[:limite]
-    total = 0
+    total, sem_listagem = 0, 0
     for i, c in enumerate(pendentes, 1):
         if progresso:
             progresso(f"Itens — contratação {i} de {len(pendentes)}…")
@@ -653,9 +670,22 @@ def sync_itens(db, progresso=None, limite=None):
                        (c["data_atualizacao"], datetime.now().isoformat(),
                         c["numero_controle"]))
             db.commit()
+        except ItensIndisponiveis:
+            # NÃO carimba `itens_versao`: a contratação continua pendente e
+            # volta na próxima coleta. Carimbar aqui era o que fazia os
+            # preços dela sumirem do banco calados.
+            sem_listagem += 1
+            db.commit()
+            continue
         except PncpErro:
             db.commit()  # preserva o que já entrou; tenta de novo na próxima
             raise
+    if sem_listagem:
+        # o usuário vê isso em Configurações → Sincronizações recentes
+        hoje = date.today()
+        _log(db, "itens", hoje, hoje, total, "aviso",
+             f"{sem_listagem} contratações sem listagem de itens (404 do "
+             f"portal) — ficaram pendentes para a próxima sincronização")
     return total
 
 

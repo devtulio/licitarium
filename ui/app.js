@@ -126,9 +126,37 @@ function esconderSplash() {
 }
 montarSplash();
 
+// Ponte com rede de proteção. O pywebview REJEITA a promise quando o
+// Python levanta, e no exe sem console o traceback não vai a lugar nenhum:
+// sem isto, uma chamada que falhava deixava os números VELHOS na tela —
+// marcar "corrigir pelo IPCA", a chamada falhar, e o resumo seguir
+// mostrando os valores não corrigidos com a caixa marcada (auditoria de
+// falha silenciosa, 2026-08-09). Um ponto só, em vez de try/catch em ~50
+// call sites. Relança: quem já trata (carregarPainel) segue tratando, e
+// quem não trata pelo menos aborta em vez de seguir com dado velho.
+function comRede(bruta) {
+  return new Proxy(bruta, {
+    get(alvo, nome) {
+      const metodo = alvo[nome];
+      // guardas do tipo `if (api.set_config)` precisam continuar valendo
+      if (typeof metodo !== "function") return metodo;
+      return async (...args) => {
+        try {
+          return await metodo.apply(alvo, args);
+        } catch (e) {
+          const aviso = $("sync-msg");
+          if (aviso) aviso.textContent =
+            `Falha em ${String(nome)}: ${(e && e.message) || e}`;
+          throw e;
+        }
+      };
+    },
+  });
+}
+
 // ── boot ──────────────────────────────────────────────────────────────────
 window.addEventListener("pywebviewready", async () => {
-  api = window.pywebview.api;
+  api = comRede(window.pywebview.api);
   document.querySelectorAll("#svg-estandarte-wiz, #svg-estandarte-sobre")
     .forEach(s => s.innerHTML = ESTANDARTE);
   $("svg-selo").innerHTML = SELO;
@@ -781,7 +809,7 @@ async function mostrarResumoPrecos() {
     for (const id of s.fora_da_curva ?? []) {
       const idStr = String(id);
       precosIncluidos.delete(idStr);
-      await api.desselecionar_preco?.(ultimoTermoPrecos ?? "", idStr);
+      await api.desselecionar_preco(ultimoTermoPrecos ?? "", idStr);
       await descartar(idStr);
     }
     carregarLista();
@@ -818,9 +846,21 @@ function colunasDe(tipo) {
   return cols;
 }
 
+// A aba Preços muda de número de colunas conforme o modo ("corrigir pelo
+// IPCA" e "comparar por conteúdo" acrescentam uma cada). Guardar tudo sob
+// a chave "itens" fazia o arrasto no modo de 9 colunas sobrescrever as
+// larguras do modo de 8 — e a guarda abaixo só rejeitava mapa FALTANDO
+// entrada, nunca sobrando, então o modo base aplicava as 8 primeiras de um
+// layout de 9 e desalinhava (auditoria, 2026-08-09). A chave passa a
+// incluir a contagem: cada modo tem as suas.
+function chaveLarguras(tipo) {
+  return tipo === "itens" ? `itens:${colunasDe(tipo).length}` : tipo;
+}
+
 function aplicarLarguras(tipo) {
   const lista = $("lista");
-  const mapa = larguras[tipo];
+  const chave = chaveLarguras(tipo);
+  const mapa = larguras[chave];
   if (!mapa) { lista.style.removeProperty("--cols"); return; }
   const flex = COL_FLEX[tipo];
   const n = colunasDe(tipo).length;
@@ -828,7 +868,7 @@ function aplicarLarguras(tipo) {
   // servem: faltando uma, o grid receberia "NaNpx" e quebraria a lista
   for (let i = 0; i < n; i++)
     if (i !== flex && !(mapa[i] > 0)) {
-      delete larguras[tipo];
+      delete larguras[chave];
       lista.style.removeProperty("--cols");
       return;
     }
@@ -840,8 +880,9 @@ function aplicarLarguras(tipo) {
 
 function guardarLarguras(tipo, px) {
   const flex = COL_FLEX[tipo];
-  larguras[tipo] = {};
-  px.forEach((v, i) => { if (i !== flex) larguras[tipo][i] = v; });
+  const chave = chaveLarguras(tipo);
+  larguras[chave] = {};
+  px.forEach((v, i) => { if (i !== flex) larguras[chave][i] = v; });
 }
 
 function autofit(tipo, i) {
@@ -986,16 +1027,39 @@ async function carregarLista() {
   $("lista").querySelectorAll('.sel input[data-item]').forEach(c =>
     c.addEventListener("change", async () => {
       const id = String(c.dataset.item);
-      if (c.checked) {
-        // marcar é seleção pura, sem motivo — reconsiderar um item que
-        // tinha sido tirado (com razão) limpa o descarte dele também
-        precosIncluidos.add(id);
-        precosDescartados.delete(id);
-        await api.selecionar_preco?.(ultimoTermoPrecos ?? "", id);
-      } else {
-        precosIncluidos.delete(id);
-        await api.desselecionar_preco?.(ultimoTermoPrecos ?? "", id);
-        await descartar(id, c.closest(".linha"));
+      const marcou = c.checked;
+      // A tela mostra o que `precosIncluidos` diz; o documento sai do que
+      // a tabela `precos_selecionados` tem. Se a gravação não pega e
+      // ninguém lê o retorno, os dois divergem sem sintoma — a mediana da
+      // tela deixa de ser a do papel (auditoria de falha silenciosa,
+      // 2026-08-09). Sem `?.` também: os métodos existem, e o `?.` só
+      // esconderia uma renomeação futura.
+      let gravou = false;
+      try {
+        if (marcou) {
+          // marcar é seleção pura, sem motivo — reconsiderar um item que
+          // tinha sido tirado (com razão) limpa o descarte dele também
+          precosIncluidos.add(id);
+          precosDescartados.delete(id);
+          gravou = (await api.selecionar_preco(
+            ultimoTermoPrecos ?? "", id))?.ok === true;
+        } else {
+          precosIncluidos.delete(id);
+          gravou = (await api.desselecionar_preco(
+            ultimoTermoPrecos ?? "", id))?.ok === true;
+          if (gravou) await descartar(id, c.closest(".linha"));
+        }
+      } catch { gravou = false; }     // o Proxy da ponte já avisou na tela
+      if (!gravou) {
+        // desfaz e relê do banco, que é quem manda: a tela não pode
+        // afirmar uma seleção que o documento não vai enxergar
+        c.checked = !marcou;
+        $("sync-msg").textContent =
+          "Não consegui gravar a seleção — a lista foi recarregada.";
+        await recarregarSelecao(ultimoTermoPrecos ?? "");
+        await recarregarDescartes(ultimoTermoPrecos ?? "");
+        carregarLista();
+        return;
       }
       mostrarResumoPrecos();          // o resumo reflete só o que ficou
       atualizarSelecaoPrecos();
@@ -1525,7 +1589,7 @@ async function descartar(id, linha) {
     descricao: celulas[1]?.textContent.trim() ?? null,
     valor: null,
   });
-  await api.descartar_preco?.(ultimoTermoPrecos ?? "", id,
+  await api.descartar_preco(ultimoTermoPrecos ?? "", id,
                               precosDescartados.get(id).motivo);
 }
 
@@ -1582,7 +1646,7 @@ async function atualizarSelecaoPrecos() {
     // sai da lista de descartados (senão ficaria fora da conta de novo)
     for (const id of precosDescartados.keys()) {
       precosIncluidos.add(id);
-      await api.selecionar_preco?.(ultimoTermoPrecos ?? "", id);
+      await api.selecionar_preco(ultimoTermoPrecos ?? "", id);
     }
     precosDescartados.clear();
     carregarLista();
@@ -1606,7 +1670,7 @@ async function registrarMotivo(id, motivo) {
   const d = precosDescartados.get(id);
   if (!d) return;
   d.motivo = motivo;
-  await api.descartar_preco?.(ultimoTermoPrecos ?? "", id, motivo);
+  await api.descartar_preco(ultimoTermoPrecos ?? "", id, motivo);
   atualizarSelecaoPrecos();
 }
 

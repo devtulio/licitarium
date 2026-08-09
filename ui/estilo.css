@@ -229,10 +229,15 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 .g-pca          { grid-template-columns:var(--cols, 60px 1fr 150px 80px 110px); }
 .g-itens        { grid-template-columns:var(--cols, 30px minmax(0,1fr) 48px 60px 118px 212px 96px 70px); }
 /* cada modo da aba Preços acrescenta uma coluna de dinheiro entre o valor
-   pago e o fornecedor; as larguras salvas não valem para elas, daí variantes */
-.g-itens.conteudo { grid-template-columns:var(--cols-conteudo, 30px minmax(0,1fr) 48px 60px 110px 118px 190px 92px 66px); }
-.g-itens.corrigido { grid-template-columns:var(--cols-corrigido, 30px minmax(0,1fr) 48px 60px 110px 118px 190px 92px 66px); }
-.g-itens.conteudo.corrigido { grid-template-columns:var(--cols-ambos, 26px minmax(0,1fr) 44px 54px 100px 100px 108px 160px 84px 60px); }
+   pago e o fornecedor, daí um padrão por variante. Todas leem o MESMO
+   --cols: as variantes liam --cols-conteudo/-corrigido/-ambos, que nada
+   nunca definia, então arrastar coluna nesses modos não aplicava nada — e
+   ainda corrompia a largura do modo base, porque a gravação era comum
+   (auditoria, 2026-08-09). Hoje as larguras são guardadas por número de
+   colunas, então cada modo tem as suas. */
+.g-itens.conteudo { grid-template-columns:var(--cols, 30px minmax(0,1fr) 48px 60px 110px 118px 190px 92px 66px); }
+.g-itens.corrigido { grid-template-columns:var(--cols, 30px minmax(0,1fr) 48px 60px 110px 118px 190px 92px 66px); }
+.g-itens.conteudo.corrigido { grid-template-columns:var(--cols, 26px minmax(0,1fr) 44px 54px 100px 100px 108px 160px 84px 60px); }
 /* na aba Preços só a descrição quebra; o resto fica em uma linha.
    O cabeçalho fica de fora do overflow para não recortar a alça. */
 .g-itens > :nth-child(n+2) { white-space:nowrap; }

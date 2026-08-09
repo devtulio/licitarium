@@ -113,13 +113,12 @@ test("contador mostra quantos de quantos estão selecionados",
   await expect(page.locator("#precos-resumo")).toContainText(
     "0 de 6 selecionados");
   await caixas(page).first().check();
-  // o total nunca muda (é a busca inteira); o "N de" segue o que a
-  // estatística conta — a fixture do mock não recalcula por item marcado,
-  // então só confere que saiu do estado "0 de"
-  await expect(page.locator("#precos-resumo")).not.toContainText(
-    "0 de 6 selecionados");
+  // o total nunca muda (é a busca inteira); o numerador segue a seleção
   await expect(page.locator("#precos-resumo")).toContainText(
-    "de 6 selecionados");
+    "1 de 6 selecionados");
+  await caixas(page).nth(1).check();
+  await expect(page.locator("#precos-resumo")).toContainText(
+    "2 de 6 selecionados");
 });
 
 test("selecionar por fornecedor soma à seleção", async ({ page }) => {
@@ -168,4 +167,34 @@ test("selecionar por texto na descrição soma à seleção", async ({ page }) =
   const chamou = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "selecionar_por_texto").pop());
   expect([chamou.busca, chamou.contendo]).toEqual(["papel", "sulfite"]);
+});
+
+// ── falha de gravação não pode ficar muda (auditoria, 2026-08-09) ─────────
+// A tela mostra o Set `precosIncluidos`; o documento sai da tabela
+// `precos_selecionados`. Gravação que não pega e ninguém lê fazia os dois
+// divergirem sem sintoma nenhum.
+
+test("caixa volta ao estado anterior quando a gravação não pega",
+    async ({ page }) => {
+  await page.evaluate(() => {
+    window.pywebview.api.selecionar_preco = async () => ({ ok: false });
+  });
+  const caixa = caixas(page).first();
+  // click, não check: `check()` espera a caixa FICAR marcada, e o ponto
+  // aqui é justamente ela voltar atrás
+  await caixa.click();
+  await expect(caixa).not.toBeChecked();
+  await expect(page.locator("#sync-msg")).toContainText("Não consegui gravar");
+});
+
+test("erro na ponte aparece na tela em vez de deixar número velho",
+    async ({ page }) => {
+  await page.locator("#f-busca").fill("papel");     // resumo só sai com termo
+  await page.evaluate(() => {
+    window.pywebview.api.estatisticas_preco = async () => {
+      throw new Error("database is locked");
+    };
+  });
+  await page.locator("#f-corrigir").check();        // recalcula o resumo
+  await expect(page.locator("#sync-msg")).toContainText("database is locked");
 });

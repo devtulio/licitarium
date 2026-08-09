@@ -216,7 +216,7 @@ test("arrastar a alça redimensiona a coluna e persiste", async ({ page }) => {
   // largura salva para voltar na próxima abertura
   const salvo = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "set_config" && c.k === "colunas").pop());
-  expect(JSON.parse(salvo.v).itens[5]).toBeGreaterThan(antes + 30);
+  expect(JSON.parse(salvo.v)["itens:8"][5]).toBeGreaterThan(antes + 30);
   // ordenação não dispara ao arrastar sobre o cabeçalho
   const chamadas = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "listar" && c.filtros && c.filtros.ord));
@@ -234,7 +234,7 @@ test("duplo clique na alça ajusta a coluna ao conteúdo (autofit)",
   }, txt);
   // encolhe a coluna a ponto de cortar até um nome curto
   await page.evaluate(() => {
-    larguras.itens = { 0:30, 2:52, 3:64, 4:124, 5:90, 6:100, 7:72 };
+    larguras["itens:8"] = { 0:30, 2:52, 3:64, 4:124, 5:90, 6:100, 7:72 };
     aplicarLarguras("itens");
   });
   expect(await cortado("ZILDA")).toBe(true);
@@ -771,7 +771,7 @@ test("largura de coluna guardada antes de a aba mudar não quebra a lista",
   await page.locator('nav.abas button[data-tipo="itens"]').click();
   // formato antigo: 6 colunas, sem a de Município
   await page.evaluate(() => {
-    larguras.itens = { 1: 52, 2: 74, 3: 124, 4: 320, 5: 78 };
+    larguras["itens:8"] = { 1: 52, 2: 74, 3: 124, 4: 320, 5: 78 };
     aplicarLarguras("itens");
   });
   const cols = await page.evaluate(() => getComputedStyle(
@@ -780,7 +780,38 @@ test("largura de coluna guardada antes de a aba mudar não quebra a lista",
   expect(cols).not.toContain("NaN");
   expect(cols.split(" ").length).toBe(8);
   // o mapa incompatível é descartado, e não reaplicado na próxima troca
-  expect(await page.evaluate(() => larguras.itens)).toBeUndefined();
+  expect(await page.evaluate(() => larguras["itens:8"])).toBeUndefined();
+});
+
+test("largura arrastada num modo da aba Preços não corrompe o outro",
+    async ({ page }) => {
+  // "corrigir pelo IPCA" e "comparar por conteúdo" acrescentam uma coluna
+  // cada. Antes tudo era guardado sob a chave "itens", e a guarda só
+  // rejeitava mapa FALTANDO entrada, nunca sobrando: voltar ao modo base
+  // aplicava as 8 primeiras larguras de um layout de 9 e desalinhava
+  // (auditoria, 2026-08-09).
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  const colunas = () => page.evaluate(() => getComputedStyle(
+    document.querySelector(".lista .cab")).gridTemplateColumns.split(" ").length);
+  expect(await colunas()).toBe(8);
+
+  // no modo de 9 colunas, guarda larguras próprias
+  await page.locator("#f-corrigir").check();
+  expect(await colunas()).toBe(9);
+  await page.evaluate(() => {
+    guardarLarguras("itens", [30, 300, 48, 60, 110, 118, 190, 92, 66]);
+    aplicarLarguras("itens");
+  });
+  // as duas chaves convivem, uma por contagem de colunas
+  expect(await page.evaluate(() => Object.keys(larguras)))
+    .toContain("itens:9");
+
+  // de volta ao modo base, o layout de 9 não vaza para o de 8
+  await page.locator("#f-corrigir").uncheck();
+  expect(await colunas()).toBe(8);
+  const cols = await page.evaluate(() => getComputedStyle(
+    document.querySelector(".lista .cab")).gridTemplateColumns);
+  expect(cols).not.toContain("NaN");
 });
 
 test("Compacta é metade da janela, Expandida é a janela inteira",
