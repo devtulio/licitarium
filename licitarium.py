@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.21.2"
+VERSAO = "1.22.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -479,13 +479,15 @@ def _corrigir_pelo_ipca(linhas, ipca):
     """Troca cada preço pelo valor corrigido, guardando o resto da linha.
 
     Item sem data utilizável, ou mais recente que o último índice, fica de
-    fora: corrigir sem saber de quando é o preço seria inventar.
+    fora: corrigir sem saber de quando é o preço seria inventar. Colunas
+    além de r[4] (fornecedor/contratação, usadas no alerta de concentração)
+    passam direto — `*r[5:]` não presume quais são.
     """
     corrigidas = []
     for r in linhas:
         valor = relatorios.corrigir(r[1], r[4], ipca)
         if valor is not None:
-            corrigidas.append((r[0], valor, r[2], r[3], r[4]))
+            corrigidas.append((r[0], valor, r[2], r[3], r[4], *r[5:]))
     corrigidas.sort(key=lambda x: x[1])
     return corrigidas, len(linhas) - len(corrigidas)
 
@@ -495,21 +497,24 @@ def _normalizar_por_conteudo(linhas):
 
     Comparar R$/quilo com R$/folha não quer dizer nada, então a série fica
     com a base **mais frequente** do resultado; o que sobrou é contado e
-    dito ao usuário, em vez de sumir em silêncio.
+    dito ao usuário, em vez de sumir em silêncio. `*r[5:]` preserva
+    fornecedor/contratação do mesmo jeito que `_corrigir_pelo_ipca`.
     """
     convertidos = []
     for r in linhas:
         p = relatorios.preco_por_conteudo(r[1], r[2], r[3])
         if p:
             convertidos.append((r[0], p["valor"], p["base"],
-                                relatorios.base_implicita(r[3])))
+                                relatorios.base_implicita(r[3]), *r[5:]))
     if not convertidos:
         return [], None, len(linhas)
     # quem só é comparável porque a unidade já era a base não vota na
     # escolha — ver relatorios.escolher_base
-    base = relatorios.escolher_base([(b, i) for _, _, b, i in convertidos])
-    serie = sorted(((i, v) for i, v, b, _ in convertidos if b == base),
-                   key=lambda x: x[1])
+    base = relatorios.escolher_base(
+        [(b, i) for _, _, b, i, *_ in convertidos])
+    serie = sorted(
+        ((i, v, *extra) for i, v, b, _, *extra in convertidos if b == base),
+        key=lambda x: x[1])
     return serie, base, len(linhas) - len(serie)
 
 
@@ -1344,7 +1349,8 @@ class Api:
                 "SELECT id, valor_unitario_homologado, descricao, unidade,"
                 " COALESCE(data_resultado, (SELECT data_publicacao"
                 "   FROM contratacoes c"
-                "  WHERE c.numero_controle = itens.contratacao_controle)) data"
+                "  WHERE c.numero_controle = itens.contratacao_controle)) data,"
+                " fornecedor_ni, contratacao_controle"
                 " FROM itens WHERE "
                 + " AND ".join(where) + " ORDER BY 2", args).fetchall()
             if not linhas:
@@ -1375,12 +1381,19 @@ class Api:
                 resumo.update(por_conteudo=True, base=base,
                               rotulo_base=relatorios.BASES[base][0],
                               sem_conversao=sem_conversao)
-            # itens fora do intervalo de Tukey: apontados, nunca removidos
-            # sozinhos — descartar preço de pesquisa é decisão de quem assina
-            if resumo.get("limite_sup") is not None:
-                resumo["fora_da_curva"] = [
-                    r[0] for r in linhas
-                    if r[1] < resumo["limite_inf"] or r[1] > resumo["limite_sup"]]
+            # itens fora de Tukey OU do escore Z modificado (o segundo capta
+            # amostra de 3-4 preços, faixa em que Tukey nem entra): sempre
+            # apontados, nunca removidos sozinhos — descartar preço de
+            # pesquisa é decisão de quem assina
+            resumo["fora_da_curva"] = [
+                r[0] for r in linhas if relatorios.e_extremo(r[1], resumo)]
+            resumo["sensibilidade"] = relatorios.sensibilidade_sem_extremo(
+                [r[1] for r in linhas], resumo)
+            # fornecedor/contratação sempre nos últimos dois lugares da
+            # linha, tenha ela passado por correção de IPCA, normalização
+            # por conteúdo, nenhuma das duas ou as duas em sequência
+            resumo["alertas_concentracao"] = relatorios.alertas_concentracao(
+                [r[-2] for r in linhas], [r[-1] for r in linhas])
             # contagens sobre a mesma série que virou resumo: no modo por
             # conteúdo, os itens sem conversão não entraram
             ids = [r[0] for r in linhas]

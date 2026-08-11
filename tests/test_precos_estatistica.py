@@ -58,7 +58,9 @@ def test_resumo_bate_com_a_biblioteca_padrao():
     assert r["n"] == 7
     assert r["media"] == pytest.approx(statistics.fmean(valores))
     assert r["mediana"] == pytest.approx(statistics.median(valores))
-    assert r["desvio"] == pytest.approx(statistics.stdev(valores))
+    # populacional (divide por n): descreve a cesta coletada, não estima
+    # o mercado inteiro a partir de amostra dele — MET-INSS-STJ-CV
+    assert r["desvio"] == pytest.approx(statistics.pstdev(valores))
     assert r["cv"] == pytest.approx(r["desvio"] / r["media"])
     assert r["minimo"] == 10.0 and r["maximo"] == 40.0
     assert r["amplitude"] == pytest.approx(30.0)
@@ -74,15 +76,34 @@ def test_quartis_por_interpolacao_linear():
     assert r["limite_sup"] == pytest.approx(13.0)
 
 
-def test_amostra_pequena_nao_ganha_quartil_nem_outlier():
-    """Com quatro preços, Q1 e Q3 seriam quase o menor e o maior.
+def test_amostra_pequena_nao_ganha_quartil_mas_ganha_robusto():
+    """Com quatro preços, Q1 e Q3 seriam quase o menor e o maior — Tukey
+    continua calado (achado antigo, ainda vale). Mas o escore Z modificado
+    sobre o MAD não depende desse piso: já aponta o R$ 900 nesta amostra de
+    4, faixa em que o programa antes não tinha diagnóstico nenhum.
 
-    Chamar um deles de "fora da curva" nesse tamanho seria opinião com
-    aparência de estatística — a análise se cala e o resumo continua.
+    mediana=13; desvios abs=[3,1,1,887]; MAD=mediana([1,1,3,887])=2;
+    raio=(3,5/0,6745)×2≈10,38 -> cercas [2,62 ; 23,38].
     """
     r = relatorios.resumo_estatistico([10.0, 12.0, 14.0, 900.0])
     assert r["n"] == 4 and r["desvio"] is not None
     assert "q1" not in r and "limite_sup" not in r
+    assert r["mad"] == pytest.approx(2.0)
+    assert r["limite_inf_robusto"] == pytest.approx(2.6217, abs=1e-3)
+    assert r["limite_sup_robusto"] == pytest.approx(23.3783, abs=1e-3)
+    assert relatorios.e_extremo(900.0, r) is True
+    assert relatorios.e_extremo(12.0, r) is False
+
+
+def test_mad_zero_nao_quebra_quando_maioria_identica():
+    """Maioria dos preços exatamente igual: MAD=0, e a fórmula do escore Z
+    divide por ele. A cerca robusta simplesmente não é calculada nesse
+    caso — Tukey (quando aplicável) continua cobrindo o extremo."""
+    r = relatorios.resumo_estatistico(
+        [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 50.0])
+    assert r["mad"] == 0.0
+    assert "limite_inf_robusto" not in r and "limite_sup_robusto" not in r
+    assert relatorios.e_extremo(50.0, r) is True   # via Tukey, n>=5
 
 
 def test_um_preco_so_nao_tem_dispersao():
@@ -102,10 +123,35 @@ def test_estatisticas_de_preco_trazem_dispersao_e_apontam_o_extremo(api):
     valores = sorted(v for *_, v in ITENS)
     assert s["n"] == len(ITENS)
     assert s["media"] == pytest.approx(statistics.fmean(valores))
-    assert s["desvio"] == pytest.approx(statistics.stdev(valores))
+    assert s["desvio"] == pytest.approx(statistics.pstdev(valores))
     # o serviço de papel timbrado (R$ 1.490,00) destoa das resmas
     assert s["fora_da_curva"] == ["I7"]
     assert s["maximo"] > s["limite_sup"]
+
+
+def test_amostra_de_quatro_aponta_extremo_via_escore_z(tmp_path, monkeypatch):
+    """Com 4 preços, Tukey nem entra (MINIMO_PARA_DISPERSAO=5) — antes
+    dessa correção, `fora_da_curva` vinha vazio aqui e o R$ 900 passava
+    batido. O escore Z modificado sobre o MAD cobre essa faixa."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t2.db")
+    db = licitarium.abrir_db()
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, objeto, data_publicacao) VALUES ('K',?,1,'111','x',?)",
+        (ANO, f"{ANO}-01-01"))
+    for i, valor in enumerate((10.0, 12.0, 14.0, 900.0), 1):
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+            " numero_item, descricao, unidade, valor_unitario_homologado,"
+            " fornecedor_ni, raw) VALUES (?,'K',?,1,?,'CANETA AZUL','UN',"
+            "?,?,'{}')", (f"C{i}", ANO, i, valor, f"nc{i}"))
+    db.commit()
+    db.close()
+    s = licitarium.Api().estatisticas_preco("caneta azul")
+    assert s["n"] == 4
+    assert "limite_sup" not in s          # Tukey continua calado
+    assert s["fora_da_curva"] == ["C4"]   # mas o extremo foi apontado
 
 
 def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path, selecionar_tudo):
@@ -123,6 +169,39 @@ def test_relatorio_de_precos_tem_o_grafico_de_dispersao(api, tmp_path, seleciona
     assert html.count("<svg") >= 1
     assert "faixa entre Q1 e Q3" in html
     assert "fora da faixa esperada" in html
+
+
+def test_papel_marca_a_linha_extrema_e_mostra_sensibilidade_e_concentracao(
+        api, tmp_path, selecionar_tudo):
+    """Achado da skill de pesquisa de preços do ChatGPT (2026-08-11): o
+    papel só mostrava a caixa agregada — nenhuma linha vinha marcada, não
+    tinha "e se eu tirasse o pior caso" nem aviso de concentração. Fixture
+    ITENS: I7 (R$ 1.490,00) é o único extremo; os 7 itens vêm da mesma
+    contratação 'K' (concentração real), cada um de fornecedor diferente."""
+    db = licitarium.abrir_db()
+    selecionar_tudo(db, "papel a4")
+    d = relatorios.dados_precos(db, "papel a4")
+    r = d["resumo"]
+
+    i7 = next(l for l in d["linhas"] if l["descricao"].startswith("FORNECIMENTO"))
+    assert i7["fora_da_curva"] is True
+    outros = [l for l in d["linhas"] if l is not i7]
+    assert all(not l["fora_da_curva"] for l in outros)
+
+    assert r["alertas_concentracao"] == \
+        ["1 processo com mais de um preço na amostra"]
+
+    s = r["sensibilidade"]
+    assert s["removido"] == pytest.approx(1490.0)
+    assert s["mediana_antes"] == pytest.approx(219.90)
+    assert s["mediana_depois"] == pytest.approx(213.97)
+    assert s["media_depois"] == pytest.approx(166.14, abs=1e-2)
+
+    html = relatorios.render_precos(d, "T", "SP")
+    db.close()
+    assert 'style="color:var(--erro)"' in html
+    assert "Sensibilidade" in html and "213,97" in html
+    assert "Concentração" in html and "1 processo" in html
 
 
 def _linhas_y(svg, classe):

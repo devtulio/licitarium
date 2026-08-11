@@ -11,7 +11,9 @@ async function abrirPrecos(page, termo = "papel") {
 
 test("resumo traz dispersão além de média e mediana", async ({ page }) => {
   await abrirPrecos(page);
-  const disp = page.locator("#precos-resumo .disp");
+  // .disp também cobre os parágrafos de concentração e sensibilidade
+  // (achado 2026-08-11) — o principal é sempre o primeiro
+  const disp = page.locator("#precos-resumo .disp").first();
   await expect(disp).toContainText("Metade dos preços entre R$ 16,90 e R$ 30,50");
   await expect(disp).toContainText("Desvio padrão R$ 86,40");
   await expect(disp).toContainText("coeficiente de variação 161%");

@@ -1109,12 +1109,24 @@ def resumo_estatistico(valores):
     Média e mediana andam juntas de propósito — a distância entre as duas é
     o que denuncia a série puxada por um extremo. A dispersão é medida em
     desvio padrão e em coeficiente de variação (desvio sobre média), que
-    permite comparar a variação de itens de preços muito diferentes.
+    permite comparar a variação de itens de preços muito diferentes. Desvio
+    padrão **populacional** (divide por n, não por n-1): descreve a cesta
+    efetivamente coletada, não estima o mercado inteiro a partir de uma
+    amostra dele — mesma convenção da metodologia administrativa que
+    embasa a presunção de CV de 25% (INSS/Manual de Pesquisa de Preços do
+    STJ).
 
-    O corte de itens atípicos é o de Tukey (1,5 vez a amplitude
-    interquartil), robusto a assimetria — o preço unitário de compra pública
-    quase nunca é simétrico. Nada é removido aqui: a função só aponta, e
-    quem decide descartar é quem assina a pesquisa.
+    Dois diagnósticos de extremo, que se complementam:
+    - **Tukey** (1,5 vez a amplitude interquartil) — só a partir de
+      `MINIMO_PARA_DISPERSAO` preços, robusto a assimetria.
+    - **Escore Z modificado sobre o MAD** (desvio absoluto mediano) — já
+      funciona com 3-4 preços, faixa em que Tukey ainda não se aplica; é a
+      alternativa que a literatura de detecção de extremos recomenda
+      justamente para amostra pequena, onde o desvio-padrão clássico se
+      deixa puxar pelo próprio extremo que deveria apontar.
+
+    Nada é removido aqui: a função só aponta, e quem decide descartar é
+    quem assina a pesquisa.
     """
     # valor_unitario_homologado é REAL, mas afinidade do SQLite não converte
     # texto não-numérico — banco antigo, de antes da validação na ingestão
@@ -1132,18 +1144,81 @@ def resumo_estatistico(valores):
     v.sort()
     n = len(v)
     media = sum(v) / n
+    mediana = _quantil(v, 0.5)
     r = {"n": n, "minimo": v[0], "maximo": v[-1], "media": media,
-         "mediana": _quantil(v, 0.5), "amplitude": v[-1] - v[0]}
+         "mediana": mediana, "amplitude": v[-1] - v[0]}
     if n >= 2:
-        variancia = sum((x - media) ** 2 for x in v) / (n - 1)
+        variancia = sum((x - media) ** 2 for x in v) / n
         r["desvio"] = variancia ** 0.5
         r["cv"] = r["desvio"] / media if media else None
+        mad = _quantil(sorted(abs(x - mediana) for x in v), 0.5)
+        r["mad"] = mad
+        if mad > 0:
+            # 0,6745 normaliza o MAD pra escala do desvio padrão sob
+            # normalidade; 3,5 é o corte que a literatura de detecção
+            # robusta de extremos usa pro escore Z modificado — mesmo
+            # papel do "1,5 × IQR" de Tukey, só que baseado na mediana.
+            raio = (3.5 / 0.6745) * mad
+            r["limite_inf_robusto"] = mediana - raio
+            r["limite_sup_robusto"] = mediana + raio
     if n >= MINIMO_PARA_DISPERSAO:
         q1, q3 = _quantil(v, 0.25), _quantil(v, 0.75)
         iqr = q3 - q1
         r.update(q1=q1, q3=q3, iqr=iqr,
                  limite_inf=q1 - 1.5 * iqr, limite_sup=q3 + 1.5 * iqr)
     return r
+
+
+def e_extremo(valor, resumo):
+    """Verdadeiro se `valor` está fora das cercas de Tukey OU do escore Z
+    modificado — os dois critérios que `resumo_estatistico` calcula.
+    União, não interseção: cada um cobre uma faixa de tamanho de amostra
+    que o outro não cobre bem."""
+    if resumo.get("limite_sup") is not None and (
+            valor < resumo["limite_inf"] or valor > resumo["limite_sup"]):
+        return True
+    if resumo.get("limite_sup_robusto") is not None and (
+            valor < resumo["limite_inf_robusto"]
+            or valor > resumo["limite_sup_robusto"]):
+        return True
+    return False
+
+
+def sensibilidade_sem_extremo(valores, resumo):
+    """Recalcula a estatística sem o preço mais distante da mediana entre
+    os apontados como extremos — não decide, só mostra o efeito de tirar
+    o pior caso (mesmo espírito do art. 23: apontar, não excluir sozinho).
+    `None` quando nada está apontado."""
+    fora = [v for v in valores if e_extremo(v, resumo)]
+    if not fora:
+        return None
+    pior = max(fora, key=lambda v: abs(v - resumo["mediana"]))
+    resto = list(valores)
+    resto.remove(pior)
+    novo = resumo_estatistico(resto)
+    if not novo:
+        return None
+    return {"removido": pior,
+            "media_antes": resumo["media"], "media_depois": novo["media"],
+            "mediana_antes": resumo["mediana"],
+            "mediana_depois": novo["mediana"]}
+
+
+def alertas_concentracao(fornecedores, contratacoes=None):
+    """Preços da mesma contratação ou do mesmo fornecedor não são
+    evidências independentes — cópias do mesmo processo de compra inflam
+    `n` sem acrescentar informação nova."""
+    alertas = []
+    for valores, rotulo in ((fornecedores, "fornecedor"),
+                            (contratacoes or [], "processo")):
+        contagem = Counter(v for v in valores if v)
+        repetidos = [k for k, n in contagem.items() if n > 1]
+        if repetidos:
+            plural = "es" if rotulo == "fornecedor" else "s"
+            alertas.append(
+                f"{len(repetidos)} {rotulo}{'' if len(repetidos) == 1 else plural}"
+                f" com mais de um preço na amostra")
+    return alertas
 
 
 def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
@@ -1277,6 +1352,15 @@ def dados_precos(db, termo, ano=None, orgao=None, excluidos=None,
                           ipca_ate_extenso=mes_por_extenso(ipca["ate"]),
                           sem_indice=sem_indice)
             marcar_amostra_reduzida(resumo, sem_indice)
+        # marca no papel o que a tela já aponta com o botão "fora da
+        # curva" — antes o documento não tinha nenhuma indicação por
+        # linha, só a caixa de dispersão agregada
+        for l, v in zip(linhas, valores):
+            l["fora_da_curva"] = e_extremo(v, resumo)
+        resumo["alertas_concentracao"] = alertas_concentracao(
+            [l["fornecedor_ni"] for l in linhas],
+            [l["contratacao_controle"] for l in linhas])
+        resumo["sensibilidade"] = sensibilidade_sem_extremo(valores, resumo)
     # os desconsiderados vão ao documento com a razão de cada um — sem isso,
     # quem confere não tem como saber que a série foi filtrada
     desconsiderados = []
@@ -1674,16 +1758,37 @@ def render_precos(d, municipio, uf, brasao=None):
     if r.get("cv") is not None:
         faixa = (f"Metade dos preços está entre <b>{moeda(r['q1'])}</b> e "
                  f"<b>{moeda(r['q3'])}</b>. " if r.get("q1") is not None else "")
+        n_fora = sum(1 for l in d["linhas"] if l.get("fora_da_curva"))
+        aviso_fora = (
+            f' <b>{n_fora} {"preço destoa" if n_fora == 1 else "preços destoam"}'
+            f' do conjunto</b> (em vermelho na tabela) pelo critério de'
+            f' Tukey e/ou pelo escore Z modificado sobre o desvio absoluto'
+            f' mediano — confira a aderência antes de usar como referência.'
+            if n_fora else "")
         cards += (
             f'<p class="disp">{faixa}Desvio padrão <b>{moeda(r["desvio"])}</b>'
             f' · coeficiente de variação <b>{r["cv"] * 100:.0f}%</b>'
-            f' ({_LEITURA_CV(r["cv"])}).</p>')
+            f' ({_LEITURA_CV(r["cv"])}).{aviso_fora}</p>')
+        if r.get("alertas_concentracao"):
+            cards += (f'<p class="disp"><b>Concentração:</b> '
+                       f'{"; ".join(r["alertas_concentracao"])} — preços da '
+                       f'mesma fonte não são evidências independentes.</p>')
+        s = r.get("sensibilidade")
+        if s:
+            cards += (
+                f'<p class="disp"><b>Sensibilidade:</b> sem o preço mais'
+                f' destoante ({val(s["removido"])}), a mediana passaria de'
+                f' {val(s["mediana_antes"])} para {val(s["mediana_depois"])}'
+                f' e a média de {val(s["media_antes"])} para'
+                f' {val(s["media_depois"])}. Não decide sozinho: mostra o'
+                f' efeito de tirar o pior caso.</p>')
         grafico = _grafico_dispersao(r, val)
         if grafico:
             cards += f'<div class="card">{grafico}</div>'
     coluna_conteudo = d.get("por_conteudo")
     coluna_corrigido = d.get("corrigido")
-    linhas = "".join(f"""<tr>
+    linhas = "".join(f"""<tr{
+      ' style="color:var(--erro)"' if l.get("fora_da_curva") else ""}>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
       <td class="num">{quantidade(l['quantidade_homologada'])}</td>

@@ -159,6 +159,14 @@ test("aba Preços lista itens e resume o histórico do termo buscado",
   await expect(page.locator("#precos-resumo")).toBeVisible();
   await expect(page.locator("#precos-resumo")).toContainText("mediana");
   await expect(page.locator("#precos-resumo")).toContainText("18,75");
+  // achado da skill de pesquisa de preços do ChatGPT (2026-08-11): tela e
+  // papel têm de mostrar a mesma coisa — concentração e sensibilidade
+  // agora aparecem nos dois
+  await expect(page.locator("#precos-resumo")).toContainText("Concentração");
+  await expect(page.locator("#precos-resumo")).toContainText(
+    "1 fornecedor com mais de um preço na amostra");
+  await expect(page.locator("#precos-resumo")).toContainText("Sensibilidade");
+  await expect(page.locator("#precos-resumo")).toContainText("17,20");
   // desmarcar traz também o item sem preço fechado
   await page.locator("#f-homologados").uncheck();
   await expect(page.locator(".linha:not(.cab)")).toHaveCount(6);

@@ -208,6 +208,11 @@ function scriptPonte(temaBanco = "portal") {
                  mediana: 18.75, fornecedores: 2,
                  desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
                  limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,
+                 alertas_concentracao: fora.length
+                   ? ["1 fornecedor com mais de um preço na amostra"] : [],
+                 sensibilidade: fora.length ? { removido: 249.8,
+                   mediana_antes: 18.75, mediana_depois: 17.2,
+                   media_antes: 53.63, media_depois: 22.1 } : null,
                  proprios: 2, referencia: 1, total };
       },
       detalhe: async (tipo, nc) =>

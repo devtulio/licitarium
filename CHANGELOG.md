@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.22.0 — 2026-08-11
+
+**Pesquisa de preços: quatro reforços aproveitados de uma skill de pesquisa
+de preços públicos que o autor mantém para outra ferramenta (ChatGPT/Codex)**
+
+- **Desvio padrão passa a ser populacional** (divide por n, não por n-1):
+  descreve a cesta efetivamente coletada, alinhado com a metodologia
+  administrativa (INSS/Manual de Pesquisa de Preços do STJ) que já embasa
+  a presunção de CV de 25% usada na leitura do coeficiente de variação.
+- **Segundo diagnóstico de extremo — escore Z modificado sobre o desvio
+  absoluto mediano (MAD)** — funciona já com 3-4 preços, faixa em que o
+  critério de Tukey (que exige 5+) nem entrava. Uma pesquisa pequena
+  passa a ter *algum* apontamento de extremo, onde antes não tinha
+  nenhum.
+- **"Fora da curva" marcado no papel, não só na tela.** O relatório
+  impresso não indicava nenhuma linha como extrema — só a caixa agregada
+  de dispersão. Agora a linha destoante vem destacada na tabela, igual ao
+  que o botão "Descartar os itens fora da curva" já fazia na tela.
+- **Sensibilidade: "e se eu tirasse o pior caso?"** Sem excluir sozinho
+  (decisão de quem assina, art. 23), o resumo agora mostra o efeito de
+  tirar o preço mais destoante — média e mediana antes/depois — tanto na
+  tela quanto no papel.
+- **Alerta de concentração por fornecedor/processo.** Preços da mesma
+  contratação ou do mesmo fornecedor não são evidências independentes;
+  agora isso é avisado. Fornecedor e contratação precisaram ser
+  preservados através das transformações de correção pelo IPCA e de
+  normalização por conteúdo, que antes reconstruíam a linha e perdiam
+  qualquer coluna além das que já usavam.
+
+**O que ficou de fora da skill de propósito:** o script de varredura do
+CSV nacional do Compras.gov não entrou — o banco de preços do Licitarium é
+deliberadamente escopado a "seu município + municípios de referência"
+(mesmo limite que a correção de troca de município desta sessão
+reforçou), e puxar a base nacional inteira contradiria essa arquitetura.
+
+348 pytest + 140 E2E. Cada reforço com teste que morde sem ele.
+
 ## 1.21.2 — 2026-08-11
 
 **4ª esquina da mesma raiz**

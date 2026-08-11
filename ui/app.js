@@ -630,26 +630,48 @@ function dispersaoHtml(s) {
     : "";
   const pct = (s.cv * 100).toLocaleString("pt-BR",
     {maximumFractionDigits: 0});
+  const concentracao = (s.alertas_concentracao ?? []).length
+    ? `<div class="disp"><b>Concentração:</b>
+        ${esc(s.alertas_concentracao.join("; "))} — preços da mesma fonte
+        não são evidências independentes.</div>`
+    : "";
+  const sens = s.sensibilidade;
+  const sensibilidade = sens
+    ? `<div class="disp"><b>Sensibilidade:</b> sem o preço mais destoante
+        (${val(sens.removido)}), a mediana passaria de
+        ${val(sens.mediana_antes)} para ${val(sens.mediana_depois)} e a
+        média de ${val(sens.media_antes)} para ${val(sens.media_depois)}.
+        Não decide sozinho: mostra o efeito de tirar o pior caso.</div>`
+    : "";
   return `<div class="disp">${quartis}Desvio padrão
     <b>${val(s.desvio)}</b> · coeficiente de variação <b>${pct}%</b>
     <span class="dim">(${leituraCv(s.cv)})</span>${
       s.q1 == null
         ? ` <span class="dim">— com ${s.n} ${s.n === 1 ? "preço" : "preços"}
-            não dá para medir quartis nem apontar valor fora da curva</span>`
-        : ""}</div>`;
+            não dá para medir quartis</span>`
+        : ""}</div>${concentracao}${sensibilidade}`;
 }
 
 // Aponta, não remove: descartar preço de uma pesquisa é decisão de quem
 // assina, e o art. 23 exige justificativa para desprezar valor coletado.
+// O intervalo mostrado é o de Tukey quando existe (n >= 5); com menos
+// preços só o escore Z modificado (sobre o desvio absoluto mediano) entra
+// em ação, e a faixa dele é que aparece.
 function foraDaCurvaHtml(s) {
   const n = (s.fora_da_curva ?? []).length;
   if (!n) return "";
+  const val = s.por_conteudo ? dinheiroFino : dinheiro;
+  const temTukey = s.limite_sup != null;
+  const inf = temTukey ? s.limite_inf : s.limite_inf_robusto;
+  const sup = temTukey ? s.limite_sup : s.limite_sup_robusto;
+  const criterio = temTukey ? "critério de Tukey"
+    : "escore Z modificado sobre o desvio absoluto mediano";
+  const faixa = inf != null
+    ? ` (fora de ${val(Math.max(0, inf))} a ${val(sup)}, pelo ${criterio})`
+    : "";
   return `<div class="fora">
-    <span>${n === 1 ? "1 preço destoa" : `${n} preços destoam`} do conjunto
-      (fora de ${(s.por_conteudo ? dinheiroFino : dinheiro)(
-          Math.max(0, s.limite_inf))} a
-      ${(s.por_conteudo ? dinheiroFino : dinheiro)(s.limite_sup)},
-      pelo critério de Tukey). Confira se são
+    <span>${n === 1 ? "1 preço destoa" : `${n} preços destoam`} do
+      conjunto${faixa}. Confira se são
       itens comparáveis antes de usar.</span>
     <button class="btn ghost" id="btn-descartar-fora">
       Descartar ${n === 1 ? "o item" : "os itens"}</button></div>`;

@@ -135,6 +135,17 @@ def test_resumo_corrigido_declara_ate_quando(api):
     assert s["maximo"] == pytest.approx(103.02)
 
 
+def test_concentracao_sobrevive_a_correcao_pelo_ipca(api):
+    """_corrigir_pelo_ipca reconstrói cada linha — sem preservar as colunas
+    extras (fornecedor_ni, contratacao_controle) via `*r[5:]`, o alerta de
+    concentração ficaria cego depois de corrigir=True. Os 3 itens desta
+    fixture compartilham fornecedor 'ni1' e contratação 'K'."""
+    s = api.estatisticas_preco("papel a4", corrigir=True)
+    assert s["alertas_concentracao"] == [
+        "1 fornecedor com mais de um preço na amostra",
+        "1 processo com mais de um preço na amostra"]
+
+
 def test_resumo_sem_correcao_continua_com_o_preco_pago(api):
     s = api.estatisticas_preco("papel a4")
     assert not s.get("corrigido")
@@ -215,6 +226,24 @@ def test_por_conteudo_usa_o_valor_ja_corrigido(api):
          api.listar("itens", {"corrigir": True})["itens"]}["I1"]
     # 103,02 / 100 folhas — e não 100,00 / 100, que divergiria do resumo
     assert i["por_conteudo"]["valor"] == pytest.approx(1.0302)
+
+
+def test_concentracao_sobrevive_a_ipca_encadeado_com_por_conteudo(api):
+    """As duas transformações em sequência (corrigir depois normalizar por
+    conteúdo) reconstroem a linha duas vezes — `_normalizar_por_conteudo`
+    tinha desempacotamento de 4-tupla fixo que rejeitaria as colunas extras
+    adicionadas pela correção do IPCA antes dela."""
+    db = _db()
+    try:
+        db.execute("UPDATE itens SET descricao='PAPEL A4 C/100 FLS'")
+        db.commit()
+    finally:
+        db.close()
+    s = api.estatisticas_preco("papel a4", corrigir=True, por_conteudo=True)
+    assert s["n"] == 3
+    assert s["alertas_concentracao"] == [
+        "1 fornecedor com mais de um preço na amostra",
+        "1 processo com mais de um preço na amostra"]
 
 
 # ── no documento ────────────────────────────────────────────────────────
