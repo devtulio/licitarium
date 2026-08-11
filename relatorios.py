@@ -1116,9 +1116,20 @@ def resumo_estatistico(valores):
     quase nunca é simétrico. Nada é removido aqui: a função só aponta, e
     quem decide descartar é quem assina a pesquisa.
     """
-    if not valores:
+    # valor_unitario_homologado é REAL, mas afinidade do SQLite não converte
+    # texto não-numérico — banco antigo, de antes da validação na ingestão
+    # do PNCP (pncp.py), pode ter uma linha assim. sum()/variância em Python
+    # quebram com TEXT; a linha malformada é descartada, não derruba a
+    # estatística inteira (mesmo critério de sync_ipca).
+    v = []
+    for x in valores or ():
+        try:
+            v.append(float(x))
+        except (TypeError, ValueError):
+            continue
+    if not v:
         return None
-    v = sorted(valores)
+    v.sort()
     n = len(v)
     media = sum(v) / n
     r = {"n": n, "minimo": v[0], "maximo": v[-1], "media": media,

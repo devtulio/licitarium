@@ -518,6 +518,42 @@ def test_preco_por_conteudo_nao_numerico_nao_quebra():
     assert r is not None and r["valor"] == pytest.approx(0.2)
 
 
+def test_resumo_estatistico_descarta_valor_nao_numerico():
+    """4ª quina da mesma raiz — encontrada testando a correção do achado
+    #2: sum()/variância em resumo_estatistico() quebravam com TEXT numa
+    lista de valor_unitario_homologado (banco anterior à validação na
+    ingestão do PNCP). A linha malformada é descartada, a estatística
+    segue com o resto — mesmo critério de sync_ipca."""
+    assert relatorios.resumo_estatistico(["N/D", None]) is None
+    r = relatorios.resumo_estatistico([10.0, "N/D", 20.0, 30.0])
+    assert r["n"] == 3
+    assert r["media"] == 20.0
+    assert r["minimo"] == 10.0 and r["maximo"] == 30.0
+
+
+def test_precos_com_valor_corrompido_no_banco_nao_quebra_o_relatorio(
+        db, tmp_path, selecionar_tudo):
+    """render_precos com um banco anterior à validação na ingestão: uma
+    linha de valor_unitario_homologado corrompida (TEXT) convivendo com
+    linhas boas não pode derrubar o documento inteiro."""
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+        " numero_item, descricao, unidade, quantidade_homologada,"
+        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
+        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [("a", "A", 2026, 1, 1, "PAPEL A4 SULFITE", "RESMA", 10, 20.0, 200.0,
+          "1", "FORN A", "2026-03-10"),
+         ("b", "A", 2026, 1, 2, "PAPEL A4 SULFITE", "RESMA", 5, "N/D", None,
+          "2", "FORN B", "2026-04-10")])
+    db.commit()
+    selecionar_tudo(db, "papel a4 sulfite")
+    r = relatorios.gerar(db, "precos", {"termo": "papel a4 sulfite"}, "T",
+                         "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Pesquisa de Preços" in html
+    assert "N/D" not in html
+
+
 def test_competencia_do_ipca_com_marcacao_nao_vira_html(db):
     """`mes_por_extenso` validava só o mês; o ano voltava cru na prosa da
     correção monetária — "<payload>-06" virava "jun/<payload>"."""

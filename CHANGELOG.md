@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.21.2 — 2026-08-11
+
+**4ª esquina da mesma raiz**
+
+Testando a correção de `moeda()`/`moeda_fina()` da 1.21.1, o teste achou
+um sítio a mais: `resumo_estatistico()` — `sum()`/variância em Python
+quebravam com TEXT numa lista de `valor_unitario_homologado`, mesmo
+problema de afinidade SQLite dos outros três (banco anterior à validação
+na ingestão do PNCP). A linha malformada agora é descartada, a estatística
+segue com o resto — mesmo critério que `sync_ipca` já usa para uma linha
+de IPCA estranha.
+
+343 pytest + 140 E2E.
+
 ## 1.21.1 — 2026-08-11
 
 **Auditoria de code review — 8 achados, todos de falha que não chegava a
