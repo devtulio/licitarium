@@ -6,15 +6,6 @@
 
 ---
 
-**📌 Aviso (agosto/2026):** o Licitarium desktop está em **modo estável**: a
-versão 1.21.x continua funcionando e recebendo correções críticas, mas o
-desenvolvimento ativo migrou para a
-**[plataforma Rationarium](https://github.com/devtulio/rationarium)** — mesma
-aplicação, agora multiusuário e hospedável, código AGPL-3.0. Quem preferir
-rodar gratuitamente por conta própria encontra lá as instruções de self-host.
-
----
-
 ## Descrição
 
 O **Licitarium** espelha, no computador do órgão, tudo o que o município publica
