@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.23.0 — 2026-08-11
+
+**Motor de gráfico: primeiro gráfico da pesquisa de preços na tela**
+
+A aba Preços nunca teve gráfico nenhum na tela — só texto (a caixa de
+Tukey só existia impressa, gerada à parte pelo Python). Ganha agora um
+box-plot em Apache ECharts (vendorizado local, sem CDN, `renderer:'svg'`)
+mostrando as **duas** cercas de extremo juntas: a de Tukey e a do escore Z
+modificado sobre o desvio absoluto mediano (MAD, 1.22.0) — a segunda
+nunca teve representação visual em lugar nenhum, só em texto. Cores lidas
+das variáveis do tema em uso (`--s1`, `--erro`, `--warn`) — segue o tema
+(Portal/Pergaminho/Observatório), não fica preso a uma paleta fixa.
+
+Escopo desta etapa: só a tela, só o agregado (caixa + cercas + média,
+sem ponto por item — `estatisticas_preco` não devolve preço por item
+hoje). O relatório impresso continua gerado 100% no Python
+(`_grafico_dispersao`), sem mudança — ele nunca passa pela tela antes de
+imprimir (diferente do Painel), então migrar o motor lá exige plumbing
+nova, ainda não construída.
+
+348 pytest + 142 E2E.
+
 ## 1.22.0 — 2026-08-11
 
 **Pesquisa de preços: quatro reforços aproveitados de uma skill de pesquisa

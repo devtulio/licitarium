@@ -206,7 +206,9 @@ function scriptPonte(temaBanco = "portal") {
         return { n: incluidos ? incluidos.length : 5,
                  minimo: 15.4, maximo: 249.8, media: 53.63,
                  mediana: 18.75, fornecedores: 2,
-                 desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5, iqr: 13.6,
+                 desvio: 86.4, cv: 1.61, mad: 6.2,
+                 limite_inf_robusto: -13.4, limite_sup_robusto: 50.6,
+                 q1: 16.9, q3: 30.5, iqr: 13.6,
                  limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,
                  alertas_concentracao: fora.length
                    ? ["1 fornecedor com mais de um preço na amostra"] : [],

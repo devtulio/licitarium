@@ -621,6 +621,57 @@ function semConversaoHtml(s) {
     só do que dá para comparar por ${esc(s.rotulo_base)}.</div>`;
 }
 
+// Box-plot de Tukey + escore Z modificado (MAD) via ECharts — antes desta
+// versão (2026-08-11) a pesquisa de preços não tinha gráfico nenhum na
+// tela, só texto; e o próprio texto não conseguia mostrar as DUAS cercas
+// juntas do jeito que um desenho mostra. `renderer:'svg'` porque o app
+// pode imprimir a partir do que a tela desenha — canvas pixela, svg não.
+// Só o agregado (caixa + cercas + média): pontos por item exigiriam
+// `estatisticas_preco` devolver cada preço, que hoje ela não devolve —
+// fase seguinte, se fizer sentido.
+let _echartBoxPreco = null;
+function desenharBoxplotPreco(el, s) {
+  if (!window.echarts || s.q1 == null) { el.classList.add("oculto"); return; }
+  el.classList.remove("oculto");
+  const cor = (nome, fallback) => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+    return v || fallback;
+  };
+  const s1 = cor("--s1", "#2a78d6"), s2 = cor("--s2", "#eb6834"),
+    erro = cor("--erro", "#a6231b"), warn = cor("--warn", "#7a5c0e"),
+    muted = cor("--muted", "#5b6066"), border = cor("--border", "#d3d6da");
+  const val = s.por_conteudo ? dinheiroFino : dinheiro;
+  const fmt = v => val(v);
+  const markLines = [];
+  if (s.limite_sup != null)
+    markLines.push({ xAxis: s.limite_sup, lineStyle: { color: s1, type: "dashed", width: 1.4 },
+      label: { formatter: "Tukey", color: s1, fontSize: 10, position: "insideEndTop" } });
+  if (s.limite_sup_robusto != null)
+    markLines.push({ xAxis: s.limite_sup_robusto, lineStyle: { color: warn, type: "dotted", width: 1.4 },
+      label: { formatter: "MAD", color: warn, fontSize: 10, position: "insideEndBottom" } });
+  if (_echartBoxPreco) { _echartBoxPreco.dispose(); _echartBoxPreco = null; }
+  _echartBoxPreco = echarts.init(el, null, { renderer: "svg" });
+  _echartBoxPreco.setOption({
+    grid: { left: 8, right: 16, top: 14, bottom: 22 },
+    xAxis: { type: "value", min: 0, axisLine: { lineStyle: { color: border } },
+      axisLabel: { color: muted, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: .4 } } },
+    yAxis: { type: "category", data: [""], axisLine: { show: false }, axisTick: { show: false } },
+    tooltip: { trigger: "item", backgroundColor: "#17181a", borderWidth: 0,
+      textStyle: { color: "#fff", fontSize: 12 },
+      formatter: p => p.seriesType === "boxplot"
+        ? `mín <b>${fmt(p.data[1])}</b><br/>Q1 <b>${fmt(p.data[2])}</b><br/>` +
+          `mediana <b>${fmt(p.data[3])}</b><br/>Q3 <b>${fmt(p.data[4])}</b><br/>máx <b>${fmt(p.data[5])}</b>`
+        : `média <b>${fmt(s.media)}</b>` },
+    series: [
+      { type: "boxplot", data: [[s.minimo, s.q1, s.mediana, s.q3, s.maximo]],
+        itemStyle: { color: `${s1}2e`, borderColor: s1, borderWidth: 1.6 },
+        boxWidth: ["24%", "24%"], markLine: { symbol: "none", animation: false, data: markLines } },
+      { type: "scatter", data: [{ value: [s.media, 0] }], symbol: "diamond",
+        symbolSize: 11, itemStyle: { color: s2 }, z: 6 }
+    ]
+  });
+}
+
 function dispersaoHtml(s) {
   if (s.desvio == null) return "";
   const val = s.por_conteudo ? dinheiroFino : dinheiro;
@@ -832,9 +883,12 @@ async function mostrarResumoPrecos() {
       <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
         Relatório de pesquisa de preços</button>
     </div>
-    ${correcaoHtml(s)}${semConversaoHtml(s)}${dispersaoHtml(s)}${foraDaCurvaHtml(s)}
+    ${correcaoHtml(s)}${semConversaoHtml(s)}
+    <div id="precos-boxplot" class="oculto" style="height:150px"></div>
+    ${dispersaoHtml(s)}${foraDaCurvaHtml(s)}
     ${await toolbarSelecaoPrecos(termo, ano, origemVal)}`;
   caixa.classList.remove("oculto");
+  desenharBoxplotPreco($("precos-boxplot"), s);
   $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
   $("btn-descartar-fora")?.addEventListener("click", async () => {
     for (const id of s.fora_da_curva ?? []) {

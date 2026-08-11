@@ -21,6 +21,33 @@ test("resumo traz dispersão além de média e mediana", async ({ page }) => {
   await expect(disp).toContainText("confira se os itens são comparáveis");
 });
 
+test("box-plot ECharts mostra as duas cercas (Tukey e MAD)",
+    async ({ page }) => {
+  await abrirPrecos(page);
+  const box = page.locator("#precos-boxplot");
+  await expect(box).toBeVisible();
+  await expect(box.locator("svg")).toBeVisible();
+  await expect(box.locator("text").filter({ hasText: "Tukey" })).toBeVisible();
+  await expect(box.locator("text").filter({ hasText: "MAD" })).toBeVisible();
+});
+
+test("box-plot some quando a amostra é pequena demais pra quartil",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  // termo sem "papel" cai fora do mock -> resumo nulo; usa monkeypatch
+  // direto no bridge pra simular n<5 (sem q1/q3)
+  await page.evaluate(() => {
+    window.pywebview.api.estatisticas_preco = async () => ({
+      n: 3, minimo: 10, maximo: 40, media: 23, mediana: 20,
+      desvio: 12, cv: 0.5, mad: 3, fornecedores: 2, proprios: 2,
+      referencia: 0, total: 3
+    });
+  });
+  await page.locator("#f-busca").fill("papel");
+  await expect(page.locator("#precos-resumo")).toBeVisible();
+  await expect(page.locator("#precos-boxplot")).toBeHidden();
+});
+
 test("preço fora da curva é apontado e só sai se o usuário mandar",
     async ({ page }) => {
   await abrirPrecos(page);
