@@ -45,6 +45,18 @@ def db():
     con.close()
 
 
+def test_data_now_do_sql_sempre_em_localtime():
+    """date('now')/datetime('now') do SQLite são UTC. Entre ~21h e meia-noite
+    de Brasília, o UTC já é o dia seguinte — um contrato vencendo hoje lia
+    como já vencido nos painéis de vigência/prazo (auditoria 2026-08-11).
+    Comportamento depende do fuso da máquina que roda o teste (não dá pra
+    simular sem mockar as funções de data do próprio SQLite), então a
+    garantia aqui é estática: nenhum 'now' bruto sobra no arquivo."""
+    fonte = Path(relatorios.__file__).read_text(encoding="utf-8")
+    nus = re.findall(r"(?:date|datetime)\('now'(?!,'localtime')[^)]*\)", fonte)
+    assert not nus, f"'now' sem localtime: {nus}"
+
+
 def test_dados_contratacoes_amparo_e_desagio(db):
     d = relatorios.dados_contratacoes(db, ano=2026)
     assert d["totais"]["n"] == 2
@@ -113,6 +125,28 @@ def test_gerar_economia_com_itens_traz_familia_no_documento_e_no_csv(db, tmp_pat
     html = Path(r["html"]).read_text(encoding="utf-8")
     assert "MERENDA ESCOLAR" in html
     assert "Alimentação" in html            # tabela por categoria
+
+
+def test_economia_por_modalidade_nao_corta_o_grafico(db, tmp_path):
+    """O gráfico "Por modalidade" cortava em 8 (relatorios.py, achado da
+    auditoria 2026-08-11) enquanto a tabela logo abaixo, na mesma página,
+    e a vista Economia na tela mostram a lista inteira — um município com
+    mais de 8 modalidades no exercício via gráfico e tabela discordando em
+    quantidade de itens. Sem par estimado/homologado por linha independente
+    e valor_estimado decrescente, a nona modalidade era exatamente a que
+    sumia do gráfico."""
+    db.executemany(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " modalidade_nome, objeto, valor_estimado, valor_homologado,"
+        " data_publicacao, referencia) VALUES (?,2026,?,?,?,?,?,'2026-01-01',0)",
+        [(f"M{i}", i, f"Modalidade {i}", "Objeto",
+          float(100 - i), float(80 - i)) for i in range(1, 10)])
+    db.commit()
+    r = relatorios.gerar(db, "economia", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    grafico = html.split("Por modalidade</h3>")[1].split("Por família de item")[0]
+    for i in range(1, 10):
+        assert f"Modalidade {i}" in grafico, f"Modalidade {i} sumiu do gráfico"
 
 
 def test_economia_lista_fornecedores_com_documento_mascarado(db, tmp_path):
@@ -201,6 +235,33 @@ def test_precos_estatisticas_e_relatorio(db, tmp_path, selecionar_tudo):
     assert "Pesquisa de Preços" in html and "art. 23" in html
     assert "pesquisa_precos_papel_a4" in r["html"]
     assert r["csv"] and Path(r["csv"]).exists()
+
+
+def test_precos_a_zero_reais_nao_quebra_o_coeficiente_de_variacao(
+        db, tmp_path, selecionar_tudo):
+    """cv = desvio/média, None quando a média é exatamente zero (itens de
+    doação/brinde na pesquisa). desvio ainda existe (é 0.0, "não é None"),
+    então a guarda antiga (checava desvio) deixava passar e
+    r["cv"] * 100 quebrava sobre None (achado da auditoria 2026-08-11)."""
+    db.executemany(
+        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
+        " numero_item, descricao, unidade, quantidade_homologada,"
+        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
+        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [("a", "A", 2026, 1, 1, "BRINDE CANETA", "UN", 10, 0.0, 0.0,
+          "1", "FORN A", "2026-03-10"),
+         ("b", "A", 2026, 1, 2, "BRINDE CANETA", "UN", 5, 0.0, 0.0,
+          "2", "FORN B", "2026-04-10")])
+    db.commit()
+    d = relatorios.dados_precos(db, "brinde caneta")
+    assert d["resumo"]["media"] == 0.0
+    assert d["resumo"]["desvio"] == 0.0
+    assert d["resumo"]["cv"] is None
+    selecionar_tudo(db, "brinde caneta")
+    r = relatorios.gerar(db, "precos", {"termo": "brinde caneta"}, "T", "SP",
+                         tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "Pesquisa de Preços" in html   # não quebrou
 
 
 def test_precos_termo_vazio_e_sem_achados(db, tmp_path):
@@ -432,6 +493,29 @@ def test_quantidade_nao_numerica_nao_vira_html(db):
     assert relatorios.quantidade(None) == "–"
     assert relatorios.quantidade(300.0) == "300"
     assert relatorios.quantidade(1500.5) == "1.500,50"
+
+
+def test_moeda_nao_numerica_nao_derruba_o_relatorio():
+    """moeda()/moeda_fina() não tinham a mesma proteção de quantidade() —
+    TEXT numa coluna REAL (auditoria 2026-08-09/11) fazia f"{v:,.2f}"
+    levantar ValueError e derrubar o relatório inteiro, não só aquela
+    célula."""
+    assert relatorios.moeda("N/D") == "–"
+    assert relatorios.moeda(None) == "–"
+    assert relatorios.moeda(100.0) == "R$ 100,00"
+    assert relatorios.moeda_fina("N/D") == "–"
+    assert relatorios.moeda_fina(None) == "–"
+    assert relatorios.moeda_fina(0.0466) == "R$ 0,0466"
+
+
+def test_preco_por_conteudo_nao_numerico_nao_quebra():
+    """Mesma raiz: preco_por_conteudo() faz valor/quantidade sem proteção,
+    e é chamada para TODA linha de dados_precos (relatorios.py:1231),
+    incondicional — não só quando a comparação "por conteúdo" está ligada."""
+    assert relatorios.preco_por_conteudo("N/D", "PAPEL A4 SULFITE", "UN") is None
+    assert relatorios.preco_por_conteudo(None, "PAPEL A4 SULFITE", "UN") is None
+    r = relatorios.preco_por_conteudo(100.0, "PAPEL A4 SULFITE C/500 FL", "PCT")
+    assert r is not None and r["valor"] == pytest.approx(0.2)
 
 
 def test_competencia_do_ipca_com_marcacao_nao_vira_html(db):

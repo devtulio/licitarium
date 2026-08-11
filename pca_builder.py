@@ -269,6 +269,16 @@ def mesclar(db, ano_alvo, ids):
         [ano_alvo] + list(ids))]
     if len(linhas) < 2:
         return {"ok": False, "erro": "itens não encontrados"}
+    unidades = {l["unidade"] for l in linhas if l["unidade"]}
+    if len(unidades) > 1:
+        # somar quantidade sem isso é fantasma: 300 PCT viram 300 KG na
+        # unidade do item "principal" — consolidar() só sinaliza
+        # unidades_divergentes porque é automático; mesclar() é ação
+        # manual do usuário e recusa em vez de corromper o dado.
+        return {"ok": False,
+                "erro": "itens com unidades diferentes ("
+                        + ", ".join(sorted(unidades))
+                        + ") não podem ser mesclados"}
     qtd = sum(l["quantidade"] or 0 for l in linhas)
     valor = sum((l["quantidade"] or 0) * (l["valor_unitario"] or 0)
                 for l in linhas)

@@ -350,3 +350,44 @@ def test_troca_do_exe_assume_o_nome_da_versao_nova():
     # sem destino informado, troca no lugar (comportamento das versões antigas)
     velho = licitarium._script_atualizacao(atual, baixado)
     assert f'move /y "{baixado}" "{atual}"' in velho
+
+
+# ── troca de acervo não pode correr por baixo de uma sync em andamento ──────
+# a thread de _rodar_sync captura o ibge numa variável local (licitarium.py,
+# _rodar_sync) antes de rodar; trocar o município ou importar um acervo
+# enquanto ela ainda está no meio contaminava o banco novo com dados do
+# antigo, sem erro nenhum visível (auditoria 2026-08-11).
+
+def test_trocar_municipio_recusa_com_sync_em_andamento(api):
+    api._sync_ativo.acquire()
+    try:
+        r = api.trocar_municipio("3536604", "Paulo de Faria", "SP")
+        assert r == {"ok": False, "erro": licitarium.MSG_SYNC_ATIVO}
+        # nada foi apagado nem trocado
+        assert api.listar("contratacoes", {})["total"] == 3
+    finally:
+        api._sync_ativo.release()
+    # destravado, a troca funciona normalmente
+    assert api.trocar_municipio("3536604", "Paulo de Faria", "SP")["ok"]
+    assert api.listar("contratacoes", {})["total"] == 0
+
+
+def test_remover_referencia_recusa_com_sync_em_andamento(api):
+    api._sync_ativo.acquire()
+    try:
+        r = api.remover_municipio_referencia("3536604")
+        assert r == {"ok": False, "erro": licitarium.MSG_SYNC_ATIVO}
+    finally:
+        api._sync_ativo.release()
+
+
+def test_importar_acervo_recusa_com_sync_em_andamento(api, monkeypatch):
+    chamou = []
+    monkeypatch.setattr(api, "_importar_acervo", lambda: chamou.append(1))
+    api._sync_ativo.acquire()
+    try:
+        r = api.importar_acervo()
+        assert r == {"ok": False, "erro": licitarium.MSG_SYNC_ATIVO}
+        assert not chamou   # nem chegou a abrir o diálogo de arquivo
+    finally:
+        api._sync_ativo.release()

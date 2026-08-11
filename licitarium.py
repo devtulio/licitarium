@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.21.0"
+VERSAO = "1.21.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -149,6 +149,14 @@ DIALOGO_ABRIR = getattr(getattr(webview, "FileDialog", None), "OPEN",
 # versão do formato da cópia de segurança: muda quando o zip deixar de ser
 # lido pelas versões anteriores
 ACERVO_SCHEMA = 1
+
+# trocar/importar o acervo enquanto uma sincronização está em andamento
+# contamina o banco novo com dados do município antigo (a thread de sync
+# guarda o ibge numa variável local, capturada antes da troca — auditoria
+# 2026-08-11); as três operações que mexem nas mesmas tabelas recusam
+# enquanto `_sync_ativo` estiver travado.
+MSG_SYNC_ATIVO = ("uma sincronização está em andamento — aguarde terminar "
+                  "e tente de novo")
 
 TABELAS = {"contratacoes": "contratacoes", "contratos": "contratos",
            "atas": "atas", "pca": "pca_itens", "itens": "itens"}
@@ -736,19 +744,25 @@ class Api:
         Só apaga o que tem `referencia=1`: se o mesmo processo existisse no
         acervo próprio, ele não pode ser tocado.
         """
-        codigo = str(codigo)
-        db = abrir_db()
+        if not self._sync_ativo.acquire(blocking=False):
+            return {"ok": False, "erro": MSG_SYNC_ATIVO}
         try:
-            for tabela in ("itens", "contratacoes"):
-                db.execute(f"DELETE FROM {tabela}"
-                           " WHERE referencia=1 AND municipio_ibge=?", (codigo,))
-            db.execute("DELETE FROM municipios_referencia WHERE ibge=?",
-                       (codigo,))
-            pncp._config(db, f"last_sync_ref_{codigo}", "")
-            db.commit()
-            return {"ok": True}
+            codigo = str(codigo)
+            db = abrir_db()
+            try:
+                for tabela in ("itens", "contratacoes"):
+                    db.execute(f"DELETE FROM {tabela}"
+                               " WHERE referencia=1 AND municipio_ibge=?",
+                               (codigo,))
+                db.execute("DELETE FROM municipios_referencia WHERE ibge=?",
+                           (codigo,))
+                pncp._config(db, f"last_sync_ref_{codigo}", "")
+                db.commit()
+                return {"ok": True}
+            finally:
+                db.close()
         finally:
-            db.close()
+            self._sync_ativo.release()
 
     def configurar_municipio(self, codigo, nome, uf):
         db = abrir_db()
@@ -762,16 +776,22 @@ class Api:
 
     def trocar_municipio(self, codigo, nome, uf):
         """Troca = reinicia o acervo (banco é cache reconstruível)."""
-        db = abrir_db()
+        if not self._sync_ativo.acquire(blocking=False):
+            return {"ok": False, "erro": MSG_SYNC_ATIVO}
         try:
-            for tabela in ("contratacoes", "contratos", "atas", "orgaos",
-                           "sync_log"):
-                db.execute(f"DELETE FROM {tabela}")
-            db.execute("DELETE FROM config WHERE chave LIKE 'last_sync_%'")
-            db.commit()
+            db = abrir_db()
+            try:
+                for tabela in ("contratacoes", "contratos", "atas", "orgaos",
+                               "sync_log"):
+                    db.execute(f"DELETE FROM {tabela}")
+                db.execute("DELETE FROM config WHERE chave LIKE 'last_sync_%'")
+                db.commit()
+            finally:
+                db.close()
+            self.configurar_municipio(codigo, nome, uf)
+            return {"ok": True}
         finally:
-            db.close()
-        return self.configurar_municipio(codigo, nome, uf)
+            self._sync_ativo.release()
 
     # ── órgãos ──────────────────────────────────────────────────────────
 
@@ -1872,6 +1892,14 @@ class Api:
         antes de qualquer coisa. O acervo atual não é apagado — vira
         `.substituido-<data>`, e desfazer é renomear de volta.
         """
+        if not self._sync_ativo.acquire(blocking=False):
+            return {"ok": False, "erro": MSG_SYNC_ATIVO}
+        try:
+            return self._importar_acervo()
+        finally:
+            self._sync_ativo.release()
+
+    def _importar_acervo(self):
         escolha = self._janela.create_file_dialog(
             DIALOGO_ABRIR, file_types=("Cópia do Licitarium (*.zip)",))
         if not escolha:

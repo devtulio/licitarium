@@ -163,18 +163,40 @@ def test_resumo_por_familia(db):
 
 
 def test_mesclar_soma_quantidade_e_pondera_preco(db):
-    pca_builder.gerar_minuta(db, 2027, {"margem": 0})
-    itens = pca_builder.listar_minuta(db, 2027)
-    filtro = next(i for i in itens if i["chave"] == "FILTRO AR MOTOR")
-    papel = next(i for i in itens if "PAPEL" in i["chave"])
+    # duas linhas da MESMA unidade — inseridas direto na minuta, sem passar
+    # por gerar_minuta, pra controlar a unidade de cada uma
+    db.executemany(
+        "INSERT INTO pca_minuta_itens (id, ano_alvo, chave, descricao,"
+        " unidade, quantidade, valor_unitario, margem, incluir, origem)"
+        " VALUES (?,2027,?,?,?,?,?,0,1,'{}')",
+        [(1, "FILTRO A", "Filtro A", "UND", 200, 100.0),
+         (2, "FILTRO B", "Filtro B", "UND", 50, 20.0)])
+    db.commit()
     # 200 un a R$100 + 50 un a R$20 -> 250 un a R$84 (média ponderada)
-    r = pca_builder.mesclar(db, 2027, [filtro["id"], papel["id"]])
+    r = pca_builder.mesclar(db, 2027, [1, 2])
     assert r["ok"] and r["itens"] == 2
     depois = pca_builder.listar_minuta(db, 2027)
     fundido = next(i for i in depois if i["mesclado"])
     assert fundido["quantidade"] == 250.0
     assert fundido["valor_unitario"] == 84.0
-    assert len(depois) == len(itens) - 1
+    assert len(depois) == 1
+
+
+def test_mesclar_recusa_unidades_diferentes(db):
+    """soma de quantidade sem checar a unidade era fantasma: 200 UND + 50
+    RESMA virava "250 UND" — mesclar() (ação manual) recusa em vez de
+    corromper, diferente de consolidar() (automático), que só sinaliza
+    unidades_divergentes (achado da auditoria 2026-08-11)."""
+    pca_builder.gerar_minuta(db, 2027, {"margem": 0})
+    itens = pca_builder.listar_minuta(db, 2027)
+    filtro = next(i for i in itens if i["chave"] == "FILTRO AR MOTOR")
+    papel = next(i for i in itens if "PAPEL" in i["chave"])
+    assert filtro["unidade"] == "UND" and papel["unidade"] == "RESMA"
+    r = pca_builder.mesclar(db, 2027, [filtro["id"], papel["id"]])
+    assert r["ok"] is False
+    assert "UND" in r["erro"] and "RESMA" in r["erro"]
+    # nada foi tocado
+    assert pca_builder.listar_minuta(db, 2027) == itens
 
 
 def test_mesclar_exige_dois_itens(db):
@@ -184,7 +206,13 @@ def test_mesclar_exige_dois_itens(db):
 
 
 def test_dividir_restaura_os_originais(db):
-    pca_builder.gerar_minuta(db, 2027, {"margem": 0})
+    db.executemany(
+        "INSERT INTO pca_minuta_itens (id, ano_alvo, chave, descricao,"
+        " unidade, quantidade, valor_unitario, margem, incluir, origem)"
+        " VALUES (?,2027,?,?,?,?,?,0,1,'{}')",
+        [(1, "FILTRO A", "Filtro A", "UND", 200, 100.0),
+         (2, "FILTRO B", "Filtro B", "UND", 50, 20.0)])
+    db.commit()
     antes = pca_builder.listar_minuta(db, 2027)
     ids = [antes[0]["id"], antes[1]["id"]]
     originais = {(i["chave"], i["quantidade"]) for i in antes[:2]}

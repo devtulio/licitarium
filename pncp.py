@@ -345,6 +345,20 @@ def _primeiro(item, *chaves):
     return None
 
 
+def _num(v):
+    """Campo numérico da API convertido, ou None se vier malformado.
+
+    Sem isso, um valor que não seja número JSON limpo (string vazia,
+    placeholder textual) fica gravado como TEXT numa coluna REAL — a
+    afinidade do SQLite não converte, e a corrupção só se manifesta bem
+    depois, em relatorios.py (formatação quebra, SUM em Python quebra,
+    filtro `> 0` deixa a linha passar sem entrar no total)."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 # ── upserts (raw sempre guardado; INSERT OR REPLACE é idempotente) ──────────
 
 def _upsert_contratacao(db, item, ibge=None, referencia=0):
@@ -365,7 +379,7 @@ def _upsert_contratacao(db, item, ibge=None, referencia=0):
          orgao.get("cnpj"), orgao.get("razaoSocial"), unidade.get("nomeUnidade"),
          item.get("modalidadeId"), item.get("modalidadeNome"),
          item.get("situacaoCompraNome"), item.get("objetoCompra"),
-         item.get("valorTotalEstimado"), item.get("valorTotalHomologado"),
+         _num(item.get("valorTotalEstimado")), _num(item.get("valorTotalHomologado")),
          item.get("dataEncerramentoProposta"),
          item.get("dataPublicacaoPncp"), item.get("dataAtualizacao"),
          referencia, ibge,
@@ -392,7 +406,7 @@ def _upsert_contrato(db, item):
          item.get("numeroContratoEmpenho"), item.get("anoContrato"),
          item.get("sequencialContrato"),
          item.get("niFornecedor"), item.get("nomeRazaoSocialFornecedor"),
-         item.get("objetoContrato"), item.get("valorGlobal"),
+         item.get("objetoContrato"), _num(item.get("valorGlobal")),
          _primeiro(item, "dataVigenciaInicio", "vigenciaInicio"),
          _primeiro(item, "dataVigenciaFim", "vigenciaFim"),
          item.get("dataPublicacaoPncp"), item.get("dataAtualizacao"),
@@ -512,8 +526,8 @@ def _upsert_pca(db, plano):
             (f"{id_pca}#{numero}", id_pca, plano.get("anoPca"),
              plano.get("orgaoEntidadeCnpj"), plano.get("nomeUnidade"), numero,
              item.get("descricaoItem"), item.get("nomeClassificacaoCatalogo"),
-             item.get("grupoContratacaoNome"), item.get("quantidadeEstimada"),
-             item.get("valorTotal"), item.get("dataAtualizacao"),
+             item.get("grupoContratacaoNome"), _num(item.get("quantidadeEstimada")),
+             _num(item.get("valorTotal")), item.get("dataAtualizacao"),
              json.dumps(item, ensure_ascii=False), agora))
         n += 1
     return n
@@ -580,10 +594,10 @@ def _upsert_item(db, contratacao, item, resultado):
          contratacao["ano"], contratacao["sequencial"], numero,
          item.get("descricao"), item.get("materialOuServicoNome"),
          item.get("itemCategoriaNome"), item.get("unidadeMedida"),
-         item.get("quantidade"), item.get("valorUnitarioEstimado"),
-         item.get("valorTotal"), 1 if item.get("temResultado") else 0,
-         r.get("valorUnitarioHomologado"), r.get("valorTotalHomologado"),
-         r.get("quantidadeHomologada"), r.get("niFornecedor"),
+         _num(item.get("quantidade")), _num(item.get("valorUnitarioEstimado")),
+         _num(item.get("valorTotal")), 1 if item.get("temResultado") else 0,
+         _num(r.get("valorUnitarioHomologado")), _num(r.get("valorTotalHomologado")),
+         _num(r.get("quantidadeHomologada")), r.get("niFornecedor"),
          r.get("nomeRazaoSocialFornecedor"), r.get("porteFornecedorNome"),
          r.get("dataResultado"), item.get("situacaoCompraItemNome"),
          item.get("dataAtualizacao"),

@@ -69,7 +69,11 @@ def documento(v):
 
 
 def moeda(v):
-    if v is None:
+    """Mesma proteção de quantidade(): a coluna promete REAL, mas afinidade
+    do SQLite não converte texto não-numérico — fica gravado como TEXT."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
         return "–"
     inteiro, decimal = f"{v:,.2f}".split(".")
     return "R$ " + inteiro.replace(",", ".") + "," + decimal
@@ -77,7 +81,9 @@ def moeda(v):
 
 def moeda_fina(v):
     """Preço de unidade-base tem centavo de centavo: R$ 0,0466 por folha."""
-    if v is None:
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
         return "–"
     if v >= 1:
         return moeda(v)
@@ -381,7 +387,7 @@ def dados_contratacoes(db, ano=None, modalidade=None, orgao=None):
 def dados_contratos(db, ano=None, vigentes=False, orgao=None):
     where, args = [], []
     if vigentes:
-        where.append("date(vigencia_fim) >= date('now')")
+        where.append("date(vigencia_fim) >= date('now','localtime')")
     elif ano:
         where.append("substr(data_publicacao,1,4)=?")
         args.append(str(ano))
@@ -405,7 +411,7 @@ def dados_contratos(db, ano=None, vigentes=False, orgao=None):
 def dados_atas(db, ano=None, vigentes=False, orgao=None):
     where, args = [], []
     if vigentes:
-        where.append("date(vigencia_fim) >= date('now')")
+        where.append("date(vigencia_fim) >= date('now','localtime')")
     elif ano:
         where.append("substr(vigencia_inicio,1,4)=?")
         args.append(str(ano))
@@ -449,24 +455,28 @@ def dados_executivo(db, ano, orgao=None):
         [str(ano)] + og_args)]
     vencendo = [dict(r) for r in db.execute(
         f"""SELECT 'Contrato' tipo, fornecedor_nome nome, objeto, vigencia_fim,
-                  CAST(julianday(vigencia_fim) - julianday('now') AS INTEGER) dias
+                  CAST(julianday(vigencia_fim) - julianday('now','localtime')
+                       AS INTEGER) dias
            FROM contratos
-           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day'){og}
+           WHERE date(vigencia_fim) BETWEEN date('now','localtime')
+                 AND date('now','localtime','+90 day'){og}
            UNION ALL
            SELECT 'Ata', json_extract(raw,'$.numeroAtaRegistroPreco') || '/' ||
                   json_extract(raw,'$.anoAta'),
                   json_extract(raw,'$.objetoContratacao'), vigencia_fim,
-                  CAST(julianday(vigencia_fim) - julianday('now') AS INTEGER)
+                  CAST(julianday(vigencia_fim) - julianday('now','localtime')
+                       AS INTEGER)
            FROM atas
-           WHERE date(vigencia_fim) BETWEEN date('now') AND date('now','+90 day'){og}
+           WHERE date(vigencia_fim) BETWEEN date('now','localtime')
+                 AND date('now','localtime','+90 day'){og}
            ORDER BY vigencia_fim""", og_args + og_args)]
     cards = dados_contratacoes(db, ano, orgao=orgao)["totais"]
     cards["contratos_vigentes"] = db.execute(
-        f"SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)>=date('now')"
-        f"{og}", og_args).fetchone()[0]
+        f"SELECT COUNT(*) FROM contratos WHERE date(vigencia_fim)"
+        f">=date('now','localtime'){og}", og_args).fetchone()[0]
     cards["atas_vigentes"] = db.execute(
-        f"SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)>=date('now')"
-        f"{og}", og_args).fetchone()[0]
+        f"SELECT COUNT(*) FROM atas WHERE date(vigencia_fim)"
+        f">=date('now','localtime'){og}", og_args).fetchone()[0]
     return {"ano": ano, "cards": cards, "modalidades": modalidades,
             "meses": meses, "fornecedores": fornecedores, "vencendo": vencendo}
 
@@ -692,7 +702,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
         # primeira — as quatro barras precisam falar do mesmo conjunto
         "vigentes": db.execute(
             f"""SELECT COUNT(*) FROM contratos k
-                 WHERE date(k.vigencia_fim) >= date('now')
+                 WHERE date(k.vigencia_fim) >= date('now','localtime')
                    AND k.contratacao_controle IN (
                      SELECT numero_controle FROM contratacoes
                       WHERE referencia=0 AND ano=?){og_k}""",
@@ -703,12 +713,13 @@ def dados_painel(db, ano, orgao=None, limites=None):
     paradas = db.execute(
         f"""SELECT COUNT(*) FROM contratacoes c
              WHERE c.referencia=0 AND c.valor_homologado IS NULL
-               AND date(c.data_publicacao) < date('now','-90 day')
+               AND date(c.data_publicacao) < date('now','localtime','-90 day')
                AND c.ano=?{og_c}""", [ano] + og_args).fetchone()[0]
     propostas = db.execute(
         f"""SELECT COUNT(*) FROM contratacoes
              WHERE referencia=0
-               AND datetime(data_encerramento_proposta) >= datetime('now'){og}""",
+               AND datetime(data_encerramento_proposta)
+                   >= datetime('now','localtime'){og}""",
         og_args).fetchone()[0]
     # O campo "unidade" do PNCP costuma trazer o nome do órgão — no acervo
     # do piloto, todas as dispensas caem em "MUNICIPIO DE ORINDIUVA" e o
@@ -1039,7 +1050,9 @@ def escolher_base(bases):
 
 def preco_por_conteudo(valor, descricao, unidade):
     """Preço na unidade-base: R$/folha, R$/kg, R$/litro, R$/metro."""
-    if valor is None:
+    try:
+        valor = float(valor)
+    except (TypeError, ValueError):
         return None
     lido = conteudo(descricao, unidade)
     if not lido:
@@ -1642,8 +1655,12 @@ def render_precos(d, municipio, uf, brasao=None):
 <div class="card"><div class="n">{r['fornecedores']}</div><div class="l">fornecedores</div></div>
 </div>"""
     # dispersão no documento: quem confere a pesquisa precisa saber se a
-    # média descreve o conjunto ou se foi puxada por um extremo
-    if r.get("desvio") is not None:
+    # média descreve o conjunto ou se foi puxada por um extremo. Checa "cv",
+    # não "desvio": com média exatamente zero (todos os preços a R$0,00),
+    # desvio existe (é 0.0) mas cv fica None (divisão por média zero) — o
+    # parágrafo é sobre coeficiente de variação, então sem cv não há o que
+    # mostrar (achado da auditoria 2026-08-11).
+    if r.get("cv") is not None:
         faixa = (f"Metade dos preços está entre <b>{moeda(r['q1'])}</b> e "
                  f"<b>{moeda(r['q3'])}</b>. " if r.get("q1") is not None else "")
         cards += (
@@ -1869,7 +1886,7 @@ def render_economia(d, municipio, uf, brasao=None):
 </div>"""
 
     graf_mod = _grafico_barras(
-        e["por_modalidade"][:8], valor=lambda m: m["economizado"] or 0,
+        e["por_modalidade"], valor=lambda m: m["economizado"] or 0,
         rotulo=lambda m: m["modalidade"] or "–",
         sub=lambda m: f"{m['n']} {'processo' if m['n'] == 1 else 'processos'}",
         cor="var(--s1)", larg=300)

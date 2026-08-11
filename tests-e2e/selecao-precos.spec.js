@@ -94,6 +94,31 @@ test("restaurar reconsidera cada item — volta a valer no resumo",
   await expect(caixas(page).nth(1)).toBeChecked();
 });
 
+// mesma auditoria de falha silenciosa (2026-08-09) do toggle individual —
+// "Restaurar todos" descartava o retorno {ok} num loop; falha no meio
+// deixava a tela "restaurada" com o banco ainda descartado.
+test("restaurar avisa e mantém o item descartado quando a gravação não pega",
+    async ({ page }) => {
+  await caixas(page).nth(0).check();
+  await caixas(page).nth(0).uncheck();
+  await expect(page.locator("#precos-selecao"))
+    .toContainText("1 item descartado");
+  const id = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "selecionar_preco").pop().item_id);
+
+  await page.evaluate((id) => {
+    window.pywebview.api.selecionar_preco = async () => ({ ok: false });
+    // reflete o que o servidor "de verdade" ainda teria: a gravação falhou,
+    // o item segue descartado depois da releitura
+    window.__descartes = { papel: [{ item_id: id, motivo: null,
+                                     descricao: null, valor: null }] };
+  }, id);
+  await page.locator("#precos-restaurar").click();
+  await expect(page.locator("#sync-msg")).toContainText("Não consegui restaurar");
+  await expect(page.locator("#precos-selecao")).toContainText("item descartado");
+  await expect(caixas(page).nth(0)).not.toBeChecked();
+});
+
 test("trocar o termo recomeça a seleção", async ({ page }) => {
   await page.locator("#f-busca").fill("papel");
   await expect(page.locator("#precos-resumo")).toBeVisible();

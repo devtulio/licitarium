@@ -264,8 +264,17 @@ $("wiz-ok").addEventListener("click", async () => {
   $("wiz-ok").disabled = true;
   $("wiz-ok").textContent = "Preparando…";
   const trocando = !!estado.municipio;
-  if (trocando) await api.trocar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
-  else await api.configurar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
+  if (trocando) {
+    const r = await api.trocar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
+    if (!r?.ok) {
+      $("wiz-ok").disabled = false;
+      $("wiz-ok").textContent = "Confirmar";
+      alert(r?.erro || "Não consegui trocar o município.");
+      return;
+    }
+  } else {
+    await api.configurar_municipio(wizEscolha.c, wizEscolha.n, wizEscolha.uf);
+  }
   iniciarApp(await api.get_estado());
 });
 
@@ -1539,7 +1548,12 @@ async function renderReferencia() {
       if (!confirm(`Remover ${nome}?\n\n`
                    + "Os preços que ele trouxe saem do banco.")) return;
       b.disabled = true;
-      await api.remover_municipio_referencia(b.dataset.remover);
+      const r = await api.remover_municipio_referencia(b.dataset.remover);
+      if (!r?.ok) {
+        alert(r?.erro || "Não consegui remover.");
+        b.disabled = false;
+        return;
+      }
       await renderReferencia();
     }));
 }
@@ -1643,12 +1657,29 @@ async function atualizarSelecaoPrecos() {
      </div>${linhas}`;
   $("precos-restaurar").addEventListener("click", async () => {
     // "restaurar" reconsidera — cada item volta a ser selecionado, não só
-    // sai da lista de descartados (senão ficaria fora da conta de novo)
-    for (const id of precosDescartados.keys()) {
-      precosIncluidos.add(id);
-      await api.selecionar_preco(ultimoTermoPrecos ?? "", id);
+    // sai da lista de descartados (senão ficaria fora da conta de novo).
+    // Cada gravação é conferida (mesmo cuidado do toggle individual,
+    // auditoria de falha silenciosa 2026-08-09): sem isso, uma falha no
+    // meio do lote deixava a tela "restaurada" com o banco ainda
+    // descartado. `selecionar_preco` já apaga o descarte no servidor
+    // quando grava — a releitura no fim reflete exatamente o que pegou.
+    let falhou = 0;
+    for (const id of [...precosDescartados.keys()]) {
+      let gravou = false;
+      try {
+        gravou = (await api.selecionar_preco(
+          ultimoTermoPrecos ?? "", id))?.ok === true;
+      } catch { gravou = false; }     // o Proxy da ponte já avisou na tela
+      if (gravou) precosIncluidos.add(id);
+      else falhou++;
     }
-    precosDescartados.clear();
+    if (falhou) {
+      $("sync-msg").textContent =
+        `Não consegui restaurar ${falhou} ${falhou === 1 ? "item" : "itens"}` +
+        " — a lista foi recarregada.";
+      await recarregarSelecao(ultimoTermoPrecos ?? "");
+    }
+    await recarregarDescartes(ultimoTermoPrecos ?? "");
     carregarLista();
     mostrarResumoPrecos();
     atualizarSelecaoPrecos();

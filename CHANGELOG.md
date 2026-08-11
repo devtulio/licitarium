@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.21.1 — 2026-08-11
+
+**Auditoria de code review — 8 achados, todos de falha que não chegava a
+lugar nenhum ou dado que não era conferido antes de virar cálculo**
+
+- **PNCP nunca validava campo numérico antes de gravar.** Um valor que não
+  fosse número JSON limpo (string vazia, decimal malformado) ficava
+  guardado como TEXT numa coluna REAL — afinidade do SQLite não converte —
+  e a corrupção só se manifestava bem depois, derrubando relatórios. Um
+  `_num()` no ponto de ingestão (`pncp.py`) evita o resto em cascata.
+- **`moeda()`/`moeda_fina()` não tinham a blindagem que `quantidade()` já
+  ganhou** contra esse mesmo TEXT-em-REAL — crashavam o relatório inteiro
+  em vez de mostrar "–". `preco_por_conteudo()`, achado testando a
+  correção acima, tinha o mesmo problema.
+- **Economia por modalidade: gráfico cortava em 8, tabela ao lado (mesma
+  página) e a tela mostravam a lista inteira.** Único corte fora do padrão
+  das listas irmãs.
+- **`date('now')` do SQLite é UTC; nada usava `'localtime'`.** Entre ~21h
+  e meia-noite de Brasília, um contrato vencendo hoje lia como já vencido
+  nos painéis de vigência e prazo — mesma classe de bug de fuso já
+  corrigida na outra família de sistemas do autor.
+- **"Restaurar todos" (aba Preços) descartava o retorno `{ok}` num loop**
+  — irmão não corrigido do toggle individual que a auditoria anterior já
+  tinha fechado.
+- **Troca de município/importação de acervo não coordenava com uma
+  sincronização em andamento** — a thread de sync guarda o código do
+  IBGE numa variável local antes de rodar; trocar o município no meio
+  contaminava o banco novo com dados do antigo, sem erro visível. As três
+  operações que mexem nas mesmas tabelas agora recusam enquanto o lock
+  estiver preso.
+- **Mesclar itens do PCA somava quantidade sem checar a unidade** — 300
+  pacotes viravam 300 kg fantasmas na minuta. Ação manual do usuário
+  agora recusa em vez de corromper (a consolidação automática continua só
+  sinalizando, que é o comportamento certo para ela).
+- **Coeficiente de variação podia ser `None`** onde só o desvio padrão era
+  checado — itens a R$0,00 (doação/brinde) derrubavam o relatório de
+  preços.
+
+341 pytest + 140 E2E. Cada achado com teste que morde sem a correção.
+
 ## 1.21.0 — 2026-08-09
 
 **Fecha as correções em aberto das auditorias**

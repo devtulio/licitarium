@@ -455,3 +455,30 @@ def test_listagem_vazia_de_verdade_carimba_normalmente(tmp_path, monkeypatch):
                         " WHERE numero_controle='C'").fetchone()[0]
     assert versao == "2026-01-01"
     db.close()
+
+
+def test_num_converte_ou_devolve_none():
+    assert pncp._num(100.0) == 100.0
+    assert pncp._num("90") == 90.0
+    assert pncp._num("") is None
+    assert pncp._num(None) is None
+    assert pncp._num("não é número") is None
+
+
+def test_valor_malformado_do_pncp_nao_vira_text_na_coluna_real(db, monkeypatch):
+    """Sem _num(), item.get("valorTotalEstimado") gravava a string crua —
+    afinidade do SQLite não converte TEXT numa coluna REAL, e o valor-lixo
+    quebrava relatorios.py mais tarde (moeda(), sum() em Python, filtro
+    "> 0" do SQL). "N/D" é não vazio — não pega o `or 0` que mascararia
+    string vazia — e ainda assim não é número."""
+    monkeypatch.setattr(pncp, "_get", lambda c, p, **kw:
+        {"data": [contratacao("PNCP-X", valorTotalEstimado="N/D",
+                              valorTotalHomologado=None)],
+         "totalPaginas": 1} if p["pagina"] == 1 and
+        p["codigoModalidadeContratacao"] == 8 else None)
+    pncp.sync_contratacoes(db, "3534203", date(2026, 1, 1), date(2026, 3, 1))
+    linha = db.execute("SELECT valor_estimado, valor_homologado FROM"
+                       " contratacoes WHERE numero_controle='PNCP-X'"
+                       ).fetchone()
+    assert linha["valor_estimado"] is None
+    assert linha["valor_homologado"] is None
