@@ -409,6 +409,13 @@
   </div>
 </div>
 
+<!-- gráfico da pesquisa de preços redesenhado aqui, fora da tela, antes de
+     imprimir — o mesmo motor (ECharts) que a aba Preços usa, capturado e
+     mandado pro papel (achado 2026-08-11: sem isso, o relatório impresso
+     nunca passa pela tela e ficaria preso ao SVG à mão pra sempre) -->
+<div id="grafico-oculto" style="position:absolute; left:-9999px; top:0;
+     width:900px; height:240px" aria-hidden="true"></div>
+
 <script src="echarts.min.js"></script>
 <script src="app.js"></script>
 <script src="painel.js"></script>

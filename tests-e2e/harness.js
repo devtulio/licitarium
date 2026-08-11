@@ -210,6 +210,18 @@ function scriptPonte(temaBanco = "portal") {
                  limite_inf_robusto: -13.4, limite_sup_robusto: 50.6,
                  q1: 16.9, q3: 30.5, iqr: 13.6,
                  limite_inf: -3.5, limite_sup: 50.9, fora_da_curva: fora,
+                 itens: [
+                   { id: "X-3#1", descricao: "PAPEL SULFITE A4 RESMA",
+                     fornecedor: "11.111.111/0001-11", valor: 15.4 },
+                   { id: "X-3#2", descricao: "PAPEL SULFITE A4 BRANCO",
+                     fornecedor: "22.222.222/0001-22", valor: 16.9 },
+                   { id: "X-3#9", descricao: "PAPEL A4 COLORIDO",
+                     fornecedor: "11.111.111/0001-11", valor: 18.75 },
+                   { id: "X-3#11", descricao: "PAPEL A4 CARBONO",
+                     fornecedor: "22.222.222/0001-22", valor: 30.5 },
+                   { id: "X-3#10", descricao: "FORNECIMENTO DE PAPEL A4 TIMBRADO",
+                     fornecedor: "33.333.333/0001-33", valor: 249.8 },
+                 ],
                  alertas_concentracao: fora.length
                    ? ["1 fornecedor com mais de um preço na amostra"] : [],
                  sensibilidade: fora.length ? { removido: 249.8,
@@ -346,6 +358,20 @@ function scriptPonte(temaBanco = "portal") {
           .filter(m => m.n.toLowerCase().includes((texto || "").toLowerCase()));
       },
       ultimo_log: async () => [],
+      dados_grafico_precos: async (termo, ano, orgao, excluidos) => {
+        window.__chamadas.push({ metodo: "dados_grafico_precos", termo, ano,
+                                 orgao, excluidos });
+        if (window.__semSelecaoPrecos) return { ok: false, erro: "selecione" };
+        return { ok: true, resumo: {
+          n: 3, minimo: 15.4, maximo: 249.8, media: 53.63, mediana: 18.75,
+          desvio: 86.4, cv: 1.61, q1: 16.9, q3: 30.5,
+          limite_inf: -3.5, limite_sup: 50.9,
+          itens: [
+            { descricao: "PAPEL SULFITE A4 RESMA", fornecedor: "11.111.111/0001-11", valor: 15.4 },
+            { descricao: "PAPEL A4 COLORIDO", fornecedor: "11.111.111/0001-11", valor: 18.75 },
+            { descricao: "FORNECIMENTO DE PAPEL A4 TIMBRADO", fornecedor: "33.333.333/0001-33", valor: 249.8 },
+          ] } };
+      },
       gerar_relatorio: async (tipo, params) => {
         window.__chamadas.push({ metodo: "gerar_relatorio", tipo, params });
         return { ok: true };

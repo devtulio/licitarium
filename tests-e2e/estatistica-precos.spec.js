@@ -31,6 +31,23 @@ test("box-plot ECharts mostra as duas cercas (Tukey e MAD)",
   await expect(box.locator("text").filter({ hasText: "MAD" })).toBeVisible();
 });
 
+test("box-plot anotado mostra um ponto por item, com rótulo",
+    async ({ page }) => {
+  await abrirPrecos(page);
+  const box = page.locator("#precos-boxplot");
+  await expect(box).toBeVisible();
+  await expect(box).toHaveCSS("height", "240px");
+  // 5 itens mockados: os 5 preços aparecem como rótulo no gráfico
+  for (const preco of ["15,40", "16,90", "18,75", "30,50", "249,80"])
+    await expect(box.locator("text").filter({ hasText: preco })).toBeVisible();
+  // o extremo (R$ 249,80) vem na cor --erro do tema em uso, não na
+  // --muted dos itens normais
+  const erroTema = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--erro").trim());
+  const rotuloExtremo = box.locator("svg text", { hasText: "249,80" }).first();
+  await expect(rotuloExtremo).toHaveAttribute("fill", erroTema);
+});
+
 test("box-plot some quando a amostra é pequena demais pra quartil",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="itens"]').click();
@@ -46,6 +63,40 @@ test("box-plot some quando a amostra é pequena demais pra quartil",
   await page.locator("#f-busca").fill("papel");
   await expect(page.locator("#precos-resumo")).toBeVisible();
   await expect(page.locator("#precos-boxplot")).toBeHidden();
+});
+
+test("relatório de preços manda o gráfico já desenhado pro papel",
+    async ({ page }) => {
+  await abrirPrecos(page);
+  await page.locator("#btn-rel-precos").click();
+  await expect(page.locator("#veu-relatorios")).toBeVisible();
+  await page.locator("#rel-gerar").click();
+
+  const previa = await page.evaluate(() => window.__chamadas
+    .find(c => c.metodo === "dados_grafico_precos"));
+  expect(previa.termo).toBe("papel");
+
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop());
+  expect(chamada.tipo).toBe("precos");
+  expect(chamada.params.grafico_html).toContain("<svg");
+  // o gráfico mandado pro papel tem o rótulo do extremo — prova que é o
+  // mesmo desenho da tela, não um SVG à mão feito à parte
+  expect(chamada.params.grafico_html).toContain("249,80");
+});
+
+test("relatório de preços sem seleção não quebra — só fica sem o gráfico pronto",
+    async ({ page }) => {
+  await page.evaluate(() => { window.__semSelecaoPrecos = true; });
+  await abrirPrecos(page);
+  await page.locator("#btn-rel-precos").click();
+  await page.locator("#rel-gerar").click();
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop());
+  expect(chamada.params.grafico_html).toBeUndefined();
+  // gerar_relatorio segue chamado — quem recusa e explica é o backend
+  // real (mock aqui sempre devolve ok, então só confere que não travou)
+  await expect(page.locator("#rel-status")).toContainText("Aberto");
 });
 
 test("preço fora da curva é apontado e só sai se o usuário mandar",

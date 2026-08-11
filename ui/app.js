@@ -626,12 +626,27 @@ function semConversaoHtml(s) {
 // tela, só texto; e o próprio texto não conseguia mostrar as DUAS cercas
 // juntas do jeito que um desenho mostra. `renderer:'svg'` porque o app
 // pode imprimir a partir do que a tela desenha — canvas pixela, svg não.
-// Só o agregado (caixa + cercas + média): pontos por item exigiriam
-// `estatisticas_preco` devolver cada preço, que hoje ela não devolve —
-// fase seguinte, se fizer sentido.
-let _echartBoxPreco = null;
+// Com `s.itens` (preço por item, 1.24.0): modo "Anotada" — ponto por item,
+// jitter em zigue-zague por ORDEM DE VALOR (não de cadastro, achado do
+// usuário: dois preços vizinhos nunca caem na mesma altura, senão o
+// rótulo gruda). Sem `s.itens`: modo agregado só com a caixa.
+function _jitterPorValor(n, passo = 15) {
+  const niveis = [0];
+  for (let i = 1; i < n; i++) {
+    const grupo = Math.ceil(i / 2);
+    niveis.push((i % 2 === 1 ? -1 : 1) * grupo * passo);
+  }
+  return niveis;
+}
 function desenharBoxplotPreco(el, s) {
-  if (!window.echarts || s.q1 == null) { el.classList.add("oculto"); return; }
+  if (!window.echarts || s.q1 == null) {
+    // limpa o que sobrou de um desenho anterior — sem isso, um contêiner
+    // oculto (o da prévia de impressão, sem tela pra esconder visualmente)
+    // capturaria o SVG de outra pesquisa quando esta não tem quartil
+    el.innerHTML = "";
+    el.classList.add("oculto");
+    return;
+  }
   el.classList.remove("oculto");
   const cor = (nome, fallback) => {
     const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
@@ -642,6 +657,7 @@ function desenharBoxplotPreco(el, s) {
     muted = cor("--muted", "#5b6066"), border = cor("--border", "#d3d6da");
   const val = s.por_conteudo ? dinheiroFino : dinheiro;
   const fmt = v => val(v);
+  const itens = s.itens || [];
   const markLines = [];
   if (s.limite_sup != null)
     markLines.push({ xAxis: s.limite_sup, lineStyle: { color: s1, type: "dashed", width: 1.4 },
@@ -649,26 +665,61 @@ function desenharBoxplotPreco(el, s) {
   if (s.limite_sup_robusto != null)
     markLines.push({ xAxis: s.limite_sup_robusto, lineStyle: { color: warn, type: "dotted", width: 1.4 },
       label: { formatter: "MAD", color: warn, fontSize: 10, position: "insideEndBottom" } });
-  if (_echartBoxPreco) { _echartBoxPreco.dispose(); _echartBoxPreco = null; }
-  _echartBoxPreco = echarts.init(el, null, { renderer: "svg" });
-  _echartBoxPreco.setOption({
-    grid: { left: 8, right: 16, top: 14, bottom: 22 },
+
+  const boxplotTooltip = d =>
+    `mín <b>${fmt(d[1])}</b><br/>Q1 <b>${fmt(d[2])}</b><br/>` +
+    `mediana <b>${fmt(d[3])}</b><br/>Q3 <b>${fmt(d[4])}</b><br/>máx <b>${fmt(d[5])}</b>`;
+
+  const series = [
+    { type: "boxplot", data: [[s.minimo, s.q1, s.mediana, s.q3, s.maximo]],
+      itemStyle: { color: `${s1}2e`, borderColor: s1, borderWidth: 1.6 },
+      boxWidth: ["24%", "24%"], markLine: { symbol: "none", animation: false, data: markLines } },
+    { type: "scatter", data: [{ value: [s.media, 0] }], symbol: "diamond",
+      symbolSize: 11, itemStyle: { color: s2 }, z: 6 }
+  ];
+
+  el.style.height = itens.length ? "240px" : "150px";
+
+  if (itens.length) {
+    const ordenados = [...itens].sort((a, b) => a.valor - b.valor);
+    const niveis = _jitterPorValor(ordenados.length);
+    series.push({ type: "scatter", z: 5, symbolSize: 8,
+      data: ordenados.map((it, i) => {
+        const j = niveis[i];
+        const extrema = it.valor > s.limite_sup
+          || (s.limite_sup_robusto != null && it.valor > s.limite_sup_robusto);
+        return { value: [it.valor, 0], item: it, symbolOffset: [0, j],
+          label: { show: true, formatter: fmt(it.valor).replace(/^R\$\s*/, ""),
+            fontSize: 10, position: j <= 0 ? "top" : "bottom",
+            color: extrema ? erro : muted },
+          itemStyle: { color: extrema ? erro : muted } };
+      }) });
+  }
+
+  // instância presa ao PRÓPRIO elemento, não a uma variável de módulo —
+  // a tela (#precos-boxplot) e a prévia oculta de impressão
+  // (#grafico-oculto) desenham ao mesmo tempo, em elementos diferentes;
+  // uma só variável faria o dispose() de um derrubar o outro
+  if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
+  const chart = echarts.init(el, null, { renderer: "svg" });
+  el.__echart = chart;
+  chart.setOption({
+    grid: { left: 8, right: 16, top: 22, bottom: 22 },
     xAxis: { type: "value", min: 0, axisLine: { lineStyle: { color: border } },
       axisLabel: { color: muted, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: .4 } } },
     yAxis: { type: "category", data: [""], axisLine: { show: false }, axisTick: { show: false } },
     tooltip: { trigger: "item", backgroundColor: "#17181a", borderWidth: 0,
       textStyle: { color: "#fff", fontSize: 12 },
-      formatter: p => p.seriesType === "boxplot"
-        ? `mín <b>${fmt(p.data[1])}</b><br/>Q1 <b>${fmt(p.data[2])}</b><br/>` +
-          `mediana <b>${fmt(p.data[3])}</b><br/>Q3 <b>${fmt(p.data[4])}</b><br/>máx <b>${fmt(p.data[5])}</b>`
-        : `média <b>${fmt(s.media)}</b>` },
-    series: [
-      { type: "boxplot", data: [[s.minimo, s.q1, s.mediana, s.q3, s.maximo]],
-        itemStyle: { color: `${s1}2e`, borderColor: s1, borderWidth: 1.6 },
-        boxWidth: ["24%", "24%"], markLine: { symbol: "none", animation: false, data: markLines } },
-      { type: "scatter", data: [{ value: [s.media, 0] }], symbol: "diamond",
-        symbolSize: 11, itemStyle: { color: s2 }, z: 6 }
-    ]
+      formatter: p => {
+        if (p.seriesType === "boxplot") return boxplotTooltip(p.data);
+        if (!p.data.item) return `média <b>${fmt(s.media)}</b>`;
+        const it = p.data.item;
+        const extrema = it.valor > s.limite_sup
+          || (s.limite_sup_robusto != null && it.valor > s.limite_sup_robusto);
+        return `<b>${esc(it.descricao)}</b><br/>${esc(it.fornecedor || "")}<br/>${fmt(it.valor)}` +
+          (extrema ? '<br/><span style="color:#f08a80">fora da faixa esperada</span>' : "");
+      } },
+    series
   });
 }
 
@@ -1586,6 +1637,22 @@ $("rel-gerar").addEventListener("click", async () => {
   }
   $("rel-gerar").disabled = true;
   $("rel-status").textContent = "Gerando…";
+  // desenha o mesmo gráfico da aba Preços num contêiner fora da tela,
+  // captura o SVG e manda pro papel — sem isso o relatório de preços
+  // nunca passa pela tela antes de imprimir (diferente do Painel) e
+  // ficaria preso ao SVG à mão pra sempre. Se a prévia falhar (nada
+  // selecionado, por exemplo), segue sem grafico_html: gerar_relatorio
+  // já dá o mesmo erro por conta própria, então o usuário não fica sem
+  // explicação — só sem o gráfico bonito.
+  if ($("rel-tipo").value === "precos" && api.dados_grafico_precos) {
+    const g = await api.dados_grafico_precos(
+      params.termo, params.ano, params.orgao, params.excluidos,
+      false, false);
+    if (g?.ok) {
+      desenharBoxplotPreco($("grafico-oculto"), g.resumo);
+      params.grafico_html = $("grafico-oculto").innerHTML;
+    }
+  }
   const r = await api.gerar_relatorio($("rel-tipo").value, params);
   $("rel-gerar").disabled = false;
   $("rel-status").textContent = r.ok

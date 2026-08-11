@@ -1727,7 +1727,7 @@ def _LEITURA_CV(cv):
     return "amostra muito dispersa; confira a comparabilidade dos itens"
 
 
-def render_precos(d, municipio, uf, brasao=None):
+def render_precos(d, municipio, uf, brasao=None, grafico_html=None):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
     if not r:
@@ -1782,7 +1782,15 @@ def render_precos(d, municipio, uf, brasao=None):
                 f' e a média de {val(s["media_antes"])} para'
                 f' {val(s["media_depois"])}. Não decide sozinho: mostra o'
                 f' efeito de tirar o pior caso.</p>')
-        grafico = _grafico_dispersao(r, val)
+        # `grafico_html` vem do ECharts que a tela já desenhou (mesmo
+        # motor da aba Preços, achado 2026-08-11 sobre trocar o motor de
+        # gráfico) — se a chamada não passou por lá (uso direto de
+        # relatorios.py, testes, CLI), cai no SVG à mão como sempre.
+        # `grafico_html` vem do ECharts que a tela já desenhou (mesmo
+        # motor da aba Preços, achado 2026-08-11 sobre trocar o motor de
+        # gráfico) — se a chamada não passou por lá (uso direto de
+        # relatorios.py, testes, CLI), cai no SVG à mão como sempre.
+        grafico = grafico_html or _grafico_dispersao(r, val)
         if grafico:
             cards += f'<div class="card">{grafico}</div>'
     coluna_conteudo = d.get("por_conteudo")
@@ -2207,7 +2215,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
                          params.get("por_conteudo"),
                          params.get("corrigir_ipca"),
                          exigir_selecao=True)
-        conteudo = render_precos(d, municipio, uf, brasao=brasao)
+        conteudo = render_precos(d, municipio, uf, brasao=brasao,
+                                 grafico_html=params.get("grafico_html"))
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"
         linhas_csv = d["linhas"]

@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.23.0"
+VERSAO = "1.24.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -497,23 +497,30 @@ def _normalizar_por_conteudo(linhas):
 
     Comparar R$/quilo com R$/folha não quer dizer nada, então a série fica
     com a base **mais frequente** do resultado; o que sobrou é contado e
-    dito ao usuário, em vez de sumir em silêncio. `*r[5:]` preserva
-    fornecedor/contratação do mesmo jeito que `_corrigir_pelo_ipca`.
+    dito ao usuário, em vez de sumir em silêncio.
+
+    Contrato de posição mantido igual ao das linhas cruas/corrigidas por
+    IPCA: r[0]=id, r[1]=valor, r[2]=descrição, r[-2]=fornecedor_ni,
+    r[-1]=contratacao_controle — quem lê `linhas` depois não precisa saber
+    quais transformações rodaram. Sem isso, a descrição desaparecia aqui
+    (só saía id/valor/base) e ficava impossível montar o gráfico com
+    rótulo por item quando "comparar por conteúdo" estava ligado.
     """
     convertidos = []
     for r in linhas:
         p = relatorios.preco_por_conteudo(r[1], r[2], r[3])
         if p:
-            convertidos.append((r[0], p["valor"], p["base"],
+            convertidos.append((r[0], p["valor"], r[2], p["base"],
                                 relatorios.base_implicita(r[3]), *r[5:]))
     if not convertidos:
         return [], None, len(linhas)
     # quem só é comparável porque a unidade já era a base não vota na
     # escolha — ver relatorios.escolher_base
     base = relatorios.escolher_base(
-        [(b, i) for _, _, b, i, *_ in convertidos])
+        [(b, i) for _, _, _, b, i, *_ in convertidos])
     serie = sorted(
-        ((i, v, *extra) for i, v, b, _, *extra in convertidos if b == base),
+        ((id_, v, desc, *extra)
+         for id_, v, desc, b, _, *extra in convertidos if b == base),
         key=lambda x: x[1])
     return serie, base, len(linhas) - len(serie)
 
@@ -1394,6 +1401,12 @@ class Api:
             # por conteúdo, nenhuma das duas ou as duas em sequência
             resumo["alertas_concentracao"] = relatorios.alertas_concentracao(
                 [r[-2] for r in linhas], [r[-1] for r in linhas])
+            # cada preço da série, pro gráfico plotar ponto por item —
+            # antes só o agregado ia pra tela, e não dava pra saber QUAL
+            # item é o extremo sem abrir a lista embaixo
+            resumo["itens"] = [
+                {"id": r[0], "descricao": r[2], "fornecedor": r[-2], "valor": r[1]}
+                for r in linhas]
             # contagens sobre a mesma série que virou resumo: no modo por
             # conteúdo, os itens sem conversão não entraram
             ids = [r[0] for r in linhas]
@@ -1651,6 +1664,39 @@ class Api:
             db.close()
 
     # ── relatórios ──────────────────────────────────────────────────────
+
+    def dados_grafico_precos(self, termo, ano=None, orgao=None,
+                             excluidos=None, por_conteudo=False,
+                             corrigir_ipca=False):
+        """Resumo + item a item para a tela pré-desenhar o gráfico do
+        relatório de preços antes de mandar imprimir.
+
+        Roda exatamente `dados_precos` com os MESMOS parâmetros que
+        `gerar_relatorio` vai usar pra gerar o documento — mesma função,
+        mesmo `exigir_selecao=True` — pra garantir que o gráfico que o
+        usuário vê na prévia é o que vai pro papel, nunca um cálculo à
+        parte que pode divergir.
+        """
+        db = abrir_db()
+        try:
+            d = relatorios.dados_precos(
+                db, termo, ano, orgao, excluidos, por_conteudo,
+                corrigir_ipca, exigir_selecao=True)
+        except ValueError as e:
+            return {"ok": False, "erro": str(e)}
+        finally:
+            db.close()
+        conteudo = d["resumo"].get("por_conteudo")
+        # aninhado em resumo["itens"], mesmo contrato de estatisticas_preco
+        # — quem desenha o gráfico (desenharBoxplotPreco) lê os dois jeitos
+        # sem precisar saber qual dos dois métodos devolveu o dado
+        d["resumo"]["itens"] = [{
+            "descricao": l["descricao"], "fornecedor": l.get("fornecedor_nome"),
+            "valor": l["por_conteudo"]["valor"] if conteudo
+                    else (l.get("corrigido") if d["resumo"].get("corrigido")
+                          else l["valor_unitario_homologado"]),
+        } for l in d["linhas"]]
+        return {"ok": True, "resumo": d["resumo"]}
 
     def gerar_relatorio(self, tipo, params=None):
         db = abrir_db()

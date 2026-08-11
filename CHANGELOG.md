@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.24.0 — 2026-08-11
+
+**Motor de gráfico: papel une com a tela na pesquisa de preços**
+
+Fecha o incremento 2: o relatório impresso de pesquisa de preços deixa de
+reimplementar o gráfico à parte em Python (`_grafico_dispersao`, SVG à
+mão) e passa a usar o mesmo ECharts que a aba Preços já desenha na tela
+(1.23.0) — com ponto por item, não só o agregado.
+
+- `estatisticas_preco`/novo `dados_grafico_precos` devolvem cada preço
+  (descrição, fornecedor, valor) — o gráfico da tela ganha o modo
+  "Anotada": ponto por item, jitter em zigue-zague por ordem de valor
+  (não de cadastro — dois preços vizinhos nunca caem na mesma altura),
+  vermelho no que passa de alguma das duas cercas.
+- `dados_grafico_precos` roda a MESMA `dados_precos()` com os MESMOS
+  parâmetros que o documento final vai usar — garante que a prévia nunca
+  diverge do papel.
+- `render_precos` aceita o SVG pronto vindo da tela (`grafico_html`); sem
+  ele, cai no `_grafico_dispersao` de sempre — chamada direta, CLI e
+  testes continuam funcionando sem depender de navegador nenhum.
+- Achado no caminho: `_normalizar_por_conteudo` reconstruía a linha e
+  derrubava a descrição — "comparar por conteúdo" ligado deixava o
+  gráfico sem rótulo por item. Corrigido: contrato de posição uniforme
+  (id/valor/descrição sempre nos mesmos lugares) entre as três
+  transformações possíveis (corrigir IPCA, comparar por conteúdo, as
+  duas, nenhuma).
+- Achado de robustez: instância do ECharts presa a uma variável de
+  módulo — desenhar na tela e no contêiner oculto de impressão ao mesmo
+  tempo fazia o `dispose()` de um derrubar o outro. Agora cada elemento
+  guarda a própria instância.
+
+351 pytest + 145 E2E.
+
 ## 1.23.0 — 2026-08-11
 
 **Motor de gráfico: primeiro gráfico da pesquisa de preços na tela**

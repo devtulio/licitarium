@@ -127,6 +127,12 @@ def test_estatisticas_de_preco_trazem_dispersao_e_apontam_o_extremo(api):
     # o serviço de papel timbrado (R$ 1.490,00) destoa das resmas
     assert s["fora_da_curva"] == ["I7"]
     assert s["maximo"] > s["limite_sup"]
+    # itens: pro gráfico plotar ponto por item, não só o agregado
+    assert len(s["itens"]) == len(ITENS)
+    assert {i["id"] for i in s["itens"]} == {id_ for id_, *_ in ITENS}
+    i7 = next(i for i in s["itens"] if i["id"] == "I7")
+    assert i7["valor"] == pytest.approx(1490.0)
+    assert i7["descricao"] == "FORNECIMENTO DE PAPEL A4 TIMBRADO"
 
 
 def test_amostra_de_quatro_aponta_extremo_via_escore_z(tmp_path, monkeypatch):
@@ -449,6 +455,55 @@ def test_selecionar_por_texto_acumula_sobre_selecao_existente(api):
     api.selecionar_por_texto("papel a4", "SULFITE")        # I1-I4
     assert set(api.selecionados("papel a4")) == \
         {"I1", "I2", "I3", "I4", "I7"}
+
+
+def test_render_precos_usa_o_grafico_pronto_quando_vem_da_tela(
+        api, selecionar_tudo):
+    """`grafico_html` (o SVG que a tela já desenhou em ECharts, achado
+    2026-08-11) substitui o `_grafico_dispersao` hand-SVG no papel — sem
+    ele, o fallback continua funcionando (chamada direta, CLI, testes)."""
+    db = licitarium.abrir_db()
+    selecionar_tudo(db, "papel a4")
+    d = relatorios.dados_precos(db, "papel a4")
+    db.close()
+    marcador = '<svg id="grafico-echarts-de-mentirinha"></svg>'
+    html = relatorios.render_precos(d, "T", "SP", grafico_html=marcador)
+    assert marcador in html
+
+    sem_override = relatorios.render_precos(d, "T", "SP")
+    assert marcador not in sem_override
+    assert "<svg" in sem_override            # o fallback ainda desenha algo
+
+
+# ── prévia do gráfico antes de imprimir ──────────────────────────────────
+
+def test_dados_grafico_precos_espelha_o_que_vai_pro_papel(
+        api, selecionar_tudo):
+    """A prévia (`dados_grafico_precos`) e o documento (`gerar` tipo
+    "precos") rodam a MESMA `dados_precos()`, com os MESMOS parâmetros —
+    é o que garante que o gráfico que a tela desenha antes de imprimir é
+    exatamente o que vai pro PDF, nunca um cálculo à parte que diverge."""
+    db = licitarium.abrir_db()
+    selecionar_tudo(db, "papel a4")
+    db.close()
+    r = api.dados_grafico_precos("papel a4")
+    assert r["ok"]
+    assert r["resumo"]["mediana"] == pytest.approx(219.9)
+    assert r["resumo"]["n"] == len(ITENS)
+    assert len(r["resumo"]["itens"]) == len(ITENS)
+    i7 = next(i for i in r["resumo"]["itens"]
+             if i["valor"] == pytest.approx(1490.0))
+    assert i7["descricao"] == "FORNECIMENTO DE PAPEL A4 TIMBRADO"
+    assert "fornecedor" in i7   # a fixture não seta fornecedor_nome; a
+                                # chave existir é o que importa aqui
+
+
+def test_dados_grafico_precos_sem_selecao_recusa_como_o_documento(api):
+    """Mesma recusa que `dados_precos(exigir_selecao=True)` já dá pro
+    documento — a prévia não pode desenhar um gráfico que o papel depois
+    recusa a gerar."""
+    r = api.dados_grafico_precos("papel a4")
+    assert r["ok"] is False and "selecione" in r["erro"]
 
 
 # ── ordenação ───────────────────────────────────────────────────────────

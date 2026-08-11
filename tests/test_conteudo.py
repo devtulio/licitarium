@@ -131,6 +131,13 @@ def test_resumo_por_conteudo_usa_a_base_predominante(api):
     assert s["n"] == 2 and s["sem_conversao"] == 2
     assert s["minimo"] == pytest.approx(0.046560)
     assert s["maximo"] == pytest.approx(0.389)
+    # _normalizar_por_conteudo reconstrói a linha e derrubava a descrição
+    # no caminho (só saía id/valor/base) — sem ela o gráfico não tem
+    # rótulo por item quando "comparar por conteúdo" está ligado
+    descricoes = {i["descricao"] for i in s["itens"]}
+    assert descricoes == {"PAPEL SULFITE A4 C/5000 FLS",
+                          "PAPEL SULFITE A4 SERRILHADO"}
+    assert all(i["fornecedor"] for i in s["itens"])
 
 
 def test_resumo_normal_continua_sobre_o_preco_pago(api):
