@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.25.0 — 2026-08-11
+
+**Motor de gráfico: papel une com a tela em Executivo e Economia**
+
+Fecha a fase B do incremento: os relatórios avulsos "Executivo" e
+"Economia e Comparativos" nunca tiveram vista nenhuma na tela — eram
+gerados 100% no Python, com gráficos em SVG à mão. Passam a reusar
+exatamente os dados que a vista Painel já busca (`api.painel`, sem
+método novo) e desenhar com o mesmo ECharts das telas.
+
+- Ao gerar, a tela desenha colunas pareadas (meses) e barras
+  (modalidade/família/categoria/fornecedor) num contêiner oculto,
+  captura o SVG de cada uma e manda pronto (`params.graficos`) —
+  mesmo padrão já usado pra Preços em 1.24.0.
+- `render_executivo`/`render_economia` (1.24.0) já aceitavam
+  `graficos={}` pré-renderizado; chamada direta, CLI e testes seguem
+  funcionando sem depender de navegador — sem gráfico pronto, cai no
+  SVG de sempre.
+- Atalho "Relatório de economia" da própria vista Painel (Economia)
+  não muda — já é gerado a partir de uma tela que acabou de desenhar
+  os gráficos; o alvo aqui era só o caminho do relatório avulso, que
+  nunca passava pela tela antes de imprimir.
+
+353 pytest + 147 E2E.
+
 ## 1.24.0 — 2026-08-11
 
 **Motor de gráfico: papel une com a tela na pesquisa de preços**

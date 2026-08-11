@@ -648,13 +648,9 @@ function desenharBoxplotPreco(el, s) {
     return;
   }
   el.classList.remove("oculto");
-  const cor = (nome, fallback) => {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
-    return v || fallback;
-  };
-  const s1 = cor("--s1", "#2a78d6"), s2 = cor("--s2", "#eb6834"),
-    erro = cor("--erro", "#a6231b"), warn = cor("--warn", "#7a5c0e"),
-    muted = cor("--muted", "#5b6066"), border = cor("--border", "#d3d6da");
+  const s1 = _corTemaEchart("--s1", "#2a78d6"), s2 = _corTemaEchart("--s2", "#eb6834"),
+    erro = _corTemaEchart("--erro", "#a6231b"), warn = _corTemaEchart("--warn", "#7a5c0e"),
+    muted = _corTemaEchart("--muted", "#5b6066"), border = _corTemaEchart("--border", "#d3d6da");
   const val = s.por_conteudo ? dinheiroFino : dinheiro;
   const fmt = v => val(v);
   const itens = s.itens || [];
@@ -720,6 +716,79 @@ function desenharBoxplotPreco(el, s) {
           (extrema ? '<br/><span style="color:#f08a80">fora da faixa esperada</span>' : "");
       } },
     series
+  });
+}
+
+function _corTemaEchart(nome, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+  return v || fallback;
+}
+
+// Barra horizontal — mesmo contrato de relatorios.py:_grafico_barras /
+// ui/painel.js:grafBarras: rótulo acima, valor (+ sub-rótulo opcional) no
+// fim da barra, ordem de entrada preservada (quem ordena é dados_painel).
+// Usado nos 4 gráficos de Economia e no "por modalidade" do Executivo —
+// achado 2026-08-11: Economia/Executivo nunca tiveram vista na tela, iam
+// direto do banco pro papel; ganham motor aqui como Preços já ganhou.
+function desenharBarrasEcharts(el, itens, { valor, rotulo, sub }) {
+  if (!window.echarts || !itens || !itens.length) { el.innerHTML = ""; return; }
+  const s1 = _corTemaEchart("--s1", "#2a78d6"), muted = _corTemaEchart("--muted", "#5b6066");
+  if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
+  const chart = echarts.init(el, null, { renderer: "svg" });
+  el.__echart = chart;
+  el.style.height = Math.max(120, itens.length * 36 + 30) + "px";
+  chart.setOption({
+    grid: { left: 4, right: 70, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: "value", show: false },
+    yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: muted, fontSize: 11 } },
+    series: [{ type: "bar", barWidth: 17,
+      data: itens.map(it => ({ value: valor(it) || 0,
+        _rotuloValor: compacto(valor(it)) + (sub ? " · " + sub(it) : ""),
+        itemStyle: { color: s1, borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: "right", color: muted, fontSize: 11,
+        formatter: p => p.data._rotuloValor } }]
+  });
+}
+
+// Colunas pareadas estimado (claro) × homologado (cheio) por mês — mesmo
+// contrato de relatorios.py:_grafico_meses / ui/painel.js:grafMeses.
+function desenharColunasEcharts(el, meses, corVar) {
+  if (!window.echarts || !meses) { el.innerHTML = ""; return; }
+  const s1 = _corTemaEchart(corVar || "--s1", "#2a78d6"),
+    muted = _corTemaEchart("--muted", "#5b6066"),
+    border = _corTemaEchart("--border", "#d3d6da");
+  const hoje = new Date().getMonth() + 1;
+  let ultimo = 0;
+  meses.forEach((m, i) => { if (m.valor || m.estimado) ultimo = i + 1; });
+  const dados = meses.slice(0, Math.max(ultimo, hoje));
+  if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
+  const chart = echarts.init(el, null, { renderer: "svg" });
+  el.__echart = chart;
+  el.style.height = "220px";
+  chart.setOption({
+    grid: { left: 8, right: 8, top: 10, bottom: 26, containLabel: true },
+    xAxis: { type: "category", data: dados.map(m => MES[m.mes - 1]),
+      axisLine: { lineStyle: { color: border } },
+      axisLabel: { color: muted, fontSize: 11 } },
+    yAxis: { type: "value",
+      axisLabel: { color: muted, fontSize: 11,
+        formatter: v => compacto(v).replace("R$ ", "") },
+      splitLine: { lineStyle: { color: border, opacity: .4 } } },
+    tooltip: { trigger: "axis", backgroundColor: "#17181a", borderWidth: 0,
+      textStyle: { color: "#fff", fontSize: 12 },
+      formatter: ps => {
+        const m = dados[ps[0].dataIndex];
+        return `<b>${MES[m.mes - 1]}</b><br/>Estimado ${compacto(m.estimado)}` +
+          `<br/>Homologado ${compacto(m.valor)}`;
+      } },
+    series: [
+      { name: "Estimado", type: "bar", data: dados.map(m => m.estimado || 0),
+        itemStyle: { color: s1, opacity: .32, borderRadius: [4, 4, 0, 0] } },
+      { name: "Homologado", type: "bar", data: dados.map(m => m.valor || 0),
+        itemStyle: { color: s1, borderRadius: [4, 4, 0, 0] } }
+    ]
   });
 }
 
@@ -1651,6 +1720,43 @@ $("rel-gerar").addEventListener("click", async () => {
     if (g?.ok) {
       desenharBoxplotPreco($("grafico-oculto"), g.resumo);
       params.grafico_html = $("grafico-oculto").innerHTML;
+    }
+  }
+  // mesma ideia pros dois relatórios que usam os gráficos do Painel —
+  // api.painel() já devolve exatamente o que dados_painel() usaria, então
+  // não precisa de método novo. Cada gráfico é desenhado no MESMO
+  // contêiner oculto, um de cada vez, e capturado antes do próximo.
+  if (["executivo", "economia"].includes($("rel-tipo").value) && api.painel) {
+    const anoAlvo = params.ano || new Date().getFullYear();
+    const dp = await api.painel(anoAlvo, params.orgao);
+    if (dp) {
+      params.graficos = {};
+      const capturar = (chave, itens, opts) => {
+        desenharBarrasEcharts($("grafico-oculto"), itens, opts);
+        params.graficos[chave] = $("grafico-oculto").innerHTML;
+      };
+      if ($("rel-tipo").value === "executivo") {
+        desenharColunasEcharts($("grafico-oculto"), dp.execucao.meses, "--s1");
+        params.graficos.meses = $("grafico-oculto").innerHTML;
+        capturar("modalidade", dp.execucao.modalidades.slice(0, 6), {
+          valor: m => m.homologado || m.estimado || 0,
+          rotulo: m => m.modalidade_nome || "–",
+          sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}` });
+      } else {
+        const item = n => n === 1 ? "item" : "itens";
+        capturar("modalidade", dp.economia.por_modalidade, {
+          valor: m => m.economizado || 0, rotulo: m => m.modalidade || "–",
+          sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}` });
+        capturar("familia", dp.economia.por_familia, {
+          valor: f => f.economizado || 0, rotulo: f => f.nome || "–",
+          sub: f => `${f.n} ${item(f.n)}` });
+        capturar("categoria", dp.economia.por_categoria, {
+          valor: c => c.economizado || 0, rotulo: c => c.nome || "–",
+          sub: c => `${c.n} ${item(c.n)}` });
+        capturar("fornecedor", dp.economia.por_fornecedor, {
+          valor: f => f.economizado || 0, rotulo: f => f.nome || "–",
+          sub: f => `${f.n} ${item(f.n)} · ${(f.pct || 0).toFixed(0)}%` });
+      }
     }
   }
   const r = await api.gerar_relatorio($("rel-tipo").value, params);

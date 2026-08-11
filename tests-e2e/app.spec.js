@@ -280,6 +280,41 @@ test("resumo de preços abre o relatório com o termo preenchido",
   await expect(page.locator("#rel-termo")).toHaveValue("papel");
 });
 
+test("relatório executivo manda os gráficos do Painel já desenhados pro papel",
+    async ({ page }) => {
+  await page.locator("#btn-relatorios").click();
+  await expect(page.locator("#veu-relatorios")).toBeVisible();
+  await page.locator("#rel-tipo").selectOption("executivo");
+  await page.locator("#rel-gerar").click();
+
+  const previa = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "painel").pop());
+  expect(previa).toBeTruthy();
+
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop());
+  expect(chamada.tipo).toBe("executivo");
+  expect(chamada.params.graficos.meses).toContain("<svg");
+  expect(chamada.params.graficos.modalidade).toContain("<svg");
+  // prova que é o desenho de verdade (dado do mock), não um SVG à parte
+  expect(chamada.params.graficos.modalidade).toContain("Pregão eletrônico");
+});
+
+test("relatório de economia manda os quatro gráficos já desenhados pro papel",
+    async ({ page }) => {
+  await page.locator("#btn-relatorios").click();
+  await page.locator("#rel-tipo").selectOption("economia");
+  await page.locator("#rel-gerar").click();
+
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop());
+  expect(chamada.tipo).toBe("economia");
+  for (const chave of ["modalidade", "familia", "categoria", "fornecedor"])
+    expect(chamada.params.graficos[chave]).toContain("<svg");
+  expect(chamada.params.graficos.familia).toContain("MATERIAL LIMPEZA");
+  expect(chamada.params.graficos.fornecedor).toContain("RHC PRODUTOS");
+});
+
 test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
   await page.locator("#btn-pca").click();
   await expect(page.locator("#veu-pca")).toBeVisible();

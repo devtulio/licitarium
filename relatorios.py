@@ -1852,11 +1852,19 @@ O número do processo leva à página oficial no PNCP, para conferência.{
                    estilo_extra=CSS_PAINEL, brasao=brasao)
 
 
-def render_executivo(d, municipio, uf, brasao=None):
+def render_executivo(d, municipio, uf, brasao=None, graficos=None):
     """Reformulado (2026-08-08, pedido do usuário) para usar os mesmos
     gráficos do Painel — hero com sparkline, colunas mensais pareadas e
     barras por modalidade — em vez de só tabelas. `d` é o retorno de
-    `dados_painel`: mesma consulta, mesmos números do que está na tela."""
+    `dados_painel`: mesma consulta, mesmos números do que está na tela.
+
+    `graficos` (achado 2026-08-11, mesmo padrão da pesquisa de preços):
+    dict `{"meses": html, "modalidade": html}` com o SVG que a tela já
+    desenhou em ECharts. Slot ausente ou `graficos=None` cai no
+    `_grafico_meses`/`_grafico_barras` de sempre — chamada direta, CLI e
+    testes continuam funcionando sem depender de navegador nenhum.
+    """
+    graficos = graficos or {}
     ano = d["ano"]
     ex = d["execucao"]
     c = ex["cards"]
@@ -1915,8 +1923,9 @@ def render_executivo(d, municipio, uf, brasao=None):
 </div>
 </div>"""
 
-    graf_meses = _grafico_meses(ex["meses"], "var(--s1)", larg=580)
-    graf_mod = _grafico_barras(
+    graf_meses = graficos.get("meses") or _grafico_meses(
+        ex["meses"], "var(--s1)", larg=580)
+    graf_mod = graficos.get("modalidade") or _grafico_barras(
         ex["modalidades"][:6],
         valor=lambda m: m["homologado"] or m["estimado"] or 0,
         rotulo=lambda m: m["modalidade_nome"] or "–",
@@ -1972,11 +1981,17 @@ def render_executivo(d, municipio, uf, brasao=None):
                    brasao=brasao)
 
 
-def render_economia(d, municipio, uf, brasao=None):
+def render_economia(d, municipio, uf, brasao=None, graficos=None):
     """Quanto foi economizado no ano, por modalidade, família de item e
     categoria do PNCP. `d` é o retorno de `dados_painel` — mesmos números
     da vista Economia do Painel, num documento que se gera sem abrir o
-    Painel."""
+    Painel.
+
+    `graficos`: mesmo dicionário-opcional que `render_executivo` aceita —
+    `{"modalidade": html, "familia": html, "categoria": html,
+    "fornecedor": html}`. Slot ausente cai no `_grafico_barras` de sempre.
+    """
+    graficos = graficos or {}
     ano = d["ano"]
     e = d["economia"]
     ate_hoje = " até hoje" if d["comparacao_parcial"] else ""
@@ -2009,22 +2024,22 @@ def render_economia(d, municipio, uf, brasao=None):
   <div class="r">homologado no ano</div></div>
 </div>"""
 
-    graf_mod = _grafico_barras(
+    graf_mod = graficos.get("modalidade") or _grafico_barras(
         e["por_modalidade"], valor=lambda m: m["economizado"] or 0,
         rotulo=lambda m: m["modalidade"] or "–",
         sub=lambda m: f"{m['n']} {'processo' if m['n'] == 1 else 'processos'}",
         cor="var(--s1)", larg=300)
-    graf_fam = _grafico_barras(
+    graf_fam = graficos.get("familia") or _grafico_barras(
         e["por_familia"], valor=lambda f: f["economizado"] or 0,
         rotulo=lambda f: f["nome"] or "–",
         sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'}",
         cor="var(--s1)", larg=300)
-    graf_cat = _grafico_barras(
+    graf_cat = graficos.get("categoria") or _grafico_barras(
         e["por_categoria"], valor=lambda c: c["economizado"] or 0,
         rotulo=lambda c: c["nome"] or "–",
         sub=lambda c: f"{c['n']} {'item' if c['n'] == 1 else 'itens'}",
         cor="var(--s1)", larg=300)
-    graf_forn = _grafico_barras(
+    graf_forn = graficos.get("fornecedor") or _grafico_barras(
         e["por_fornecedor"], valor=lambda f: f["economizado"] or 0,
         rotulo=lambda f: f["nome"] or "–",
         sub=lambda f: f"{f['n']} {'item' if f['n'] == 1 else 'itens'} · "
@@ -2181,14 +2196,16 @@ def gerar(db, tipo, params, municipio, uf, destino):
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_executivo(d, municipio, uf, brasao=brasao)
+        conteudo = render_executivo(d, municipio, uf, brasao=brasao,
+                                    graficos=params.get("graficos"))
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
     elif tipo == "economia":
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
-        conteudo = render_economia(d, municipio, uf, brasao=brasao)
+        conteudo = render_economia(d, municipio, uf, brasao=brasao,
+                                   graficos=params.get("graficos"))
         nome = f"economia_comparativo_{ano}"
         linhas_csv = d["economia"]["por_familia"]
     elif tipo == "minuta_pca":

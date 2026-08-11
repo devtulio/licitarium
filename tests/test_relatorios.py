@@ -99,6 +99,25 @@ def test_gerar_executivo_sem_csv(db, tmp_path):
     assert "Resumo Executivo" in Path(r["html"]).read_text(encoding="utf-8")
 
 
+def test_executivo_usa_grafico_pronto_quando_vem_da_tela(db, tmp_path):
+    """`graficos` (ECharts que a tela já desenhou, achado 2026-08-11, mesmo
+    padrão da pesquisa de preços) substitui `_grafico_meses`/`_grafico_barras`
+    slot a slot; sem ele, o fallback hand-SVG segue funcionando."""
+    marcador_meses = '<svg id="meses-de-mentirinha"></svg>'
+    marcador_mod = '<svg id="modalidade-de-mentirinha"></svg>'
+    r = relatorios.gerar(db, "executivo",
+                         {"ano": 2026, "graficos": {"meses": marcador_meses,
+                                                    "modalidade": marcador_mod}},
+                         "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert marcador_meses in html and marcador_mod in html
+
+    r2 = relatorios.gerar(db, "executivo", {"ano": 2026}, "T", "SP", tmp_path)
+    html2 = Path(r2["html"]).read_text(encoding="utf-8")
+    assert marcador_meses not in html2
+    assert "<svg" in html2   # o fallback ainda desenha algo
+
+
 def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
     """Sem item com par estimado/homologado, por_familia fica vazia — mesmo
     critério de "sem dados" que os outros relatórios já usam (linhas_csv
@@ -109,6 +128,18 @@ def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
     assert "Economia e Comparativos" in html
     # 300 estimados (A+B) - 80 homologados (só A) = 220
     assert "220,00" in html
+
+
+def test_economia_usa_graficos_prontos_nos_quatro_slots(db, tmp_path):
+    """Os 4 gráficos de barra (modalidade/família/categoria/fornecedor)
+    aceitam o SVG pronto vindo da tela, cada um no seu slot."""
+    marcadores = {k: f'<svg id="{k}-de-mentirinha"></svg>'
+                 for k in ("modalidade", "familia", "categoria", "fornecedor")}
+    r = relatorios.gerar(db, "economia", {"ano": 2026, "graficos": marcadores},
+                         "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    for marcador in marcadores.values():
+        assert marcador in html
 
 
 def test_gerar_economia_com_itens_traz_familia_no_documento_e_no_csv(db, tmp_path):
