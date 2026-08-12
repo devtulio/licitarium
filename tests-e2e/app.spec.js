@@ -131,6 +131,24 @@ test("abas trocam colunas e detalhe abre ao clicar na linha",
   await expect(page.locator("#veu-detalhe")).toBeHidden();
 });
 
+test("botão Imprimir do modal de detalhe manda o que a tela já mostra",
+    async ({ page }) => {
+  await page.locator('nav.abas button[data-tipo="contratos"]').click();
+  await page.locator(".linha:not(.cab)").first().click();
+  await expect(page.locator("#veu-detalhe")).toBeVisible();
+  const titulo = await page.locator("#det-titulo").textContent();
+  await page.locator("#det-imprimir").click();
+
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "imprimir_detalhe").pop());
+  expect(chamada.tipo).toBe("contratos");
+  expect(chamada.titulo).toBe(titulo);
+  // o mesmo HTML já formatado (moeda/data) que está em #det-meta na tela —
+  // não reimplementa rótulo por rótulo no Python
+  expect(chamada.meta_html).toContain('class="k"');
+  expect(chamada.meta_html).toContain('class="v"');
+});
+
 test("tema troca via configurações e persiste via set_config",
     async ({ page }) => {
   await page.locator("#btn-config").click();

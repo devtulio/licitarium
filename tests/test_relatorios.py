@@ -118,6 +118,20 @@ def test_executivo_usa_grafico_pronto_quando_vem_da_tela(db, tmp_path):
     assert "<svg" in html2   # o fallback ainda desenha algo
 
 
+def test_render_detalhe_usa_o_html_que_a_tela_ja_montou():
+    """Ficha do modal de detalhe (achado 2026-08-12): `meta_html` vem
+    pronto — rótulo/valor já formatados — e entra sem reimplementar nada
+    em Python; só título e subtítulo passam pelo escape de sempre."""
+    meta = ('<div><div class="k">Órgão</div>'
+            '<div class="v">Prefeitura &amp; Câmara</div></div>')
+    html = relatorios.render_detalhe(
+        "Aquisição de <material>", "12345/2026-1", meta, "T", "SP")
+    assert meta in html                        # HTML pronto, sem retoque
+    assert "&lt;material&gt;" in html          # título passa pelo escape
+    assert "12345/2026-1" in html
+    assert 'size: A4 portrait' in html         # ficha de um registro é retrato
+
+
 def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
     """Sem item com par estimado/homologado, por_familia fica vazia — mesmo
     critério de "sem dados" que os outros relatórios já usam (linhas_csv

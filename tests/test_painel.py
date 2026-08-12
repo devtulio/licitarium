@@ -461,6 +461,27 @@ def test_impressao_ignora_vista_vazia(tmp_path, monkeypatch):
     assert "Análise comparativa" not in html
 
 
+# ── ficha do modal de detalhe ───────────────────────────────────────────
+
+def test_imprimir_detalhe_grava_a_ficha_com_o_que_a_tela_montou(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    licitarium.abrir_db().close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    meta = '<div><div class="k">Fornecedor</div><div class="v">Acme</div></div>'
+    r = licitarium.Api().imprimir_detalhe(
+        "contratos", "12345/2026-1", "Contrato de manutenção",
+        "12345/2026-1", meta)
+    assert r["ok"]
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert meta in html
+    assert "Contrato de manutenção" in html
+    assert "size: A4 portrait" in html
+    assert "detalhe_12345_2026-1" in r["arquivo"]
+
+
 # ── economia ────────────────────────────────────────────────────────────
 
 def test_economia_totais_batem_com_os_cards_do_ano(api):

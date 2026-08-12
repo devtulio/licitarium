@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.26.0 — 2026-08-12
+
+**Imprimir ficha do registro no modal de detalhe**
+
+Pedido do usuário: ao clicar numa contratação, contrato ou ata e abrir
+o modal com "Ver no PNCP ↗", agora tem também "🖨 Imprimir" — gera uma
+ficha impressa (A4 retrato) só daquele registro específico, com brasão
+do município quando configurado.
+
+- Novo `Api.imprimir_detalhe`/`relatorios.render_detalhe`: mesmo padrão
+  já usado pro Painel e pros relatórios ECharts — a tela manda o
+  `#det-meta` que já montou (rótulo/valor com a mesma formatação de
+  moeda/data do modal), o Python só envelopa em página impressa. Sem
+  reimplementar rótulo por rótulo em Python, sem divergir do que a
+  tela mostra.
+- Funciona pra qualquer tipo aberto nesse modal (contratações,
+  contratos, atas, itens, PCA) — o botão não é específico de um tipo.
+
+355 pytest + 149 E2E.
+
 ## 1.25.1 — 2026-08-12
 
 **Correção: gráficos zerados no papel (Executivo, Economia, Preços)**

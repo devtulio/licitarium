@@ -2176,6 +2176,30 @@ def render_painel(vistas, municipio, uf, ano, brasao=None):
                    estilo_extra=CSS_PAINEL, brasao=brasao)
 
 
+CSS_FICHA = """
+  .ficha-grid { display:grid; grid-template-columns:repeat(2,1fr);
+                gap:10px 24px; margin-top:4px; }
+  .ficha-grid > div { break-inside:avoid; }
+  .ficha-grid .k { font-size:9.5px; letter-spacing:.05em;
+                   text-transform:uppercase; color:var(--suave); }
+  .ficha-grid .v { font-size:12.5px; color:var(--texto); margin-top:1px; }
+"""
+
+
+def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None):
+    """Ficha impressa de um registro específico — contratação, contrato,
+    ata, item ou PCA — aberto no modal de detalhe da tela.
+
+    `meta_html` vem pronto do que a tela já mostra (rótulo/valor com a
+    mesma formatação de moeda/data do modal): mesmo padrão dos demais
+    relatórios (tela desenha, papel captura), sem reimplementar rótulo
+    por rótulo aqui.
+    """
+    corpo = f'<div class="ficha-grid">{meta_html}</div>'
+    return _pagina(titulo or "Detalhe", corpo, municipio, uf, subtitulo or "",
+                   paisagem=False, estilo_extra=CSS_FICHA, brasao=brasao)
+
+
 def gerar(db, tipo, params, municipio, uf, destino):
     """Gera o relatório e retorna {"html": caminho, "csv": caminho|None}."""
     params = params or {}

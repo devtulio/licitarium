@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.25.1"
+VERSAO = "1.26.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1461,6 +1461,31 @@ class Api:
         destino = DIR_DADOS / "relatorios"
         destino.mkdir(parents=True, exist_ok=True)
         arquivo = destino / f"painel_{ano or date.today().year}.html"
+        arquivo.write_text(html, encoding="utf-8")
+        webbrowser.open(arquivo.as_uri())
+        return {"ok": True, "arquivo": str(arquivo)}
+
+    def imprimir_detalhe(self, tipo, numero_controle, titulo, subtitulo,
+                          meta_html):
+        """Ficha impressa do registro aberto no modal de detalhe.
+
+        `meta_html` é o que a tela já montou (rótulo/valor formatados) —
+        mesmo padrão do painel: a tela desenha, o papel só captura.
+        """
+        db = abrir_db()
+        try:
+            municipio = pncp._config(db, "municipio_nome") or "Município"
+            uf = pncp._config(db, "municipio_uf") or ""
+            brasao = pncp._config(db, "brasao")
+        finally:
+            db.close()
+        html = relatorios.render_detalhe(titulo, subtitulo, meta_html,
+                                         municipio, uf, brasao=brasao)
+        destino = DIR_DADOS / "relatorios"
+        destino.mkdir(parents=True, exist_ok=True)
+        limpo = re.sub(r"[^\w-]+", "_",
+                        (numero_controle or titulo or tipo).lower())[:60]
+        arquivo = destino / f"detalhe_{limpo}.html"
         arquivo.write_text(html, encoding="utf-8")
         webbrowser.open(arquivo.as_uri())
         return {"ok": True, "arquivo": str(arquivo)}

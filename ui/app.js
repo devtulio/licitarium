@@ -1486,6 +1486,10 @@ async function abrirDetalhe(nc) {
 }
 $("det-pncp").addEventListener("click", () =>
   api.abrir_pncp(estado.tipo, detalheAtual));
+$("det-imprimir").addEventListener("click", () =>
+  api.imprimir_detalhe(estado.tipo, detalheAtual,
+    $("det-titulo").textContent, $("det-sub").textContent,
+    $("det-meta").innerHTML));
 
 // ── montador de minuta do PCA ─────────────────────────────────────────────
 $("btn-pca").addEventListener("click", async () => {
