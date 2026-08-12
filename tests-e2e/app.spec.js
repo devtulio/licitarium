@@ -315,6 +315,26 @@ test("relatório de economia manda os quatro gráficos já desenhados pro papel"
   expect(chamada.params.graficos.fornecedor).toContain("RHC PRODUTOS");
 });
 
+// achado 2026-08-12: a captura acontece no MESMO tick do setOption — sem
+// animation:false, o SVG pego é o 1º frame da animação padrão do ECharts
+// (barra crescendo de zero), então o relatório saía com as barras
+// "zeradas" mesmo com <svg> e texto presentes (os testes acima não pegam
+// isso — checam conteúdo, não geometria).
+test("barras dos gráficos capturados vêm no tamanho final, não no frame zerado da animação",
+    async ({ page }) => {
+  await page.locator("#btn-relatorios").click();
+  await page.locator("#rel-tipo").selectOption("executivo");
+  await page.locator("#rel-gerar").click();
+  const html = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "gerar_relatorio").pop().params.graficos.modalidade);
+  const m = html.match(/<path d="M([\d.]+)\s[\d.]+L([\d.]+)/);
+  expect(m).not.toBeNull();
+  const largura = Math.abs(parseFloat(m[2]) - parseFloat(m[1]));
+  // barra zerada teria início e fim quase no mesmo x (poucos px de raio
+  // do cantinho arredondado); a maior modalidade real passa de 600px
+  expect(largura).toBeGreaterThan(100);
+});
+
 test("montador de PCA gera, edita e recalcula os totais", async ({ page }) => {
   await page.locator("#btn-pca").click();
   await expect(page.locator("#veu-pca")).toBeVisible();

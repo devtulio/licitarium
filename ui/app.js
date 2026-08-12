@@ -700,6 +700,9 @@ function desenharBoxplotPreco(el, s) {
   const chart = echarts.init(el, null, { renderer: "svg" });
   el.__echart = chart;
   chart.setOption({
+    // sem isso, o SVG capturado pra impressão pega o 1º frame da
+    // animação (barras crescendo de zero) — gráfico "zerado" no papel
+    animation: false,
     grid: { left: 8, right: 16, top: 22, bottom: 22 },
     xAxis: { type: "value", min: 0, axisLine: { lineStyle: { color: border } },
       axisLabel: { color: muted, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: .4 } } },
@@ -738,6 +741,7 @@ function desenharBarrasEcharts(el, itens, { valor, rotulo, sub }) {
   el.__echart = chart;
   el.style.height = Math.max(120, itens.length * 36 + 30) + "px";
   chart.setOption({
+    animation: false,
     grid: { left: 4, right: 70, top: 8, bottom: 8, containLabel: true },
     xAxis: { type: "value", show: false },
     yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
@@ -768,6 +772,7 @@ function desenharColunasEcharts(el, meses, corVar) {
   el.__echart = chart;
   el.style.height = "220px";
   chart.setOption({
+    animation: false,
     grid: { left: 8, right: 8, top: 10, bottom: 26, containLabel: true },
     xAxis: { type: "category", data: dados.map(m => MES[m.mes - 1]),
       axisLine: { lineStyle: { color: border } },

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.25.1 — 2026-08-12
+
+**Correção: gráficos zerados no papel (Executivo, Economia, Preços)**
+
+Achado pelo usuário testando os relatórios reais: barras e colunas
+saíam zeradas no documento impresso, apesar do `<svg>` e dos rótulos
+aparecerem certos. Causa: `desenharBarrasEcharts`/`desenharColunasEcharts`/
+`desenharBoxplotPreco` não desligavam a animação padrão do ECharts —
+a captura do `innerHTML` acontece no MESMO tick do `setOption`, então
+pegava sempre o 1º frame da animação (barra crescendo de zero), nunca
+o desenho final. `animation: false` nas três funções — sem efeito na
+tela (a prévia/impressão nunca fica visível animando de qualquer
+jeito). Teste antigo não pegava isso: checava `<svg>` e texto, não
+geometria — novo teste lê o `d` do primeiro `<path>` de barra e confere
+que a largura bate com o dado real, não com zero.
+
+353 pytest + 148 E2E.
+
 ## 1.25.0 — 2026-08-11
 
 **Motor de gráfico: papel une com a tela em Executivo e Economia**
