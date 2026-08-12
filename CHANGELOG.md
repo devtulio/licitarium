@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.26.1 — 2026-08-12
+
+**Ficha impressa do detalhe ganha os "Dados completos (JSON)"**
+
+Achado pelo usuário: a ficha de 1.26.0 saía sem a seção "Dados
+completos (JSON do PNCP)" que o modal mostra — ficava só cabeçalho
+(brasão + identificação) e a grade de campos. `Api.imprimir_detalhe`/
+`relatorios.render_detalhe` ganham `raw_html`: o JSON colorido que o
+modal já monta (`jsonColorido`) entra pronto na ficha, mesmo padrão de
+`meta_html` — sem reimplementar o realce de sintaxe em Python.
+
+356 pytest + 149 E2E.
+
 ## 1.26.0 — 2026-08-12
 
 **Imprimir ficha do registro no modal de detalhe**

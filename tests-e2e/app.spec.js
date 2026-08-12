@@ -147,6 +147,9 @@ test("botão Imprimir do modal de detalhe manda o que a tela já mostra",
   // não reimplementa rótulo por rótulo no Python
   expect(chamada.meta_html).toContain('class="k"');
   expect(chamada.meta_html).toContain('class="v"');
+  // achado 2026-08-12: faltava o JSON completo (mesmo que o modal mostra
+  // em "Dados completos") — a ficha impressa ficava sem ele
+  expect(chamada.raw_html).toContain('class="j-chave"');
 });
 
 test("tema troca via configurações e persiste via set_config",

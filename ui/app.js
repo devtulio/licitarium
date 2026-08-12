@@ -1489,7 +1489,7 @@ $("det-pncp").addEventListener("click", () =>
 $("det-imprimir").addEventListener("click", () =>
   api.imprimir_detalhe(estado.tipo, detalheAtual,
     $("det-titulo").textContent, $("det-sub").textContent,
-    $("det-meta").innerHTML));
+    $("det-meta").innerHTML, $("det-raw").innerHTML));
 
 // ── montador de minuta do PCA ─────────────────────────────────────────────
 $("btn-pca").addEventListener("click", async () => {

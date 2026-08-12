@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.26.0"
+VERSAO = "1.26.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1466,11 +1466,12 @@ class Api:
         return {"ok": True, "arquivo": str(arquivo)}
 
     def imprimir_detalhe(self, tipo, numero_controle, titulo, subtitulo,
-                          meta_html):
+                          meta_html, raw_html=""):
         """Ficha impressa do registro aberto no modal de detalhe.
 
-        `meta_html` é o que a tela já montou (rótulo/valor formatados) —
-        mesmo padrão do painel: a tela desenha, o papel só captura.
+        `meta_html`/`raw_html` são o que a tela já montou (rótulo/valor
+        formatados e o JSON colorido) — mesmo padrão do painel: a tela
+        desenha, o papel só captura.
         """
         db = abrir_db()
         try:
@@ -1480,7 +1481,8 @@ class Api:
         finally:
             db.close()
         html = relatorios.render_detalhe(titulo, subtitulo, meta_html,
-                                         municipio, uf, brasao=brasao)
+                                         municipio, uf, brasao=brasao,
+                                         raw_html=raw_html)
         destino = DIR_DADOS / "relatorios"
         destino.mkdir(parents=True, exist_ok=True)
         limpo = re.sub(r"[^\w-]+", "_",

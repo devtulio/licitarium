@@ -2183,19 +2183,33 @@ CSS_FICHA = """
   .ficha-grid .k { font-size:9.5px; letter-spacing:.05em;
                    text-transform:uppercase; color:var(--suave); }
   .ficha-grid .v { font-size:12.5px; color:var(--texto); margin-top:1px; }
+  .ficha-raw { margin-top:22px; padding-top:14px;
+               border-top:1px solid var(--borda); }
+  .ficha-raw h2 { margin-bottom:8px; }
+  .ficha-raw pre { background:var(--cabecalho); border:1px solid var(--borda);
+                   border-radius:3px; padding:10px 12px; font-size:10px;
+                   line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .j-chave { color:var(--acento); }
+  .j-str   { color:#2f7d32; }
+  .j-num   { color:var(--atencao); }
+  .j-bool, .j-null { color:var(--suave); font-weight:600; }
 """
 
 
-def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None):
+def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None,
+                    raw_html=""):
     """Ficha impressa de um registro específico — contratação, contrato,
     ata, item ou PCA — aberto no modal de detalhe da tela.
 
-    `meta_html` vem pronto do que a tela já mostra (rótulo/valor com a
-    mesma formatação de moeda/data do modal): mesmo padrão dos demais
-    relatórios (tela desenha, papel captura), sem reimplementar rótulo
-    por rótulo aqui.
+    `meta_html`/`raw_html` vêm prontos do que a tela já mostra (rótulo/
+    valor formatados e o JSON colorido do "Dados completos"): mesmo
+    padrão dos demais relatórios (tela desenha, papel captura), sem
+    reimplementar rótulo por rótulo nem o realce do JSON aqui.
     """
     corpo = f'<div class="ficha-grid">{meta_html}</div>'
+    if raw_html:
+        corpo += (f'<div class="ficha-raw"><h2>Dados completos (JSON do '
+                  f'PNCP)</h2><pre>{raw_html}</pre></div>')
     return _pagina(titulo or "Detalhe", corpo, municipio, uf, subtitulo or "",
                    paisagem=False, estilo_extra=CSS_FICHA, brasao=brasao)
 

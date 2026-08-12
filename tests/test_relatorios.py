@@ -132,6 +132,20 @@ def test_render_detalhe_usa_o_html_que_a_tela_ja_montou():
     assert 'size: A4 portrait' in html         # ficha de um registro é retrato
 
 
+def test_render_detalhe_leva_o_json_colorido_do_modal():
+    """achado 2026-08-12: a ficha impressa saía sem o "Dados completos"
+    que o modal mostra — pedido do usuário, mesmo padrão de meta_html:
+    a tela já colore (jsonColorido), o Python só encaixa."""
+    raw = '<span class="j-chave">"objeto"</span>: <span class="j-str">"x"</span>'
+    html = relatorios.render_detalhe("T", "1/2026", "<div></div>", "T", "SP",
+                                     raw_html=raw)
+    assert raw in html
+    assert "Dados completos" in html
+
+    sem_raw = relatorios.render_detalhe("T", "1/2026", "<div></div>", "T", "SP")
+    assert "Dados completos" not in sem_raw    # sem raw_html, nem a seção aparece
+
+
 def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
     """Sem item com par estimado/homologado, por_familia fica vazia — mesmo
     critério de "sem dados" que os outros relatórios já usam (linhas_csv

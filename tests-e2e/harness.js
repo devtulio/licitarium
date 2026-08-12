@@ -439,9 +439,10 @@ function scriptPonte(temaBanco = "portal") {
       },
       exportar_csv: async () => ({ ok: false, erro: null }),
       abrir_pncp: async () => true,
-      imprimir_detalhe: async (tipo, nc, titulo, subtitulo, meta_html) => {
+      imprimir_detalhe: async (tipo, nc, titulo, subtitulo, meta_html,
+                               raw_html) => {
         window.__chamadas.push({ metodo: "imprimir_detalhe", tipo, nc,
-          titulo, subtitulo, meta_html });
+          titulo, subtitulo, meta_html, raw_html });
         return { ok: true, arquivo: "detalhe.html" };
       },
     }};
