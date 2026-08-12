@@ -482,6 +482,57 @@ def test_imprimir_detalhe_grava_a_ficha_com_o_que_a_tela_montou(
     assert "detalhe_12345_2026-1" in r["arquivo"]
 
 
+def test_imprimir_detalhe_nomeia_o_pdf_pelo_contrato_orgao_e_fornecedor(
+        tmp_path, monkeypatch):
+    """Pedido do usuário (2026-08-12): o nome sugerido ao "Salvar como
+    PDF" (o <title>) identifica o documento sem precisar abrir — não o
+    município genérico de sempre."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO orgaos (cnpj, razao_social) VALUES (?,?)",
+              ("45148970000177", "MUNICIPIO DE ORINDIUVA"))
+    db.execute(
+        "INSERT INTO contratos (numero_controle, orgao_cnpj, numero_contrato,"
+        " ano_contrato, fornecedor_nome, objeto, valor_global) VALUES"
+        " (?,?,?,?,?,?,?)",
+        ("Y-1", "45148970000177", "0046", 2026,
+         "M J M VALVERDE SERVIÇOS E LOCAÇÕES ME", "Festa do peão", 32000))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    r = licitarium.Api().imprimir_detalhe(
+        "contratos", "Y-1", "Festa do peão", "Y-1", "<div></div>")
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert ("<title>CONTRATO 46-2026 MUNICIPIO DE ORINDIUVA X "
+            "M J M VALVERDE SERVIÇOS E LOCAÇÕES ME</title>") in html
+
+
+def test_imprimir_detalhe_nomeia_o_pdf_da_ata_sem_fornecedor(
+        tmp_path, monkeypatch):
+    """Ata não tem fornecedor no PNCP (é por item, não por ata) — o nome
+    do PDF fica só com tipo, número e órgão."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    db = licitarium.abrir_db()
+    db.execute("INSERT INTO orgaos (cnpj, razao_social) VALUES (?,?)",
+              ("45148970000177", "MUNICIPIO DE ORINDIUVA"))
+    db.execute(
+        "INSERT INTO atas (numero_controle, orgao_cnpj, numero_ata, ano_ata,"
+        " objeto) VALUES (?,?,?,?,?)",
+        ("Z-1", "45148970000177", "26", 2025, "Fraldas"))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    r = licitarium.Api().imprimir_detalhe(
+        "atas", "Z-1", "Fraldas", "Z-1", "<div></div>")
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert ("<title>ATA DE REGISTRO DE PREÇOS 26-2025 "
+            "MUNICIPIO DE ORINDIUVA</title>") in html
+
+
 # ── economia ────────────────────────────────────────────────────────────
 
 def test_economia_totais_batem_com_os_cards_do_ano(api):

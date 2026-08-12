@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.28.0 — 2026-08-12
+
+**Nome do PDF: ficha impressa de contrato/ata**
+
+Pedido do usuário: ao "Salvar como PDF" a ficha de um contrato ou
+ata, o nome sugerido pelo navegador identifica o documento sem
+precisar abrir.
+
+- Contrato: `CONTRATO {número}-{ano} {ÓRGÃO} X {FORNECEDOR}`.
+- Ata: `ATA DE REGISTRO DE PREÇOS {número}-{ano} {ÓRGÃO}` — sem
+  fornecedor: o PNCP não guarda fornecedor por ata (é por item).
+- Nos demais tipos (contratações, itens, PCA) o título continua
+  "Município — UF", como já era.
+- Nome do órgão vem da tabela local `orgaos` (mesma fonte que
+  Configurações já usa) por CNPJ do registro.
+
+359 pytest + 152 E2E.
+
 ## 1.27.2 — 2026-08-12
 
 **Ficha impressa do detalhe: cabeçalho, objeto e link da origem**

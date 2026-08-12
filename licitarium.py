@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.27.2"
+VERSAO = "1.28.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -580,6 +580,42 @@ def _selecionar_ids(db, termo, ids):
             (termo, str(item_id), agora))
         db.execute("DELETE FROM precos_descartes"
                    " WHERE termo=? AND item_id=?", (termo, str(item_id)))
+
+
+def _nome_orgao(db, cnpj):
+    if not cnpj:
+        return None
+    r = db.execute("SELECT razao_social FROM orgaos WHERE cnpj=?",
+                   (cnpj,)).fetchone()
+    return r[0] if r and r[0] else None
+
+
+def _sem_zeros(numero):
+    """PNCP grava número de contrato com zero à esquerda ('0046') — mesma
+    normalização que a tela já faz (ui/app.js:numContrato)."""
+    limpo = re.sub(r"^0+", "", str(numero or "")) or str(numero or "")
+    return limpo
+
+
+def _titulo_impressao_detalhe(db, tipo, d):
+    """Nome sugerido pro PDF ao salvar a ficha impressa (pedido do
+    usuário, 2026-08-12): identifica o documento pelo que quem guarda o
+    arquivo procura — tipo, número, órgão e (em contratos) fornecedor —
+    não pelo município, que já é implícito em cada instalação.
+
+    Sem padrão pedido pro tipo (ou dado faltando), `None` — quem chama
+    cai no título padrão (município — UF).
+    """
+    orgao = _nome_orgao(db, d.get("orgao_cnpj")) or "ÓRGÃO NÃO IDENTIFICADO"
+    if tipo == "contratos" and d.get("numero_contrato"):
+        numero = _sem_zeros(d["numero_contrato"])
+        ano = d.get("ano_contrato") or ""
+        fornecedor = d.get("fornecedor_nome") or "FORNECEDOR NÃO IDENTIFICADO"
+        return f"CONTRATO {numero}-{ano} {orgao} X {fornecedor}"
+    if tipo == "atas" and d.get("numero_ata"):
+        ano = d.get("ano_ata") or ""
+        return f"ATA DE REGISTRO DE PREÇOS {d['numero_ata']}-{ano} {orgao}"
+    return None
 
 
 class Api:
@@ -1479,11 +1515,18 @@ class Api:
             municipio = pncp._config(db, "municipio_nome") or "Município"
             uf = pncp._config(db, "municipio_uf") or ""
             brasao = pncp._config(db, "brasao")
+            # o <title> vira o nome sugerido ao "Salvar como PDF" — em
+            # contratos e atas, um nome que identifica o documento sem
+            # abrir (pedido do usuário, 2026-08-12); nos demais tipos,
+            # cai no padrão (município — UF) dentro de render_detalhe
+            d = self.detalhe(tipo, numero_controle) or {}
+            titulo_doc = _titulo_impressao_detalhe(db, tipo, d)
         finally:
             db.close()
         html = relatorios.render_detalhe(titulo, subtitulo, meta_html,
                                          municipio, uf, brasao=brasao,
-                                         raw_html=raw_html)
+                                         raw_html=raw_html,
+                                         titulo_doc=titulo_doc)
         destino = DIR_DADOS / "relatorios"
         destino.mkdir(parents=True, exist_ok=True)
         limpo = re.sub(r"[^\w-]+", "_",

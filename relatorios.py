@@ -2202,7 +2202,7 @@ CSS_FICHA = """
 
 
 def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None,
-                    raw_html=""):
+                    raw_html="", titulo_doc=None):
     """Ficha impressa de um registro específico — contratação, contrato,
     ata, item ou PCA — aberto no modal de detalhe da tela.
 
@@ -2215,13 +2215,16 @@ def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None,
     valor formatados e o JSON colorido do "Dados completos"): mesmo
     padrão dos demais relatórios (tela desenha, papel captura), sem
     reimplementar rótulo por rótulo nem o realce do JSON aqui.
+
+    `titulo_doc`: nome do documento (vira `<title>` — o nome sugerido
+    ao "Salvar como PDF"). Sem ele, cai no padrão "Município — UF".
     """
     corpo = f'<p class="ficha-objeto">{_e(titulo)}</p>'
     corpo += f'<div class="ficha-grid">{meta_html}</div>'
     if raw_html:
         corpo += (f'<div class="ficha-raw"><h2>Dados completos (JSON do '
                   f'PNCP)</h2><pre>{raw_html}</pre></div>')
-    return _pagina(f"{municipio} — {uf}", corpo, municipio, uf,
+    return _pagina(titulo_doc or f"{municipio} — {uf}", corpo, municipio, uf,
                    subtitulo or "", paisagem=False, estilo_extra=CSS_FICHA,
                    brasao=brasao)
 
