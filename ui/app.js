@@ -2035,13 +2035,20 @@ function ligarBuscaReferencia() {
 ligarBuscaReferencia();
 
 // ── config ────────────────────────────────────────────────────────────────
+// A modal demorava a abrir porque as ~5 chamadas à ponte pywebview
+// (get_estado, brasao, listar_orgaos, referência, log) rodavam uma
+// depois da outra — cada `await` soma o ida-e-volta da ponte, que sozinho
+// já custa dezenas de ms. Duas mudanças (achado 2026-08-12): a modal abre
+// já no clique, e as chamadas independentes disparam juntas (Promise.all)
+// em vez de em fila — o tempo total vira o da mais lenta, não a soma.
 $("btn-config").addEventListener("click", async () => {
-  const e = await api.get_estado();
+  abrirModal("veu-config");
+  const [e, brasao, orgaos, log] = await Promise.all([
+    api.get_estado(), api.brasao(), api.listar_orgaos(), api.ultimo_log(),
+    renderReferencia()]);
   $("cfg-municipio").innerHTML = `${esc(e.municipio)} — ${esc(e.uf)}
     <small class="dim">(IBGE ${esc(e.ibge)})</small>`;
-  const brasao = await api.brasao();
   mostrarBrasao(brasao.dataurl);
-  const orgaos = await api.listar_orgaos();
   $("cfg-orgaos").innerHTML = orgaos.map(o =>
     `<div class="orgrow"><span>${esc(o.razao_social ?? o.cnpj)}
        <small>${esc(o.cnpj)} · ${o.origem === "manual" ? "adicionado manualmente"
@@ -2052,16 +2059,13 @@ $("btn-config").addEventListener("click", async () => {
   $("cfg-orgaos").querySelectorAll("input[data-cnpj]").forEach(c =>
     c.addEventListener("change", () =>
       api.set_orgao_ativo(c.dataset.cnpj, c.checked)));
-  await renderReferencia();
   aplicarLimCompras(parseFloat(e.limite_dispensa_compras) || 0);
   aplicarLimObras(parseFloat(e.limite_dispensa_obras) || 0);
-  const log = await api.ultimo_log();
   $("cfg-log").innerHTML = log.map(l =>
     `<div class="logline">${esc(l.iniciado_em?.slice(0,16).replace("T"," "))} ·
      ${esc(l.tipo)} · ${l.status === "ok" ? `${l.registros} registros`
        : `<span style="color:var(--warn)">erro: ${esc(l.erro)}</span>`}</div>`)
     .join("") || `<div class="dim">Nenhuma sincronização ainda.</div>`;
-  abrirModal("veu-config");
 });
 function mostrarBrasao(dataurl) {
   const preview = $("cfg-brasao-preview");

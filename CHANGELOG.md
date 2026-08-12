@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.27.1 — 2026-08-12
+
+**Configurações: modal abria devagar — corrigido**
+
+Achado pelo usuário: clicar em "Configurações" demorava a abrir a
+modal. Causa: o clique disparava 5 chamadas à ponte pywebview (dados
+do município, brasão, órgãos monitorados, municípios de referência,
+log de sincronização) uma **depois** da outra — cada `await` soma o
+ida-e-volta da ponte, que sozinho já custa dezenas de ms, e a modal só
+aparecia depois que as 5 respondiam.
+
+- A modal agora abre no clique, antes de qualquer chamada.
+- As 5 chamadas disparam juntas (`Promise.all`) em vez de em fila — o
+  tempo de espera vira o da mais lenta, não a soma de todas.
+- Teste novo mede o efeito de verdade: com 200ms de atraso simulado
+  em cada chamada, a modal abre em <200ms (antes: ~1000ms, a soma das
+  5) e os dados terminam de chegar perto dos 200ms, não dos 1000ms.
+
+356 pytest + 151 E2E.
+
 ## 1.27.0 — 2026-08-12
 
 **Contratos e Atas: vigência inicial/final e status em colunas próprias**

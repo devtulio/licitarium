@@ -151,6 +151,39 @@ test("contratos e atas separam vigência inicial/final e status em colunas próp
     "Status"]);
 });
 
+test("Configurações abre no clique e busca os dados em paralelo, não em fila",
+    async ({ page }) => {
+  // achado 2026-08-12 (relatado pelo usuário): a modal só aparecia depois
+  // de 5 idas-e-voltas sequenciais à ponte pywebview — cada `await` soma o
+  // ida-e-volta, então o atraso total era a SOMA, não o maior dos cinco.
+  // Cronometrado dentro da página (performance.now()): o round-trip
+  // Node↔navegador do Playwright some do meio, senão os limiares abaixo
+  // não têm folga nenhuma pra variação normal do CI.
+  const ATRASO = 200;
+  const { tAbriu, tCompletou } = await page.evaluate(async (ms) => {
+    const lenta = (fn) => (...a) => new Promise(r =>
+      setTimeout(() => r(fn(...a)), ms));
+    const api = window.pywebview.api;
+    for (const m of ["get_estado", "brasao", "listar_orgaos", "ultimo_log",
+                     "listar_municipios_referencia"])
+      api[m] = lenta(api[m].bind(api));
+    const t0 = performance.now();
+    document.querySelector("#btn-config").click();
+    while (document.querySelector("#veu-config").classList.contains("oculto"))
+      await new Promise(r => setTimeout(r, 1));
+    const tAbriu = performance.now() - t0;
+    while (!document.querySelector("#cfg-municipio").textContent.trim())
+      await new Promise(r => setTimeout(r, 1));
+    return { tAbriu, tCompletou: performance.now() - t0 };
+  }, ATRASO);
+  // a modal abre antes mesmo da primeira chamada lenta responder — não
+  // espera resposta nenhuma pra aparecer
+  expect(tAbriu).toBeLessThan(ATRASO);
+  // 5 chamadas de 200ms em paralelo terminam perto de 200ms; em fila
+  // seriam ~1000ms — a folga de 2x cobre a variação normal do CI
+  expect(tCompletou).toBeLessThan(ATRASO * 2);
+});
+
 test("botão Imprimir do modal de detalhe manda o que a tela já mostra",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="contratos"]').click();
