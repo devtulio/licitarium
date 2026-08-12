@@ -146,6 +146,22 @@ def test_render_detalhe_leva_o_json_colorido_do_modal():
     assert "Dados completos" not in sem_raw    # sem raw_html, nem a seção aparece
 
 
+def test_render_detalhe_cabecalho_e_municipio_objeto_desce_pro_corpo():
+    """Pedido do usuário (2026-08-12): o cabeçalho é brasão + identificação
+    do município (não o objeto, que é comprido demais pra ficar ali) —
+    o objeto desce pro corpo, em caixa alta e justificado."""
+    html = relatorios.render_detalhe(
+        "objeto bem comprido de uma contratação qualquer", "1/2026",
+        "<div></div>", "Orindiúva", "SP")
+    # <title> e o h1 do cabeçalho mostram o município, não o objeto
+    assert "<title>Orindiúva — SP</title>" in html
+    assert "<h1>Orindiúva — SP</h1>" in html
+    # o objeto vira parágrafo próprio, fora do cabeçalho, com a classe
+    # que aplica caixa alta + justificado
+    assert ('<p class="ficha-objeto">objeto bem comprido de uma '
+            'contratação qualquer</p>') in html
+
+
 def test_gerar_economia_sem_itens_nao_gera_csv(db, tmp_path):
     """Sem item com par estimado/homologado, por_familia fica vazia — mesmo
     critério de "sem dados" que os outros relatórios já usam (linhas_csv

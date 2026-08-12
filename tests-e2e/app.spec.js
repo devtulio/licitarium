@@ -184,6 +184,28 @@ test("Configurações abre no clique e busca os dados em paralelo, não em fila"
   expect(tCompletou).toBeLessThan(ATRASO * 2);
 });
 
+test("ficha impressa: objeto no corpo (não no cabeçalho) e origem vira link do PNCP",
+    async ({ page }) => {
+  // pedido do usuário (2026-08-12): cabeçalho = brasão + município;
+  // objeto desce pro corpo; "Contratação de origem" vira link no papel
+  await page.locator('nav.abas button[data-tipo="atas"]').click();
+  await page.locator(".linha:not(.cab)").first().click();
+  await expect(page.locator("#veu-detalhe")).toBeVisible();
+  await page.locator("#det-imprimir").click();
+
+  const chamada = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "imprimir_detalhe").pop());
+  // "Contratação de origem" (45148970000177-1-000061/2025 na 1ª ata do
+  // mock) veio como link pro edital, com o mesmo texto de antes
+  expect(chamada.meta_html).toContain(
+    '<a href="https://pncp.gov.br/app/editais/45148970000177/2025/61">'
+    + '45148970000177-1-000061/2025</a>');
+  // na TELA (não na impressão) segue texto puro — nunca um <a href> cru
+  // dentro da modal do pywebview, que navegaria a janela do app pra fora
+  const metaTela = await page.locator("#det-meta").innerHTML();
+  expect(metaTela).not.toContain("<a href");
+});
+
 test("botão Imprimir do modal de detalhe manda o que a tela já mostra",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="contratos"]').click();

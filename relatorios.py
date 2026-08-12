@@ -2177,12 +2177,17 @@ def render_painel(vistas, municipio, uf, ano, brasao=None):
 
 
 CSS_FICHA = """
+  .ficha-objeto { text-transform:uppercase; text-align:justify;
+                  hyphens:auto; font-family:Georgia,serif; font-size:14.5px;
+                  line-height:1.5; color:var(--texto); margin:2px 0 20px; }
   .ficha-grid { display:grid; grid-template-columns:repeat(2,1fr);
                 gap:10px 24px; margin-top:4px; }
   .ficha-grid > div { break-inside:avoid; }
   .ficha-grid .k { font-size:9.5px; letter-spacing:.05em;
                    text-transform:uppercase; color:var(--suave); }
   .ficha-grid .v { font-size:12.5px; color:var(--texto); margin-top:1px; }
+  .ficha-grid .v a { color:var(--acento); text-decoration:none;
+                      border-bottom:1px dotted var(--acento); }
   .ficha-raw { margin-top:22px; padding-top:14px;
                border-top:1px solid var(--borda); }
   .ficha-raw h2 { margin-bottom:8px; }
@@ -2201,17 +2206,24 @@ def render_detalhe(titulo, subtitulo, meta_html, municipio, uf, brasao=None,
     """Ficha impressa de um registro específico — contratação, contrato,
     ata, item ou PCA — aberto no modal de detalhe da tela.
 
+    Cabeçalho é o brasão + identificação do município (mesmo padrão dos
+    demais relatórios) — o objeto não cabia ali sem afogar o município,
+    então desce pro corpo como parágrafo em caixa alta e justificado
+    (pedido do usuário, achado 2026-08-12), com a grade de campos abaixo.
+
     `meta_html`/`raw_html` vêm prontos do que a tela já mostra (rótulo/
     valor formatados e o JSON colorido do "Dados completos"): mesmo
     padrão dos demais relatórios (tela desenha, papel captura), sem
     reimplementar rótulo por rótulo nem o realce do JSON aqui.
     """
-    corpo = f'<div class="ficha-grid">{meta_html}</div>'
+    corpo = f'<p class="ficha-objeto">{_e(titulo)}</p>'
+    corpo += f'<div class="ficha-grid">{meta_html}</div>'
     if raw_html:
         corpo += (f'<div class="ficha-raw"><h2>Dados completos (JSON do '
                   f'PNCP)</h2><pre>{raw_html}</pre></div>')
-    return _pagina(titulo or "Detalhe", corpo, municipio, uf, subtitulo or "",
-                   paisagem=False, estilo_extra=CSS_FICHA, brasao=brasao)
+    return _pagina(f"{municipio} — {uf}", corpo, municipio, uf,
+                   subtitulo or "", paisagem=False, estilo_extra=CSS_FICHA,
+                   brasao=brasao)
 
 
 def gerar(db, tipo, params, municipio, uf, destino):

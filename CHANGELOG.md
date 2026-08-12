@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.27.2 — 2026-08-12
+
+**Ficha impressa do detalhe: cabeçalho, objeto e link da origem**
+
+Pedido do usuário, olhando a ficha impressa de um contrato: o objeto
+(texto comprido) disputava espaço com o brasão no cabeçalho.
+
+- Cabeçalho volta a ser só brasão + identificação do município (mesmo
+  padrão dos demais relatórios) — o objeto desce pro corpo, em
+  parágrafo próprio, caixa alta e justificado.
+- "Contratação de origem" na grade de campos vira link pro edital no
+  PNCP (construído no JS a partir do próprio número de controle —
+  mesmo formato que `Api.abrir_pncp` já usa, sem chamada nova à
+  ponte). Só no papel: um `<a href>` cru dentro da modal do pywebview
+  navegaria a janela do app pra fora dele, então a tela continua
+  mostrando texto puro.
+
+357 pytest + 152 E2E.
+
 ## 1.27.1 — 2026-08-12
 
 **Configurações: modal abria devagar — corrigido**

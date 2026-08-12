@@ -1472,11 +1472,23 @@ function jsonColorido(obj) {
     });
 }
 
+// número de controle de uma contratação: CNPJ-1-SEQUENCIAL/ANO (mesmo
+// formato que Api.abrir_pncp usa pro link de edital) — dá pra montar o
+// link direto no JS, sem chamada nova à ponte pywebview
+function linkPncpContratacao(numeroControle) {
+  const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numeroControle || "");
+  if (!m) return null;
+  const [, cnpj, seq, ano] = m;
+  return `https://pncp.gov.br/app/editais/${cnpj}/${ano}/${parseInt(seq, 10)}`;
+}
+
 let detalheAtual = null;
+let detalheDados = null;
 async function abrirDetalhe(nc) {
   const d = await api.detalhe(estado.tipo, nc);
   if (!d) return;
   detalheAtual = nc;
+  detalheDados = d;
   $("det-titulo").textContent = d.objeto || d.descricao || d.numero_controle || d.id;
   $("det-sub").textContent = d.numero_controle || d.id_pca || "";
   $("det-pncp").classList.toggle("oculto", estado.tipo === "pca");
@@ -1494,10 +1506,26 @@ async function abrirDetalhe(nc) {
 }
 $("det-pncp").addEventListener("click", () =>
   api.abrir_pncp(estado.tipo, detalheAtual));
+// pedido do usuário (2026-08-12): na ficha impressa, "Contratação de
+// origem" vira link pro edital no PNCP — só na impressão, não na tela:
+// um <a href> de verdade dentro da modal pywebview navegaria a própria
+// janela do app pra fora dele (o padrão do resto do app é sempre abrir
+// no navegador via Api.abrir_pncp, nunca um link cru na tela)
+function metaParaImpressao() {
+  const clone = $("det-meta").cloneNode(true);
+  const link = linkPncpContratacao(detalheDados?.contratacao_controle);
+  if (link) {
+    const chave = [...clone.querySelectorAll(".k")]
+      .find(k => k.textContent === "Contratação de origem");
+    const valor = chave?.nextElementSibling;
+    if (valor) valor.innerHTML = `<a href="${esc(link)}">${esc(valor.textContent)}</a>`;
+  }
+  return clone.innerHTML;
+}
 $("det-imprimir").addEventListener("click", () =>
   api.imprimir_detalhe(estado.tipo, detalheAtual,
     $("det-titulo").textContent, $("det-sub").textContent,
-    $("det-meta").innerHTML, $("det-raw").innerHTML));
+    metaParaImpressao(), $("det-raw").innerHTML));
 
 // ── montador de minuta do PCA ─────────────────────────────────────────────
 $("btn-pca").addEventListener("click", async () => {
