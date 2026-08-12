@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.27.0 — 2026-08-12
+
+**Contratos e Atas: vigência inicial/final e status em colunas próprias**
+
+Pedido do usuário: a coluna "Vigência" combinava as duas datas e o
+selo (Vigente/Vence em N d/Encerrado) espremidos numa célula só.
+Agora são três colunas: Vigência inicial, Vigência final e Status —
+mais fáceis de ler e de ordenar (novo: ordenar por qualquer uma das
+duas datas, antes só dava pela data final).
+
+- Contratos: Contrato, Objeto / Fornecedor, Vigência inicial, Vigência
+  final, Status, Valor.
+- Atas: Ata, Contratação de origem, Objeto, Vigência inicial, Vigência
+  final, Status (sem Valor — atas não têm esse campo no PNCP).
+- Selo do Status continua com o texto no badge e a data completa no
+  title (WCAG 1.4.1: cor nunca é o único indicador).
+
+356 pytest + 150 E2E.
+
 ## 1.26.1 — 2026-08-12
 
 **Ficha impressa do detalhe ganha os "Dados completos (JSON)"**

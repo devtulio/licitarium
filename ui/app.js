@@ -429,9 +429,12 @@ const COLUNAS = {
                  ["Objeto","objeto"], ["Valor","valor"],
                  ["Situação","situacao"]],
   contratos:    [["Contrato","numero"], ["Objeto / Fornecedor","objeto"],
-                 ["Vigência","vigencia"], ["Valor","valor"]],
+                 ["Vigência inicial","vigencia_inicio"],
+                 ["Vigência final","vigencia_fim"], ["Status",null],
+                 ["Valor","valor"]],
   atas:         [["Ata","numero"], ["Contratação de origem","origem"],
-                 ["Objeto","objeto"], ["Vigência","vigencia"]],
+                 ["Objeto","objeto"], ["Vigência inicial","vigencia_inicio"],
+                 ["Vigência final","vigencia_fim"], ["Status",null]],
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
@@ -500,11 +503,12 @@ function statusVigencia(fim) {
 }
 
 // a cor sozinha não informa (daltonismo, impressão em preto e branco): o selo
-// leva sempre o texto do estado, e a data completa fica no title
-function badgeVigencia(d) {
+// leva sempre o texto do estado, e a data completa fica no title — coluna
+// própria (achado 2026-08-12: vigência inicial/final e status separados)
+function celulaStatusVigencia(d) {
   const s = statusVigencia(d.vigencia_fim);
-  if (!s) return "";
-  return ` <span class="badge ${s.cl}" title="Vigência até `
+  if (!s) return `<span class="dim">–</span>`;
+  return `<span class="badge ${s.cl}" title="Vigência até `
     + `${dataBr(d.vigencia_fim)}">${s.txt}</span>`;
 }
 
@@ -531,7 +535,9 @@ function renderLinha(tipo, d) {
         esc(d.objeto ?? "–")}</span><br>
         <span class="dim" title="${esc(d.fornecedor_nome ?? "")}">${
           esc(d.fornecedor_nome ?? "")}</span></span>
-      <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>
+      <span class="dim">${dataBr(d.vigencia_inicio)}</span>
+      <span class="dim">${dataBr(d.vigencia_fim)}</span>
+      <span>${celulaStatusVigencia(d)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
   if (tipo === "itens") {
     const homologado = d.valor_unitario_homologado != null;
@@ -574,7 +580,9 @@ function renderLinha(tipo, d) {
   return `<span class="dim">${esc(d.numero_ata ?? "–")}/${esc(d.ano_ata ?? "")}</span>
     <span class="dim">${esc(d.contratacao_controle ?? "–")}</span>
     <span class="obj">${esc(d.objeto ?? "–")}</span>
-    <span class="dim vig">${dataBr(d.vigencia_inicio)} – ${dataBr(d.vigencia_fim)}${badgeVigencia(d)}</span>`;
+    <span class="dim">${dataBr(d.vigencia_inicio)}</span>
+    <span class="dim">${dataBr(d.vigencia_fim)}</span>
+    <span>${celulaStatusVigencia(d)}</span>`;
 }
 
 // Quanto a série varia em relação à própria média. Acima de 25% o TCU e os

@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.26.1"
+VERSAO = "1.27.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -168,12 +168,13 @@ ORDENAVEIS = {
                      "situacao": "situacao"},
     "contratos": {"numero":
                   "(COALESCE(ano_contrato,0)*100000+COALESCE(sequencial_contrato,0))",
-                  "objeto": "objeto",
-                  "vigencia": "vigencia_fim", "valor": "valor_global"},
+                  "objeto": "objeto", "vigencia_inicio": "vigencia_inicio",
+                  "vigencia_fim": "vigencia_fim", "valor": "valor_global"},
     "atas": {"numero":
              "(COALESCE(ano_ata,0)*100000+CAST(COALESCE(numero_ata,'0') AS INTEGER))",
              "origem": "contratacao_controle", "objeto": "objeto",
-             "vigencia": "vigencia_fim"},
+             "vigencia_inicio": "vigencia_inicio",
+             "vigencia_fim": "vigencia_fim"},
     "pca": {"item": "numero_item", "descricao": "descricao",
             "categoria": "categoria", "quantidade": "quantidade",
             "valor": "valor_total"},

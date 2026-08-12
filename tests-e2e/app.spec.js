@@ -131,6 +131,26 @@ test("abas trocam colunas e detalhe abre ao clicar na linha",
   await expect(page.locator("#veu-detalhe")).toBeHidden();
 });
 
+test("contratos e atas separam vigência inicial/final e status em colunas próprias",
+    async ({ page }) => {
+  // pedido do usuário (2026-08-12): "Vigência" combinada (duas datas + selo
+  // espremidos numa célula) virou 3 colunas — vig. inicial, vig. final, status
+  await page.locator('nav.abas button[data-tipo="contratos"]').click();
+  const cabecalho = page.locator(".cab > *");
+  await expect(cabecalho).toHaveText(["Contrato", "Objeto / Fornecedor",
+    "Vigência inicial", "Vigência final", "Status", "Valor"]);
+  const primeira = page.locator(".linha:not(.cab)").first();
+  const celulas = primeira.locator("> *");
+  await expect(celulas.nth(2)).toHaveText("28/05/2026");   // vigência inicial
+  await expect(celulas.nth(3)).toHaveText(/^\d{2}\/\d{2}\/\d{4}$/);  // final
+  await expect(celulas.nth(4).locator(".badge")).toBeVisible();  // status
+
+  await page.locator('nav.abas button[data-tipo="atas"]').click();
+  await expect(page.locator(".cab > *")).toHaveText(["Ata",
+    "Contratação de origem", "Objeto", "Vigência inicial", "Vigência final",
+    "Status"]);
+});
+
 test("botão Imprimir do modal de detalhe manda o que a tela já mostra",
     async ({ page }) => {
   await page.locator('nav.abas button[data-tipo="contratos"]').click();
@@ -662,39 +682,30 @@ test("selos de situação atingem o contraste AA nos três temas",
   }
 });
 
-test("selo de vigência: centralizado na célula e com respiro da data",
+test("selo de vigência: coluna própria, centralizada mesmo em linha alta",
     async ({ page }) => {
+  // achado 2026-08-12: vigência inicial/final e status viraram colunas
+  // separadas (antes eram datas + selo espremidos numa célula só)
   await page.setViewportSize({ width: 1300, height: 900 });
   for (const aba of ["contratos", "atas"]) {
     await page.locator(`nav.abas button[data-tipo="${aba}"]`).click();
     const m = await page.evaluate(() =>
       [...document.querySelectorAll(".linha:not(.cab)")].map(l => {
-        const cel = l.querySelector(".vig");
-        const selo = cel.querySelector(".badge");
-        const rc = cel.getBoundingClientRect(), rs = selo.getBoundingClientRect();
+        const selo = l.querySelector(".badge");
+        const rs = selo.getBoundingClientRect();
         const rl = l.getBoundingClientRect();
         return {
           alturaLinha: rl.height,
-          // quanto o centro da célula desvia do centro da linha
-          desvioCentro: Math.abs((rc.top + rc.height / 2)
+          // quanto o centro do selo desvia do centro vertical da linha
+          desvioCentro: Math.abs((rs.top + rs.height / 2)
                                  - (rl.top + rl.height / 2)),
-          // respiro entre as datas e o selo, e selo em bloco próprio
-          respiro: parseFloat(getComputedStyle(selo).marginTop),
-          seloEmBloco: getComputedStyle(selo).display === "block",
-          // o selo não encosta nas bordas: fica centralizado sob as datas
-          centradoNaCelula: Math.abs((rs.left + rs.width / 2)
-                                     - (rc.left + rc.width / 2)) <= 2,
         };
       }));
     expect(m.length).toBe(3);
     // uma das linhas tem objeto longo: é onde o alinhamento aparecia errado
     expect(Math.max(...m.map(x => x.alturaLinha))).toBeGreaterThan(90);
-    for (const x of m) {
+    for (const x of m)
       expect(x.desvioCentro).toBeLessThanOrEqual(2);   // centralizado
-      expect(x.respiro).toBeGreaterThanOrEqual(4);     // com espaçamento
-      expect(x.seloEmBloco).toBe(true);
-      expect(x.centradoNaCelula).toBe(true);
-    }
   }
 });
 

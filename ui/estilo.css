@@ -224,8 +224,8 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 .cab:hover { background:var(--surface2); }
 /* larguras padrão; o usuário pode ajustar arrastando (var --cols) */
 .g-contratacoes { grid-template-columns:var(--cols, 80px 135px 1fr 120px 120px); }
-.g-contratos    { grid-template-columns:var(--cols, 110px 1fr 160px 110px); }
-.g-atas         { grid-template-columns:var(--cols, 90px 210px 1fr 170px); }
+.g-contratos    { grid-template-columns:var(--cols, 110px 1fr 100px 100px 110px 110px); }
+.g-atas         { grid-template-columns:var(--cols, 90px 210px 1fr 100px 100px 110px); }
 .g-pca          { grid-template-columns:var(--cols, 60px 1fr 150px 80px 110px); }
 .g-itens        { grid-template-columns:var(--cols, 30px minmax(0,1fr) 48px 60px 118px 212px 96px 70px); }
 /* cada modo da aba Preços acrescenta uma coluna de dinheiro entre o valor
@@ -304,7 +304,9 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(2),
 .g-contratacoes > :nth-child(5),
 .g-contratos > :nth-child(1), .g-contratos > :nth-child(3),
-.g-atas > :nth-child(1), .g-atas > :nth-child(2), .g-atas > :nth-child(4),
+.g-contratos > :nth-child(4), .g-contratos > :nth-child(5),
+.g-atas > :nth-child(1), .g-atas > :nth-child(2),
+.g-atas > :nth-child(4), .g-atas > :nth-child(5), .g-atas > :nth-child(6),
 .g-pca > :nth-child(1), .g-pca > :nth-child(3),
 .g-itens > :nth-child(3), .g-itens > :nth-child(4),
 .g-itens > :nth-child(6), .g-itens > :nth-child(7),
@@ -330,9 +332,6 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .descartado select { max-width:280px; }
 .descartado input[type="text"] { width:220px; }
 .linha .obj { display:block; text-align:justify; hyphens:auto; }
-/* datas e selo centralizados na célula, com respiro entre eles: o selo em
-   bloco próprio garante a linha separada mesmo quando a coluna é alargada */
-.linha .vig .badge { display:block; width:fit-content; margin:6px auto 0; }
 /* preço vindo de município de referência: discreto, mas sempre visível —
    o usuário não pode confundir a própria série com a de fora */
 .de-fora { color:var(--warn); font-size:10.5px; }
