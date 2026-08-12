@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.28.1 — 2026-08-12
+
+**Nome do PDF: ficha impressa de contratações**
+
+Pedido do usuário: mesma lógica dos contratos/atas (1.28.0), agora
+pras contratações. `{MODALIDADE} {número}-{ano} {ÓRGÃO}` — ex.:
+`PREGÃO ELETRÔNICO 28-2026 MUNICIPIO DE ORINDIUVA`,
+`INEXIGIBILIDADE 28-2026 MUNICIPIO DE ORINDIUVA`. Sem fornecedor: uma
+contratação pode ter mais de um (ou nenhum, se ainda não homologada).
+`orgao_nome` já vem na própria linha de `contratacoes` — não precisa
+do cadastro local de órgãos como contratos/atas precisavam.
+
+360 pytest + 152 E2E.
+
 ## 1.28.0 — 2026-08-12
 
 **Nome do PDF: ficha impressa de contrato/ata**

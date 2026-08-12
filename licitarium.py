@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.28.0"
+VERSAO = "1.28.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -606,7 +606,14 @@ def _titulo_impressao_detalhe(db, tipo, d):
     Sem padrão pedido pro tipo (ou dado faltando), `None` — quem chama
     cai no título padrão (município — UF).
     """
-    orgao = _nome_orgao(db, d.get("orgao_cnpj")) or "ÓRGÃO NÃO IDENTIFICADO"
+    # `contratacoes` já guarda o nome do órgão na própria linha; os
+    # demais tipos só têm o CNPJ, aí cai no cadastro local de órgãos
+    orgao = (d.get("orgao_nome") or _nome_orgao(db, d.get("orgao_cnpj"))
+             or "ÓRGÃO NÃO IDENTIFICADO")
+    if tipo == "contratacoes" and d.get("sequencial") is not None:
+        numero = f"{d['sequencial']}-{d.get('ano') or ''}"
+        modalidade = (d.get("modalidade_nome") or "").upper()
+        return f"{modalidade} {numero} {orgao}".strip()
     if tipo == "contratos" and d.get("numero_contrato"):
         numero = _sem_zeros(d["numero_contrato"])
         ano = d.get("ano_contrato") or ""

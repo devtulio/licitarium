@@ -482,6 +482,31 @@ def test_imprimir_detalhe_grava_a_ficha_com_o_que_a_tela_montou(
     assert "detalhe_12345_2026-1" in r["arquivo"]
 
 
+def test_imprimir_detalhe_nomeia_o_pdf_da_contratacao_pela_modalidade(
+        tmp_path, monkeypatch):
+    """Pedido do usuário (2026-08-12): mesma lógica dos contratos, agora
+    pras contratações — MODALIDADE + número-ano + órgão, sem fornecedor
+    (a contratação em si pode não ter um único fornecedor definido)."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    db = licitarium.abrir_db()
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, orgao_nome, modalidade_nome, objeto) VALUES"
+        " (?,?,?,?,?,?,?)",
+        ("X-1", 2026, 28, "45148970000177", "MUNICIPIO DE ORINDIUVA",
+         "Pregão eletrônico", "Aquisição de material"))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    r = licitarium.Api().imprimir_detalhe(
+        "contratacoes", "X-1", "Aquisição de material", "X-1", "<div></div>")
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert ("<title>PREGÃO ELETRÔNICO 28-2026 "
+            "MUNICIPIO DE ORINDIUVA</title>") in html
+
+
 def test_imprimir_detalhe_nomeia_o_pdf_pelo_contrato_orgao_e_fornecedor(
         tmp_path, monkeypatch):
     """Pedido do usuário (2026-08-12): o nome sugerido ao "Salvar como
