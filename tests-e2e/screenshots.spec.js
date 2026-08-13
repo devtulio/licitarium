@@ -5,7 +5,7 @@ const { abrirApp } = require("./harness");
 
 const DESTINO = path.resolve(__dirname, "..", "docs", "screenshots");
 
-for (const tema of ["portal", "pergaminho", "observatorio"]) {
+for (const tema of ["portal", "pergaminho", "observatorio", "civil"]) {
   test(`screenshot tema ${tema}`, async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 860 });
     await abrirApp(page);

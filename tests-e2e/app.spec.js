@@ -36,7 +36,8 @@ test.describe("splash", () => {
 
   for (const [tema, marca] of [["portal", ".cx"],
                                ["pergaminho", ".cx.diploma"],
-                               ["observatorio", ".anel .giro"]]) {
+                               ["observatorio", ".anel .giro"],
+                               ["civil", ".cx.civil"]]) {
     test(`composição do tema ${tema}`, async ({ page }) => {
       // serve o tema.js como o Python o escreve (interceptar o arquivo, e
       // não injetar a variável: o próprio arquivo do app a sobrescreveria)
@@ -693,9 +694,9 @@ test("situação da vigência não escorrega de dia por causa do fuso",
   expect(r.comHora.cl).toBe("warn");       // tolera timestamp completo
 });
 
-test("selos de situação atingem o contraste AA nos três temas",
+test("selos de situação atingem o contraste AA nos quatro temas",
     async ({ page }) => {
-  for (const tema of ["portal", "pergaminho", "observatorio"]) {
+  for (const tema of ["portal", "pergaminho", "observatorio", "civil"]) {
     await abrirApp(page, { tema, temaBanco: tema });
     await page.locator('nav.abas button[data-tipo="contratos"]').click();
     const medidas = await page.evaluate(() => {

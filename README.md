@@ -30,8 +30,9 @@ guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
 ![Licitarium — tema Portal](docs/screenshots/portal.png)
 
 <p align="center">
-  <img src="docs/screenshots/pergaminho.png" width="49%" alt="Tema Pergaminho">
-  <img src="docs/screenshots/observatorio.png" width="49%" alt="Tema Observatório">
+  <img src="docs/screenshots/pergaminho.png" width="32%" alt="Tema Pergaminho">
+  <img src="docs/screenshots/observatorio.png" width="32%" alt="Tema Observatório">
+  <img src="docs/screenshots/civil.png" width="32%" alt="Tema Rótulo Civil">
 </p>
 
 ## O que ele faz
@@ -230,7 +231,8 @@ pncp.py              cliente da API do PNCP + motor de sincronização
 pca_builder.py       motor da minuta do PCA (agrupamento, ABC, projeções)
 relatorios.py        geração dos relatórios em HTML/CSV
 ui/index.html        marcação
-ui/estilo.css        três temas por data-theme
+ui/estilo.css        quatro temas por data-theme + fontes vendorizadas
+ui/fonts/             EB Garamond, Public Sans, Lato (woff2, sem CDN)
 ui/app.js            lógica da interface
 tests/               pytest — motor de sync com HTTP mockado
 tests-e2e/           Playwright — interface com a ponte mockada

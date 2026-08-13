@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.31.1"
+VERSAO = "1.32.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -2298,7 +2298,7 @@ def _escrever_tema_da_splash(tema):
     arquivo ao lado do index.html é lido de forma síncrona pelo navegador,
     então a composição já nasce correta.
     """
-    if tema not in ("portal", "pergaminho", "observatorio"):
+    if tema not in ("portal", "pergaminho", "observatorio", "civil"):
         tema = "portal"
     try:
         (DIR_APP / "ui" / "tema.js").write_text(

@@ -156,7 +156,7 @@ test("gráfico do relatório de preços usa a cor fixa do papel, não a do tema 
   // achado 2026-08-13 (/dataviz): o box-plot capturado pra impressão
   // herdava a --erro do tema ativo na tela (Pergaminho/Observatório nunca
   // validados pra fundo branco) — documento oficial não tem tema
-  for (const tema of ["pergaminho", "observatorio"]) {
+  for (const tema of ["pergaminho", "observatorio", "civil"]) {
     await abrirApp(page, { tema, temaBanco: tema });
     const erroTema = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue("--erro").trim());

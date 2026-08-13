@@ -79,6 +79,10 @@ const SPLASH_POR_TEMA = {
     <div class="mark">LICITARI<b>V</b>M</div>
     <div class="divisa">svb hasta pvblica</div>
     <div class="barra" style="width:150px"><i id="splash-barra"></i></div></div>`,
+  civil: () => `<div class="cx civil">${SELO_SVG(60)}
+    <div><div class="mark">LICITARI<b>V</b>M</div>
+      <div class="linha2" id="splash-muni">Contratações públicas</div>
+      <div class="barra"><i id="splash-barra"></i></div></div></div>`,
 };
 const SELO_SVG = t =>
   `<svg viewBox="0 0 64 64" aria-hidden="true" style="width:${t}px;height:${t}px;flex:none">${SELO}</svg>`;

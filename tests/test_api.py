@@ -117,6 +117,17 @@ def test_assets_da_ui_existem_ao_lado_do_index():
     assert "<style>" not in html and "<script>" not in html
 
 
+def test_fontes_vendorizadas_existem_ao_lado_do_estilo():
+    """@font-face falha em silêncio (cai pro fallback, sem erro visível) —
+    o arquivo referenciado precisa existir de verdade, não só o @font-face."""
+    ui = licitarium.DIR_APP / "ui"
+    css = (ui / "estilo.css").read_text(encoding="utf-8")
+    refs = re.findall(r"url\('(fonts/[^']+)'\)", css)
+    assert len(refs) >= 4          # EB Garamond, Public Sans, Lato regular/bold
+    for ref in refs:
+        assert (ui / ref).exists(), ref
+
+
 def test_manual_segue_o_padrao_de_nome_da_familia():
     """O navegador usa o <title> como nome do PDF ao salvar/imprimir.
 
@@ -173,6 +184,9 @@ def test_tema_da_splash_gravado_e_validado(tmp_path, monkeypatch):
     licitarium._escrever_tema_da_splash("pergaminho")
     assert (tmp_path / "ui" / "tema.js").read_text(encoding="utf-8") \
         == 'window.__TEMA = "pergaminho";\n'
+    licitarium._escrever_tema_da_splash("civil")
+    assert (tmp_path / "ui" / "tema.js").read_text(encoding="utf-8") \
+        == 'window.__TEMA = "civil";\n'
     # valor fora da lista vira o padrão (o arquivo entra na página como JS)
     licitarium._escrever_tema_da_splash("'; alert(1); //")
     assert '"portal"' in (tmp_path / "ui" / "tema.js").read_text(encoding="utf-8")

@@ -140,24 +140,36 @@ Ressalva descoberta ao dar tema ao manual (1.1.0): o **exergo** do estandarte
 fixa, ele desaparece no fundo escuro do Observatório. Exergo acompanha a cor do
 texto; pedra, hasta e sinete continuam fixos.
 
-## 5. Os três temas
+## 5. Os quatro temas
 
 Selecionáveis nas configurações, persistidos no banco; **Portal é o padrão**
 (claro). Implementação: CSS custom properties trocadas por `data-theme` no
-`<html>` — um layout, três peles; Pergaminho acrescenta exceções pontuais
-(serifa em valores, filete duplo dourado no cabeçalho).
+`<html>` — um layout, quatro peles; Pergaminho e Rótulo Civil acrescentam
+exceções pontuais (serifa própria em valores, tipografia real vendorizada
+em vez de só `system-ui`).
 
 | Tema | Caráter | Fundo | Destaque | Inspiração |
 |---|---|---|---|---|
 | **Portal** (padrão) | Institucional moderno | `#f8f9fa` claro | Azul `#1351b4` | Linguagem visual gov.br — familiaridade imediata para o servidor público |
 | **Pergaminho** | O arquivo | Papel `#f5efe2` | Selo `#8b2e2e` / dourado `#b08d3e` | O acervo histórico; serifas, filetes, materiais da marca |
 | **Observatório** | O painel | Escuro `#10151c` | Âmbar `#f0a836` / verde `#2dd4a7` | Radar de dados; números tabulares, KPIs |
+| **Rótulo Civil** | O portal de serviço | Claro `#f6f9fa` | Verde `#1b7a4d` | Direção "Rótulo Civil" do brainstorm visual do Rationarium (2026-08-13) — cantos mais soltos, mais convidativo, pensado pra quem abre uma vez por semana |
 
 Tokens: `--bg --surface --surface2 --text --muted --border --accent --accent-fg
---ok --warn --radius --pill --shadow --mark-v`. KPIs na tela inicial em todos os
-temas (herança da direção Observatório, promovida a recurso do produto).
+--ok --warn --radius --pill --shadow --mark-v --font-ui --font-display`. KPIs na
+tela inicial em todos os temas (herança da direção Observatório, promovida a
+recurso do produto).
 
-As três peles valem na tela e, desde a 1.1.0, no **MANUAL.html**. **Nos
+**Tipografia por tema**: só Pergaminho e Rótulo Civil trocam de rosto —
+`--font-display` (EB Garamond, vendorizada) para valores/números em destaque,
+e `--font-ui` própria para o corpo (Public Sans no Pergaminho, Lato no Rótulo
+Civil). Portal e Observatório ficam no `system-ui` de sempre, em título e
+corpo. Fontes vendorizadas em `ui/fonts/*.woff2`, sem CDN — mesmo padrão do
+`echarts.min.js`.
+
+As quatro peles valem na tela. No **MANUAL.html** (desde a 1.1.0) ainda são
+só três — Rótulo Civil não chegou lá (documento avulso, seletor próprio,
+pendente). **Nos
 relatórios não**: desde a v1.20.0 o documento impresso tem paleta própria e
 fixa (`relatorios.py:PALETA_DOCUMENTO`) — papel que vai ao Tribunal de
 Contas é peça institucional do município, não vitrine do tema; e desde a
@@ -183,7 +195,7 @@ relatórios.
 ## 7. Acessibilidade
 
 Padrão WCAG 2.1 AA (mesma régua da família SGCD): contraste mínimo 4.5:1 em
-texto sobre fundo nos três temas, foco visível, navegação por teclado, SVGs
+texto sobre fundo nos quatro temas, foco visível, navegação por teclado, SVGs
 decorativos com `aria-hidden`. Verificar contraste ao ajustar qualquer token.
 
 ## 8. Explorações descartadas (registro de decisão)
@@ -211,6 +223,7 @@ Composição por tema, montada em `ui/index.html`:
 | Portal (padrão) | Cartão com selo, município e barra |
 | Pergaminho | Cartão com estandarte entre filetes duplos dourados |
 | Observatório | Selo com anel giratório e a divisa |
+| Rótulo Civil | Cartão com selo, município e barra — mesma composição do Portal, a cor e a tipografia é que diferem |
 
 - O **selo e o estandarte mantêm as cores da marca em qualquer tema**; só
   fundo, texto e detalhes seguem a paleta ativa. Recolorir a marca por tema

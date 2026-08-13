@@ -1,10 +1,25 @@
-/* Aparência do Licitarium: um layout, três peles (IDENTIDADE.md §5). */
+/* Fontes vendorizadas (sem CDN, mesmo padrão do echarts.min.js): só
+   Pergaminho e Rótulo Civil usam serifada de destaque + sans de corpo
+   própria — Portal e Observatório ficam no system-ui de sempre. */
+@font-face { font-family:'EB Garamond'; font-style:normal; font-weight:400 600;
+  font-display:swap; src:url('fonts/eb-garamond-variable.woff2') format('woff2'); }
+@font-face { font-family:'Public Sans'; font-style:normal; font-weight:400 700;
+  font-display:swap; src:url('fonts/public-sans-variable.woff2') format('woff2'); }
+@font-face { font-family:'Lato'; font-style:normal; font-weight:400;
+  font-display:swap; src:url('fonts/lato-regular.woff2') format('woff2'); }
+@font-face { font-family:'Lato'; font-style:normal; font-weight:700;
+  font-display:swap; src:url('fonts/lato-bold.woff2') format('woff2'); }
+
+/* Aparência do Licitarium: um layout, quatro peles (IDENTIDADE.md §5). */
 :root, [data-theme="portal"] {
   --bg:#f8f9fa; --surface:#ffffff; --surface2:#f1f3f5;
   --text:#1b1b1b; --muted:#5c6670; --border:#e3e6e8;
   --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#a26a00;
   --erro:#b00020; --badge-tom:85%;
   --radius:8px; --pill:99px; --font-ui:system-ui,'Segoe UI',sans-serif;
+  /* --font-display: só pergaminho/civil sobrescrevem — o resto herda o
+     próprio --font-ui, ou seja, título e corpo no mesmo rosto de sempre */
+  --font-display:var(--font-ui);
   --shadow:0 1px 3px rgba(0,0,0,.08); --mark-v:var(--accent);
 }
 [data-theme="pergaminho"] {
@@ -13,6 +28,8 @@
   --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#8a6d1f;
   --erro:#8b2e2e; --badge-tom:85%;
   --radius:3px; --pill:3px; --shadow:0 1px 2px rgba(43,33,21,.12); --mark-v:#8b2e2e;
+  --font-ui:'Public Sans',system-ui,'Segoe UI',sans-serif;
+  --font-display:'EB Garamond',Georgia,serif;
 }
 [data-theme="observatorio"] {
   --bg:#10151c; --surface:#1a212b; --surface2:#141a23;
@@ -20,6 +37,19 @@
   --accent:#f0a836; --accent-fg:#10151c; --ok:#2dd4a7; --warn:#f0a836;
   --erro:#ff8a80; --badge-tom:100%;
   --radius:8px; --pill:6px; --shadow:0 1px 4px rgba(0,0,0,.4); --mark-v:#f0a836;
+}
+/* Rótulo Civil — portal de serviço, não arquivo: fundo claro, verde de
+   confirmação/economia, cantos mais soltos, tipografia real (não só
+   system-ui) — ver o mockup "Rationarium — 3 direções visuais" que
+   originou a direção (2026-08-13). */
+[data-theme="civil"] {
+  --bg:#f6f9fa; --surface:#ffffff; --surface2:#eaf0ee;
+  --text:#122a22; --muted:#5b7a6e; --border:#d9e6e1;
+  --accent:#1b7a4d; --accent-fg:#ffffff; --ok:#1b7a4d; --warn:#9c6b15;
+  --erro:#b23a2e; --badge-tom:85%;
+  --radius:12px; --pill:99px; --shadow:0 1px 3px rgba(18,42,34,.1); --mark-v:#1b7a4d;
+  --font-ui:'Lato',system-ui,'Segoe UI',sans-serif;
+  --font-display:'EB Garamond',Georgia,serif;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { height:100%; }
@@ -176,8 +206,9 @@ main { max-width:max(50vw, 1000px); margin:0 auto; padding:18px 22px 30px; }
                  color:var(--warn); white-space:nowrap; }
 /* sem tabular-nums: numero de exibicao usa figura proporcional; largura
    fixa de digito e para onde numero alinha na vertical (tabela, eixo) */
-.kpi .n { font-size:22px; font-weight:700; color:var(--accent); }
-[data-theme="pergaminho"] .kpi .n { font-family:Georgia,serif; font-weight:400; }
+.kpi .n { font-size:22px; font-weight:700; color:var(--accent);
+          font-family:var(--font-display); }
+[data-theme="pergaminho"] .kpi .n, [data-theme="civil"] .kpi .n { font-weight:400; }
 .kpi .l { font-size:10.5px; color:var(--muted); letter-spacing:.07em;
           text-transform:uppercase; margin-top:3px; }
 
@@ -250,9 +281,9 @@ nav.abas button.on { color:var(--accent); font-weight:600;
 .precos .grade { display:flex; gap:10px; flex-wrap:wrap; }
 .precos .cel { flex:1 1 auto; min-width:96px; }
 .precos .cel .v { font-size:16px; font-weight:700; white-space:nowrap;
-                  font-variant-numeric:tabular-nums; }
-[data-theme="pergaminho"] .precos .cel .v { font-family:Georgia,serif;
-                                            font-weight:400; }
+                  font-variant-numeric:tabular-nums; font-family:var(--font-display); }
+[data-theme="pergaminho"] .precos .cel .v, [data-theme="civil"] .precos .cel .v
+  { font-weight:400; }
 .precos .cel .r { font-size:10px; color:var(--muted); letter-spacing:.05em;
                   text-transform:uppercase; margin-top:2px; }
 .precos .cel.destaque .v { color:var(--accent); }
@@ -294,8 +325,7 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 [data-fonte="grande"]  body { zoom:1.12; }
 [data-fonte="extra"]   body { zoom:1.25; }
 .num { text-align:center; font-variant-numeric:tabular-nums;
-       white-space:nowrap; }
-[data-theme="pergaminho"] .num { font-family:Georgia,serif; }
+       white-space:nowrap; font-family:var(--font-display); }
 .dim { color:var(--muted); font-size:12px; }
 /* valor sem homologação: é estimativa, não pode passar por valor final */
 .est { font-style:italic; color:var(--muted); }
@@ -415,7 +445,7 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .veu { padding-top:24px; }
 .cfg { padding:18px 20px; margin-bottom:14px; }
 .cfg h2 { font-size:14px; margin-bottom:10px; }
-.tcards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.tcards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
 .tcard { border:2px solid var(--border); border-radius:var(--radius);
          padding:10px; background:var(--surface); color:var(--text);
          text-align:center; font-size:12.5px; }
@@ -453,6 +483,16 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
   /* degraus mais espaçados que os do tema claro: sobre fundo escuro, dois
      azuis próximos viram a mesma cor e o mapa de calor deixa de informar */
   --seq1:#123a6e; --seq2:#1c5cab; --seq3:#2a78d6; --seq4:#5598e7; --seq5:#b7d3f6;
+}
+/* Civil: série em verde (s1, a cor de acento) + laranja/azul/dourado pra
+   separar sob daltonismo — validada pelo script de seis checks da skill
+   dataviz contra a superfície #ffffff (2026-08-13): banda de luminosidade,
+   piso de croma, separação CVD (pior par ΔE 8,3 protan), piso de visão
+   normal e contraste — todas passam. Rampa sequencial de um hue só
+   (verde), degraus validados por monotonicidade/gap/faixa de matiz. */
+[data-theme="civil"] {
+  --s1:#1b7a4d; --s2:#c97a2e; --s3:#2e6fa8; --s4:#a88a1f;
+  --seq1:#8fcfad; --seq2:#6bb98d; --seq3:#4a9c6d; --seq4:#1b7a4d; --seq5:#0d4028;
 }
 .painel-topo { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
                margin:4px 0 12px; }

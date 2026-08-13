@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.32.0 — 2026-08-13
+
+**Novo tema: Rótulo Civil**
+
+Quarto tema, ao lado de Portal, Pergaminho e Observatório: fundo claro,
+verde de confirmação/economia como acento, cantos mais soltos — nasceu da
+direção "Rótulo Civil" do brainstorm visual do projeto irmão Rationarium
+(aposentado; só o visual foi aproveitado). Paleta de gráficos validada
+pelo script de seis checks da skill dataviz (separação sob daltonismo,
+contraste, banda de luminosidade).
+
+Pergaminho e Rótulo Civil ganham tipografia própria — EB Garamond (serifa
+de destaque em valores/números) + Public Sans/Lato (corpo), vendorizadas
+localmente em `ui/fonts/*.woff2`, sem CDN. Portal e Observatório
+continuam no `system-ui` de sempre.
+
 ## 1.31.1 — 2026-08-13
 
 **Correção: CI de release sempre falhava (cosmético, sem efeito no release)**
