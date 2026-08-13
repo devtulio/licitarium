@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.33.0 — 2026-08-13
+
+**Revisão da identidade visual**
+
+Mesmo conceito de sempre — tabula ansata, estandarte, LICITARIVM com V
+clássico, a fundamentação histórica intacta. O que mudou foi a execução.
+
+- **A marca não depende mais de fonte instalada.** O L do ícone e as
+  inscrições do estandarte eram `<text font-family="Georgia">`: numa
+  máquina sem Georgia, a marca mudava de desenho. Agora são contorno
+  vetorial da EB Garamond vendorizada (SIL OFL, que permite vetorizar e
+  redistribuir).
+- **A inscrição do estandarte parou de ser espremida.** O `textLength`
+  comprimia os glifos para caber — LICITARIVM mede 9,3× a altura da
+  capitular e era forçado em ~6,7×. O corpo agora é derivado da largura
+  disponível, e a letra mantém a proporção que o desenhista lhe deu.
+- **Ícones de interface desenhados, no lugar de emoji.** Os ⚠ ⏱ 📄 ⏸ 🖨
+  vinham coloridos da fonte do sistema e ignoravam a paleta; os novos
+  herdam `currentColor` e acompanham os quatro temas. De quebra, os
+  mesmos conceitos usavam emoji diferentes em telas diferentes
+  (vencimento era ⚠ na tela inicial e ⏱ no Painel) — agora saem todos do
+  mesmo conjunto.
+- **O wordmark passa a usar a mesma serifada da marca** nos quatro temas,
+  em vez da Georgia do sistema.
+- **Rótulo Civil ganhou splash própria**, em vez de reaproveitar a do
+  Portal.
+- **Um gerador, não quatro cópias à mão.** A arte era mantida em paralelo
+  nos SVG, no `ui/app.js`, no `relatorios.py` e no desenho em Pillow do
+  `gerar_ico.py`. Agora `design/gerar_marca.py` é a fonte, e
+  `tests/test_marca.py` falha se alguém editar uma cópia sem regerar.
+
 ## 1.32.0 — 2026-08-13
 
 **Novo tema: Rótulo Civil**

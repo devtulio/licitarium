@@ -20,29 +20,12 @@ const dataBr = s => {
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG",
   "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
-const ESTANDARTE = `
-  <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
-  <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
-  <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
-        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
-  <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
-        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
-  <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
-  <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
-        fill="#2b2115" text-anchor="middle">MMXXVI</text>`;
+// A arte da marca vem de ui/marca.js (gerado de design/*.svg): era cópia
+// mantida à mão aqui e em relatorios.py, com três chances de divergir.
+const ESTANDARTE = MARCA.estandarte;
 
 // selo oficial (design/icone-t1.svg): tabula ansata com L capitular
-const SELO = `
-  <polygon points="11,25 3,19 3,45 11,39" fill="#8b2e2e"/>
-  <polygon points="53,25 61,19 61,45 53,39" fill="#8b2e2e"/>
-  <rect x="9" y="17" width="46" height="30" fill="#8b2e2e"/>
-  <rect x="12.5" y="20.5" width="39" height="23" fill="none" stroke="#f5efe2"
-        stroke-width="1.4" opacity=".7"/>
-  <text x="32" y="40.5" font-family="Georgia, 'Times New Roman', serif"
-        font-size="21" fill="#f5efe2" text-anchor="middle">L</text>`;
+const SELO = MARCA.selo;
 
 const estado = { tipo:"contratacoes", pagina:1, municipio:null,
                  ord:null, dir:"desc", objetosAlvo:null };
@@ -79,10 +62,13 @@ const SPLASH_POR_TEMA = {
     <div class="mark">LICITARI<b>V</b>M</div>
     <div class="divisa">svb hasta pvblica</div>
     <div class="barra" style="width:150px"><i id="splash-barra"></i></div></div>`,
-  civil: () => `<div class="cx civil">${SELO_SVG(60)}
-    <div><div class="mark">LICITARI<b>V</b>M</div>
-      <div class="linha2" id="splash-muni">Contratações públicas</div>
-      <div class="barra"><i id="splash-barra"></i></div></div></div>`,
+  // Rótulo Civil é o portal de serviço: composição empilhada e centrada,
+  // com mais respiro e a barra larga — quem abre uma vez por semana lê
+  // melhor o "está carregando" do que o Portal denso resolve num canto.
+  civil: () => `<div class="cx civil">${SELO_SVG(64)}
+    <div class="mark">LICITARI<b>V</b>M</div>
+    <div class="linha2" id="splash-muni">Contratações públicas</div>
+    <div class="barra"><i id="splash-barra"></i></div></div>`,
 };
 const SELO_SVG = t =>
   `<svg viewBox="0 0 64 64" aria-hidden="true" style="width:${t}px;height:${t}px;flex:none">${SELO}</svg>`;
@@ -157,6 +143,17 @@ function comRede(bruta) {
     },
   });
 }
+
+// Preenche os ícones dos botões escritos direto no HTML. O marcador
+// `data-icone` evita uma cópia do SVG no index.html: a arte continua num
+// lugar só (ui/icones.js), e o HTML só diz qual quer.
+function preencherIcones(raiz = document) {
+  raiz.querySelectorAll("[data-icone]").forEach(el => {
+    const arte = ICONE[el.dataset.icone];
+    if (arte) el.innerHTML = arte;
+  });
+}
+preencherIcones();
 
 // ── boot ──────────────────────────────────────────────────────────────────
 window.addEventListener("pywebviewready", async () => {
@@ -348,15 +345,18 @@ function renderKpis(k) {
     `homologado em ${new Date().getFullYear()}`;
   $("kpi-vigentes").textContent = k.vigentes;
   const alertas = [];
+  // os mesmos conceitos aparecem nos chips do Painel; até a 1.32.0 cada
+  // tela usava um emoji diferente pro mesmo alerta (vencimento era ⚠ aqui
+  // e ⏱ lá; proposta era ⏱ aqui e 📄 lá). Agora saem do mesmo conjunto.
   if (k.vencendo_60_contratos > 0)
-    alertas.push(`<button class="chip" id="chip-vencendo-contratos">⚠
+    alertas.push(`<button class="chip" id="chip-vencendo-contratos">${ICONE.prazo}
       ${k.vencendo_60_contratos} contrato(s) vence(m) nos próximos 60 dias
       </button>`);
   if (k.vencendo_60_atas > 0)
-    alertas.push(`<button class="chip" id="chip-vencendo-atas">⚠
+    alertas.push(`<button class="chip" id="chip-vencendo-atas">${ICONE.prazo}
       ${k.vencendo_60_atas} ata(s) vence(m) nos próximos 60 dias</button>`);
   if (k.propostas_abertas > 0)
-    alertas.push(`<button class="chip info" id="chip-propostas">⏱
+    alertas.push(`<button class="chip info" id="chip-propostas">${ICONE.proposta}
       ${k.propostas_abertas} processo(s) com propostas abertas</button>`);
   $("alertas").innerHTML = alertas.join("");
   $("alertas").classList.toggle("oculto", alertas.length === 0);
@@ -1641,7 +1641,7 @@ async function carregarMinuta() {
           ? '<button class="tag-mesclado" data-dividir="' + i.id + '" title="Desfazer a mesclagem">MESCLADO ⤢</button>' : ""}</span>
       <span><input type="text" data-campo="unidade" value="${esc(i.unidade ?? "")}">
         ${i.origem && i.origem.unidades_divergentes
-          ? '<span class="aviso-un" title="O grupo tem unidades diferentes; confira">⚠</span>' : ""}</span>
+          ? `<span class="aviso-un" title="O grupo tem unidades diferentes; confira">${ICONE.limite}</span>` : ""}</span>
       <span><input type="number" data-campo="quantidade" step="0.01"
         value="${i.quantidade ?? 0}"></span>
       <span><input type="number" data-campo="valor_unitario" step="0.01"

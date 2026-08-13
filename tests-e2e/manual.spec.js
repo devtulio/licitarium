@@ -34,8 +34,10 @@ test("estandarte mantém a paleta da marca; só o exergo acompanha o tema", asyn
   // pedra e sinete são da marca (IDENTIDADE.md §4): não mudam com o tema
   await expect(page.locator("header.capa svg rect"))
     .toHaveCSS("fill", "rgb(222, 213, 194)");
-  // o exergo é inscrito no suporte, não na pedra: some se não acompanhar
-  await expect(page.locator("header.capa svg text").last())
+  // o exergo é inscrito no suporte, não na pedra: some se não acompanhar.
+  // Desde a 1.33.0 a inscrição é contorno vetorial, não <text> — o alvo é
+  // o path pintado com var(--text), que é justamente o que segue o tema.
+  await expect(page.locator('header.capa svg path[fill="var(--text)"]').last())
     .toHaveCSS("fill", "rgb(220, 227, 236)");
 });
 

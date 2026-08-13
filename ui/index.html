@@ -93,7 +93,7 @@
         <select id="p-orgao" aria-label="Órgão do painel">
           <option value="">Todos os órgãos</option></select>
         <button class="btn ghost" id="btn-imprimir-painel"
-          title="Gera o painel em A3 paisagem para impressão">🖨 Imprimir</button>
+          title="Gera o painel em A3 paisagem para impressão"><span data-icone="imprimir"></span> Imprimir</button>
       </div>
       <div id="p-execucao" class="vista"></div>
       <div id="p-analise" class="vista oculto"></div>
@@ -166,7 +166,7 @@
     <div class="meta" id="det-meta"></div>
     <div class="macoes">
       <button class="btn" id="det-pncp">Ver no PNCP ↗</button>
-      <button class="btn ghost" id="det-imprimir">🖨 Imprimir</button>
+      <button class="btn ghost" id="det-imprimir"><span data-icone="imprimir"></span> Imprimir</button>
     </div>
     <details class="raw"><summary>Dados completos (JSON do PNCP)</summary>
       <pre id="det-raw"></pre></details>
@@ -269,7 +269,7 @@
       </div>
       <div class="dim" style="font-size:11.5px; margin-top:12px">
         O relatório abre no navegador, pronto para imprimir ou salvar em PDF
-        (🖨). As relações também geram CSV na mesma pasta.
+        (botão Imprimir). As relações também geram CSV na mesma pasta.
       </div>
     </div>
   </div>
@@ -420,6 +420,9 @@
      width:900px; height:240px" aria-hidden="true"></div>
 
 <script src="echarts.min.js"></script>
+<!-- marca.js e icones.js antes do app.js: ele lê MARCA e ICONE na carga -->
+<script src="marca.js"></script>
+<script src="icones.js"></script>
 <script src="app.js"></script>
 <script src="painel.js"></script>
 </body>

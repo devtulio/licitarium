@@ -431,8 +431,10 @@ test("chips concordam em número", async ({ page }) => {
 
 test("chip de processo parado não usa o mesmo ícone dos de vencimento",
     async ({ page }) => {
-  // achado da auditoria de design (2026-08-08): ⏱ (vencendo) e ⏳ (parado)
-  // liam como a mesma família — "tempo passando" — pra conceitos opostos
+  // achado da auditoria de design (2026-08-08): relógio (vencendo) e
+  // ampulheta (parado) liam como a mesma família — "tempo passando" — pra
+  // conceitos opostos. Desde a 1.33.0 os ícones são SVG desenhado, então a
+  // comparação é do desenho, não mais do caractere de emoji.
   await page.evaluate(() => {
     window.__painel = { ...window.PAINEL_DADOS,
       alertas: { perto_do_limite: 0, acima_do_limite: 0,
@@ -440,14 +442,13 @@ test("chip de processo parado não usa o mesmo ícone dos de vencimento",
                  propostas: 0, paradas: 1 } };
   });
   await page.locator("#p-ano").selectOption({ index: 0 });
-  const iconeVencendo = await page.locator("#painel-chips .chip")
-    .filter({ hasText: "contrato vence" }).locator("b").first()
-    .evaluate(el => el.previousSibling.textContent.trim());
-  const iconeParado = await page.locator("#painel-chips .chip")
-    .filter({ hasText: "sem resultado" }).locator("b").first()
-    .evaluate(el => el.previousSibling.textContent.trim());
+  const desenho = (texto) => page.locator("#painel-chips .chip")
+    .filter({ hasText: texto }).locator("svg.ico").first()
+    .evaluate(el => el.innerHTML.replace(/\s+/g, " ").trim());
+  const iconeVencendo = await desenho("contrato vence");
+  const iconeParado = await desenho("sem resultado");
+  expect(iconeVencendo).not.toBe("");
   expect(iconeParado).not.toBe(iconeVencendo);
-  expect(iconeParado).not.toBe("⏳");
 });
 
 test("chips ficam com a mesma altura mesmo quando o texto quebra linha",

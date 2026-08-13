@@ -1025,29 +1025,29 @@ function mostrarChips(a) {
   // deixa de bater com o número que o usuário acabou de ver
   const orgao = $("p-orgao").value || undefined;
   const chips = [];
-  if (a.perto_do_limite) chips.push(["grave", "⚠", a.perto_do_limite,
+  if (a.perto_do_limite) chips.push(["grave", ICONE.limite, a.perto_do_limite,
     `objeto${a.perto_do_limite > 1 ? "s" : ""} ${a.acima_do_limite
       ? "acima do" : "perto do"} limite anual de dispensa`,
     () => irPara("contratacoes", {ano: P.dados.ano, orgao, modalidade: "8",
                                   objetos: a.objetos_perto_do_limite})]);
-  if (a.vencendo_contratos) chips.push(["aviso", "⏱", a.vencendo_contratos,
+  if (a.vencendo_contratos) chips.push(["aviso", ICONE.prazo, a.vencendo_contratos,
     a.vencendo_contratos === 1 ? "contrato vence em 60 dias"
                                : "contratos vencem em 60 dias",
     () => irPara("contratos",
                 {orgao, vencendo: true, ord: "vigencia", dir: "asc"})]);
-  if (a.vencendo_atas) chips.push(["aviso", "⏱", a.vencendo_atas,
+  if (a.vencendo_atas) chips.push(["aviso", ICONE.prazo, a.vencendo_atas,
     a.vencendo_atas === 1 ? "ata vence em 60 dias" : "atas vencem em 60 dias",
     () => irPara("atas",
                 {orgao, vencendo: true, ord: "vigencia", dir: "asc"})]);
-  if (a.propostas) chips.push(["", "📄", a.propostas,
+  if (a.propostas) chips.push(["", ICONE.proposta, a.propostas,
     a.propostas === 1 ? "processo com proposta aberta"
                       : "processos com proposta aberta",
     () => irPara("contratacoes", {orgao, propostas: true})]);
-  // achado da auditoria de design (2026-08-08): ⏳ (ampulheta) e ⏱ (relógio,
-  // usado nos dois chips de vencimento acima) lêem como "tempo passando" a
-  // um olhar rápido, mas dizem coisas opostas — prazo chegando vs processo
-  // parado. ⏸ lê como "parado" de propósito, sem competir com relógio.
-  if (a.paradas) chips.push(["", "⏸", a.paradas,
+  // achado da auditoria de design (2026-08-08): ampulheta e relógio (usado
+  // nos dois chips de vencimento acima) lêem como "tempo passando" a um
+  // olhar rápido, mas dizem coisas opostas — prazo chegando vs processo
+  // parado. A pausa lê como "parado" de propósito, sem competir com relógio.
+  if (a.paradas) chips.push(["", ICONE.parado, a.paradas,
     a.paradas === 1 ? "processo sem resultado há mais de 90 dias"
                     : "processos sem resultado há mais de 90 dias",
     () => irPara("contratacoes", {ano: P.dados.ano, orgao, parada: true})]);

@@ -15,21 +15,9 @@ from datetime import date, datetime
 
 import pca_builder
 
-# fonte da verdade da arte: design/estandarte-t3.svg
-ESTANDARTE = """<svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
-  <line x1="32" y1="57" x2="32" y2="15" stroke="#b08d3e" stroke-width="2.6" stroke-linecap="round"/>
-  <ellipse cx="32" cy="10.5" rx="2.3" ry="5" fill="#b08d3e"/>
-  <polygon points="12,25.5 5,21 5,37 12,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <polygon points="52,25.5 59,21 59,37 52,32.5" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <rect x="11" y="19" width="42" height="20" fill="#ded5c2" stroke="#2b2115" stroke-width="1.6"/>
-  <text x="32" y="27.5" font-family="Georgia, serif" font-size="5.4" fill="#2b2115"
-        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">LICITARIVM</text>
-  <text x="32" y="34.5" font-family="Georgia, serif" font-size="3.6" fill="#8b2e2e"
-        text-anchor="middle" textLength="36" lengthAdjust="spacingAndGlyphs">SVB · HASTA · PVBLICA</text>
-  <line x1="20" y1="57.5" x2="44" y2="57.5" stroke="#2b2115" stroke-width="1.6" stroke-linecap="round"/>
-  <text x="32" y="62.5" font-family="Georgia, serif" font-size="4.6" letter-spacing="1"
-        fill="#2b2115" text-anchor="middle">MMXXVI</text>
-</svg>"""
+# a arte vem de marca.py, gerado por design/gerar_marca.py a partir do
+# design/estandarte-t3.svg — antes era uma cópia mantida à mão aqui
+from marca import ESTANDARTE
 
 TITULOS = {"contratacoes": "Relação de Contratações",
            "contratos": "Relação de Contratos",

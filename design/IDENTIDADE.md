@@ -121,6 +121,18 @@ montada numa **hasta** de ponta lanceolada fincada numa linha de solo, com
    (`icone-t1-16.svg` — sem filete, L branco maior). Regenerar sempre por
    `gerar_ico.py` (Pillow: desenho a 1024 px, redução LANCZOS, SHARPEN nos frames
    ≤24 px, frames do maior para o menor, fundo transparente).
+5. **Nada de `<text>` nas peças da marca** (desde a 1.33.0). Até a 1.32.0 o L do
+   ícone e as inscrições do estandarte eram `<text font-family="Georgia">`: o
+   desenho da marca dependia de uma fonte instalada, e numa máquina sem Georgia
+   caía num fallback qualquer. Hoje são **contorno vetorial** da EB Garamond
+   vendorizada (SIL OFL, que permite vetorizar e redistribuir — Georgia e
+   Palatino são proprietárias e embarcar contorno delas num repo MIT seria
+   risco de licença). `tests/test_marca.py` falha se `<text>` voltar.
+6. **A arte tem um gerador, não se edita à mão**: `design/gerar_marca.py`
+   escreve os três SVG e as duas cópias derivadas (`ui/marca.js` e `marca.py`,
+   que alimentam a tela e o relatório). Antes a mesma arte era mantida à mão em
+   quatro lugares — os SVG, o `ui/app.js`, o `relatorios.py` e o desenho em
+   Pillow do `gerar_ico.py` —, e sincronizar dependia de alguém lembrar.
 
 ## 4. Cores
 
@@ -184,13 +196,36 @@ relatórios.
 
 ## 6. Tipografia
 
-- **Marca e wordmark**: Georgia (serifada de sistema, presente em todo Windows) —
-  aproximação pragmática da capitalis monumentalis sem dependência de webfont.
-  No `.ico`, Georgia **Bold** (traço grosso sobrevive à miniatura; a capitalis
-  também tinha contraste forte de traço).
-- **Interface**: fonte do sistema (`system-ui`/Segoe UI) — legibilidade e zero
-  dependência.
+- **Marca e wordmark**: **EB Garamond** vendorizada (`--font-marca`), igual nos
+  quatro temas — a marca não muda com o tema. Substituiu a Georgia de sistema na
+  1.33.0: a Garamond é revival renascentista das capitais romanas, mais próxima
+  da *capitalis monumentalis* que uma serifada de tela dos anos 90, e por ser
+  vendorizada (não CDN) não reintroduz dependência de rede. A ressalva antiga
+  ("sem dependência de webfont") deixou de valer quando o projeto passou a
+  vendorizar fontes.
+- **No `.ico`**: mesma EB Garamond, instanciada em **peso 600** nos frames ≥32 px
+  e **800 com capitular maior** nos de 16/24. Não é gosto: medindo a fração de
+  pixels de letra que sobrevive à redução para 16 px, a Georgia Bold anterior
+  entregava 13,5% — a Garamond, que é old-style de traço leve, só alcança isso
+  em 800 com a capitular perto de 30 (chega a 14,9%).
+- **Interface**: fonte do sistema (`system-ui`/Segoe UI) em Portal e
+  Observatório; Pergaminho e Rótulo Civil têm rosto próprio (§5).
 - **Números em tabelas e KPIs**: `font-variant-numeric: tabular-nums`.
+
+### 6.1 Ícones de interface
+
+Desenhados (`ui/icones.js`), não emoji. Emoji é renderizado pela fonte do
+sistema: vem colorido, com estilo próprio — cartunesco no Windows — e ignora a
+paleta do tema; num app de identidade epigráfica, destoava de tudo. Os ícones
+herdam `currentColor`, então acompanham os quatro temas.
+
+Grade de 24, traço 1,75, pontas e junções arredondadas, só contorno. Conjunto:
+`limite` (triângulo de atenção), `prazo` (relógio), `proposta` (a própria tabula
+ansata — o edital em exposição), `parado` (pausa) e `imprimir`.
+
+Achado ao trocar (1.33.0): os mesmos conceitos usavam **emoji diferentes em
+telas diferentes** — vencimento era ⚠ na tela inicial e ⏱ no Painel; proposta
+era ⏱ na inicial e 📄 no Painel. Agora saem todos do mesmo conjunto.
 
 ## 7. Acessibilidade
 
@@ -223,7 +258,7 @@ Composição por tema, montada em `ui/index.html`:
 | Portal (padrão) | Cartão com selo, município e barra |
 | Pergaminho | Cartão com estandarte entre filetes duplos dourados |
 | Observatório | Selo com anel giratório e a divisa |
-| Rótulo Civil | Cartão com selo, município e barra — mesma composição do Portal, a cor e a tipografia é que diferem |
+| Rótulo Civil | Cartão empilhado e centrado, cantos soltos e barra larga — mais respiro que o Portal, para quem abre o sistema uma vez por semana |
 
 - O **selo e o estandarte mantêm as cores da marca em qualquer tema**; só
   fundo, texto e detalhes seguem a paleta ativa. Recolorir a marca por tema
