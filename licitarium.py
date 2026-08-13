@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.31.0"
+VERSAO = "1.31.1"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1811,7 +1811,7 @@ class Api:
         """
         try:
             req = urllib.request.Request(
-                "https://api.github.com/repos/devtulio/licitarium/releases/latest",
+                "https://api.github.com/repos/devtulio/licitarium-free/releases/latest",
                 headers={"User-Agent": pncp.USER_AGENT,
                          "Accept": "application/vnd.github+json"})
             with urllib.request.urlopen(req, timeout=10) as r:

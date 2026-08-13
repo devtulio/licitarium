@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.31.1 — 2026-08-13
+
+**Correção: CI de release sempre falhava (cosmético, sem efeito no release)**
+
+O job da CI que roda em push de tag tentava anexar o executável à
+release de novo, mas ele já tinha sido subido pelo passo manual do
+fluxo de release — sem `--clobber`, esse job sempre mostrava X vermelho
+mesmo com o release e o DOI saindo corretos. Também: repositório
+renomeado para `licitarium-free`, sem mudança de código/branding.
+
 ## 1.31.0 — 2026-08-13
 
 **Painel migrado para ECharts**
