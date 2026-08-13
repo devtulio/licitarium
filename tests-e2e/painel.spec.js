@@ -18,10 +18,17 @@ test("o Painel é a tela inicial e não mostra a lista", async ({ page }) => {
   await expect(page.locator("#kpis-topo")).toBeVisible();
 });
 
+// ECharts (renderer SVG) desenha barra como <path>, não <rect>, e sempre
+// põe um <rect fill="none"> de fundo antes de qualquer marca — por isso a
+// marca real é ":is(rect, path) sem fill=none", não só "rect"
+const MARCA_REAL = '#p-execucao svg :is(rect, path):not([fill="none"])';
+
 test("a marca sob o cursor acende e as irmãs recuam", async ({ page }) => {
-  const barras = page.locator("#p-execucao svg rect");
+  const barras = page.locator(MARCA_REAL);
   const alvo = barras.first();
-  const irma = barras.nth(3);
+  // a série "estimado" já nasce com fill-opacity .32 (dado, não estado de
+  // hover) — pega uma marca sem opacidade própria pra testar o realce
+  const irma = page.locator(`${MARCA_REAL}:not([fill-opacity])`).first();
 
   // em repouso ninguém está esmaecido nem aceso
   await expect(irma).toHaveCSS("fill-opacity", "1");
@@ -40,7 +47,7 @@ test("a marca sob o cursor acende e as irmãs recuam", async ({ page }) => {
 test("barra não muda de tamanho ao ser realçada", async ({ page }) => {
   /* A barra vale o número que representa: crescer no hover faria a marca
      mentir sobre o valor. Quem cresce é o ponto, onde tamanho não é dado. */
-  const barra = page.locator("#p-execucao svg rect").first();
+  const barra = page.locator(MARCA_REAL).first();
   const antes = await barra.boundingBox();
   await barra.hover();
   await expect(barra).toHaveCSS("filter", "brightness(1.16)");
@@ -51,7 +58,10 @@ test("barra não muda de tamanho ao ser realçada", async ({ page }) => {
 
 test("o tooltip próprio aparece na hora, com o valor em destaque",
     async ({ page }) => {
-  const barra = page.locator("#p-execucao svg rect[data-tip-v]").first();
+  // gráficos ECharts não carregam data-tip-v (o tooltip é ligado por
+  // evento do próprio motor, não por delegação em atributo) — a marca
+  // real já basta pra disparar o mostrarTt compartilhado
+  const barra = page.locator(MARCA_REAL).first();
   const tt = page.locator(".graf-tt");
   await expect(tt).toBeHidden();
 
@@ -180,8 +190,12 @@ test("análise traz as três séries e o mapa de calor", async ({ page }) => {
   await expect(v).toContainText("Deságio por modalidade");
   await expect(v).toContainText("Concentração de fornecedores");
   await expect(v).toContainText("processos por mês e modalidade");
-  // uma linha por exercício comparado
-  expect(await v.locator("svg polyline").count()).toBeGreaterThanOrEqual(3);
+  // uma linha por exercício comparado — ECharts (renderer SVG) desenha
+  // linha como <path stroke-width="...">, não <polyline>; o atributo
+  // stroke-width (só nas linhas de dado, nunca nas grades do eixo) separa
+  // as séries reais do resto do SVG
+  expect(await v.locator('[data-graf="series"] svg path[stroke-width]').count())
+    .toBeGreaterThanOrEqual(3);
 });
 
 test("economia mostra o total do ano e os três agrupamentos",
@@ -201,8 +215,8 @@ test("economia traz a série acumulada de 3 exercícios", async ({ page }) => {
   const v = page.locator("#p-economia");
   await expect(v).toContainText("Economia acumulada");
   // uma linha por exercício comparado, mesmo padrão da série de Análise
-  expect(await v.locator('[data-graf="economia_series"] svg polyline').count())
-    .toBeGreaterThanOrEqual(3);
+  expect(await v.locator('[data-graf="economia_series"] svg path[stroke-width]')
+    .count()).toBeGreaterThanOrEqual(3);
 });
 
 test("economia traz o ranking de fornecedores por deságio", async ({ page }) => {
@@ -210,10 +224,12 @@ test("economia traz o ranking de fornecedores por deságio", async ({ page }) =>
   const cartao = page.locator(
     '#p-economia .card:has([data-graf="economia_fornecedor"])');
   await expect(cartao).toContainText("quem fechou abaixo do estimado");
-  // o mais econômico lidera, com quantidade e % ao lado do nome
-  const rotulos = cartao.locator("svg text.rot");
-  await expect(rotulos.first()).toContainText("23 itens");
-  await expect(rotulos.first()).toContainText("16%");
+  // o mais econômico lidera, com quantidade e % ao lado do valor (ECharts
+  // não marca o texto com classe — busca por conteúdo, não por seletor)
+  await expect(cartao.locator("svg text").filter({ hasText: "23 itens" }))
+    .toBeVisible();
+  await expect(cartao.locator("svg text").filter({ hasText: "16%" }))
+    .toBeVisible();
   // a ressalva anda junto do número: deságio alto pode ser estimativa inflada
   await expect(cartao).toContainText("estimativa inflada");
 });
@@ -371,14 +387,16 @@ test("os gráficos são desenhados na largura do espaço, não esticados",
   const svg = page.locator('#p-execucao [data-graf="meses"] svg');
   await expect(svg).toBeVisible();
   await page.waitForTimeout(300);
-  const antes = await svg.getAttribute("viewBox");
+  // ECharts (renderer SVG) sai com width/height absolutos, não viewBox —
+  // ao contrário do SVG à mão que o resto do Painel ainda desenha
+  const antes = await svg.getAttribute("width");
 
-  // tela mais larga: o viewBox acompanha, em vez de escalar com faixa morta
+  // tela mais larga: o SVG acompanha, em vez de escalar com faixa morta
   await page.setViewportSize({ width: 1800, height: 1000 });
   await page.waitForTimeout(300);
-  const depois = await svg.getAttribute("viewBox");
+  const depois = await svg.getAttribute("width");
   expect(depois).not.toBe(antes);
-  const larguraSvg = Number(depois.split(" ")[2]);
+  const larguraSvg = Number(depois);
   const caixa = await page.locator('#p-execucao [data-graf="meses"]')
     .boundingBox();
   expect(Math.abs(larguraSvg - caixa.width)).toBeLessThan(3);
@@ -390,7 +408,8 @@ test("vista oculta desenha ao aparecer", async ({ page }) => {
   await page.locator('.subabas button[data-vista="vigilancia"]').click();
   const svg = page.locator('#p-vigilancia [data-graf="funil"] svg');
   await expect(svg).toBeVisible();
-  const larg = Number((await svg.getAttribute("viewBox")).split(" ")[2]);
+  // ECharts (renderer SVG) sai com width absoluto, não viewBox
+  const larg = Number(await svg.getAttribute("width"));
   expect(larg).toBeGreaterThan(200);
 });
 

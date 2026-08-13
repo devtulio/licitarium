@@ -29,11 +29,15 @@ test("todo gráfico tem nome acessível e não esconde os rótulos",
     async ({ page }) => {
   await page.locator('.subabas button[data-vista="economia"]').click();
   await page.waitForTimeout(250);
+  // [data-overlay] é a camada de corte vertical/rótulo por cima do SVG do
+  // ECharts (ver painel.js:grafSeries) — decorativa, aria-hidden, e o
+  // gráfico de baixo já carrega o nome acessível
   const graficos = await page.evaluate(() =>
-    [...document.querySelectorAll("#p-economia svg")].map(s => ({
-      nome: s.querySelector("title")?.textContent ?? "",
-      papel: s.getAttribute("role"),
-    })));
+    [...document.querySelectorAll("#p-economia svg:not([data-overlay])")]
+      .map(s => ({
+        nome: s.querySelector("title")?.textContent ?? "",
+        papel: s.getAttribute("role"),
+      })));
   expect(graficos.length).toBeGreaterThanOrEqual(4);
   for (const g of graficos) {
     expect(g.nome.length).toBeGreaterThan(3);   // <title> = nome acessível

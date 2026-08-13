@@ -136,58 +136,105 @@ function ligarTooltips() {
   raiz.addEventListener("pointerleave", esconderTt);
 }
 
+// ── ECharts: estilos de texto compartilhados, mesmos valores das classes
+// .rot/.val/.eixo de estilo.css — o SVG do ECharts não carrega classe CSS
+// (sai com style="" inline), então o valor precisa ir explícito aqui.
+const ROT_TXT = { fontSize: 10.5, color: "var(--muted)" };
+const VAL_TXT = { fontSize: 11, color: "var(--text)" };
+const COR_EIXO = "var(--border)";
+
+// x/y do evento nativo do ECharts — mesma assinatura que mostrarTt já espera
+// (clientX, clientY), pra reusar o tooltip único sem reescrevê-lo.
+function _ptEvento(params) {
+  const nativo = params.event?.event;
+  return [nativo?.clientX ?? 0, nativo?.clientY ?? 0];
+}
+
+// instância presa ao elemento (não a uma variável de módulo): vários
+// cartões desenham ao mesmo tempo (ver desenharBoxplotPreco em app.js) —
+// uma só variável faria o dispose() de um derrubar o outro
+function _iniciarEchart(el) {
+  if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
+  const chart = echarts.init(el, null, { renderer: "svg" });
+  el.__echart = chart;
+  return chart;
+}
+
 // ── colunas pareadas: estimado (claro) × homologado (cheio) ────────────────
-function grafMeses(meses, larg = 660) {
+function grafMeses(el, meses, larg = 660) {
   // Mês sem contratação é informação: filtrá-lo comprimia o eixo e escondia
   // o buraco — no acervo do piloto, março sumia entre fevereiro e abril.
-  if (!meses.some(m => m.valor || m.estimado))
-    return `<div class="vazio">Sem contratações no exercício.</div>`;
+  if (!meses.some(m => m.valor || m.estimado)) {
+    el.innerHTML = `<div class="vazio">Sem contratações no exercício.</div>`;
+    return;
+  }
   const ultimo = meses.reduce(
     (u, m, i) => (m.valor || m.estimado) ? i : u, 0);
   const dados = meses.slice(0, Math.max(ultimo + 1, new Date().getMonth() + 1));
-  const alto = 170, base = 170;
-  const e = escala(Math.max(...dados.map(m => Math.max(m.valor, m.estimado))));
-  const passo = (larg - 60) / dados.length;
-  const y = (v) => base - (v / e.topo) * (base - 30);
-  let g = "";
-  for (let v = 0; v <= e.topo + 1e-6; v += e.passo) {
-    g += `<line class="eixo" x1="48" y1="${y(v)}" x2="${larg - 8}" y2="${y(v)}"
-           opacity="${v ? .55 : 1}"/>
-      <text class="rot" x="44" y="${y(v) + 4}" text-anchor="end"
-        >${v ? compacto(v).replace("R$ ", "") : "0"}</text>`;
-  }
-  dados.forEach((m, i) => {
-    const x = 56 + i * passo, w = Math.min(34, passo / 2.6);
-    const he = Math.max(2, base - y(m.estimado)), hh = Math.max(2, base - y(m.valor));
-    g += `<rect x="${x}" y="${y(m.estimado)}" width="${w}" height="${he}" rx="4"
-            fill="var(--s1)" opacity=".32"
-            ${dtip(compacto(m.estimado), `${MES[m.mes - 1]} · estimado`)}/>
-          <rect x="${x + w + 2}" y="${y(m.valor)}" width="${w}" height="${hh}" rx="4"
-            fill="var(--s1)" ${dtip(compacto(m.valor), `${MES[m.mes - 1]
-              } · homologado · ${m.n} ${m.n === 1 ? "processo" : "processos"}`)}/>
-          <text class="rot" x="${x + w + 1}" y="${base + 16}" text-anchor="middle"
-            >${MES[m.mes - 1]}</text>`;
-  });
-  return svg(larg, alto + 26, g) + `<div class="leg">
-    <span><i style="background:var(--s1);opacity:.32"></i>Estimado</span>
+  el.innerHTML = `<div class="graf-echart" style="height:196px"></div>
+    <div class="leg"><span><i style="background:var(--s1);opacity:.32"></i>Estimado</span>
     <span><i style="background:var(--s1)"></i>Homologado</span></div>`;
+  const chart = _iniciarEchart(el.querySelector(".graf-echart"));
+  chart.setOption({
+    animation: false,
+    grid: { left: 8, right: 8, top: 10, bottom: 8, containLabel: true },
+    xAxis: { type: "category", data: dados.map(m => MES[m.mes - 1]),
+      axisLine: { lineStyle: { color: COR_EIXO } }, axisTick: { show: false },
+      axisLabel: ROT_TXT },
+    yAxis: { type: "value", min: 0, axisLabel: { ...ROT_TXT,
+        formatter: v => compacto(v).replace("R$ ", "") },
+      splitLine: { lineStyle: { color: COR_EIXO, opacity: .55 } } },
+    series: [
+      { name: "Estimado", type: "bar", data: dados.map(m => m.estimado || 0),
+        itemStyle: { color: "var(--s1)", opacity: .32, borderRadius: [4, 4, 0, 0] },
+        emphasis: { disabled: true } },
+      { name: "Homologado", type: "bar", data: dados.map(m => m.valor || 0),
+        itemStyle: { color: "var(--s1)", borderRadius: [4, 4, 0, 0] },
+        emphasis: { disabled: true } }
+    ]
+  });
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    const m = dados[p.dataIndex];
+    const rotulo = p.seriesName === "Homologado"
+      ? `${MES[m.mes - 1]} · homologado · ${m.n} ${m.n === 1 ? "processo" : "processos"}`
+      : `${MES[m.mes - 1]} · estimado`;
+    mostrarTt(..._ptEvento(p), [{ v: compacto(p.value), l: rotulo }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── barras horizontais, uma série, rótulo direto ──────────────────────────
-function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 360) {
-  if (!itens.length) return `<div class="vazio">Sem dados no exercício.</div>`;
-  const max = Math.max(...itens.map(valor)) || 1;
-  const linha = 40;
-  let g = "";
-  itens.forEach((it, i) => {
-    const y = i * linha + 18, w = Math.max(3, (valor(it) / max) * (larg - 110));
-    g += `<text class="rot" x="0" y="${y - 6}">${esc(rotulo(it))}${
-            sub ? ` · ${esc(sub(it))}` : ""}</text>
-          <rect x="0" y="${y}" width="${w}" height="17" rx="4" fill="${cor}"
-            ${dtip(compacto(valor(it)), rotulo(it))}/>
-          <text class="val" x="${w + 8}" y="${y + 14}">${compacto(valor(it))}</text>`;
+// Mesmo layout de app.js:desenharBarrasEcharts (rótulo como eixo à
+// esquerda, valor ao final da barra) — os dois motores usam a mesma
+// convenção agora, onde antes o Painel desenhava o rótulo acima da barra.
+function grafBarras(el, itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 360) {
+  if (!itens.length) {
+    el.innerHTML = `<div class="vazio">Sem dados no exercício.</div>`;
+    return;
+  }
+  el.style.height = Math.max(120, itens.length * 36 + 20) + "px";
+  const chart = _iniciarEchart(el);
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 70, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: "value", show: false },
+    yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+    series: [{ type: "bar", barWidth: 17,
+      data: itens.map(it => ({ value: valor(it) || 0,
+        _rotuloValor: compacto(valor(it)) + (sub ? " · " + sub(it) : ""),
+        itemStyle: { color: cor, borderRadius: [0, 4, 4, 0] } })),
+      emphasis: { disabled: true },
+      label: { show: true, position: "right", ...VAL_TXT,
+        formatter: p => p.data._rotuloValor } }]
   });
-  return svg(larg, itens.length * linha + 6, g);
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    const it = itens[p.dataIndex];
+    mostrarTt(..._ptEvento(p), [{ v: compacto(valor(it)), l: rotulo(it) }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── linhas do acumulado: ano corrente em destaque, anteriores em contexto ──
@@ -195,318 +242,449 @@ function grafBarras(itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 360) 
 // vale sem hover nenhum. Passar o mouse troca para um corte vertical: a
 // pergunta deixa de ser "quanto o ano atual acumulou" e vira "o que os três
 // anos valiam neste mês", com uma linha só no tooltip por ano.
-function grafSeries(series, anoAtual, larg = 1000) {
+// A linha em si vem do ECharts; o corte vertical (crosshair) continua
+// desenhado à mão, num SVG-overlay por cima do <div> do ECharts — mesmo
+// contrato de dados de antes (data-cross-hit/guia/pt/serie-padrao), só
+// que as coordenadas agora vêm de chart.convertToPixel/FromPixel em vez
+// de fórmula própria, pra nunca descolar da grade que o ECharts desenhou.
+function grafSeries(el, series, anoAtual) {
   const anos = Object.keys(series).sort();
   const todos = anos.flatMap(a => series[a]);
-  if (!todos.some(v => v))
-    return { html: `<div class="vazio">Sem histórico para comparar.</div>` };
-  // 90px à direita ficam para os rótulos dos anos: fora da área do plot,
-  // dentro do viewBox — senão o texto sai cortado na borda
-  const base = 170, e = escala(Math.max(...todos));
-  const ultimoMesAtual = Math.min(new Date().getMonth(), 11);
-  const passoX = (larg - 150) / 11;
-  const x = (i) => 56 + i * passoX;
-  const y = (v) => base - (v / e.topo) * (base - 26);
-  let g = "";
-  for (let v = 0; v <= e.topo + 1e-6; v += e.passo) {
-    g += `<line class="eixo" x1="52" y1="${y(v)}" x2="${larg - 20}" y2="${y(v)}"
-            opacity="${v ? .55 : 1}"/>
-          <text class="rot" x="48" y="${y(v) + 4}" text-anchor="end"
-            >${v ? compacto(v).replace("R$ ", "") : "0"}</text>`;
+  if (!todos.some(v => v)) {
+    el.innerHTML = `<div class="vazio">Sem histórico para comparar.</div>`;
+    return;
   }
-  [0, 2, 4, 6, 8, 10].forEach(i =>
-    g += `<text class="rot" x="${x(i)}" y="${base + 18}" text-anchor="middle"
-           >${MES[i]}</text>`);
+  const ultimoMesAtual = Math.min(new Date().getMonth(), 11);
+  el.innerHTML = `<div style="position:relative">
+    <div class="graf-echart" style="height:220px"></div>
+    <svg data-overlay aria-hidden="true"
+      style="position:absolute;inset:0"></svg></div>`;
+  const alvoChart = el.querySelector(".graf-echart");
+  const overlay = el.querySelector("svg[data-overlay]");
+  const chart = _iniciarEchart(alvoChart);
   const cores = {};
-  anos.forEach((ano, k) => {
-    const atual = ano === String(anoAtual);
-    cores[ano] = atual ? "var(--s1)" : "var(--muted)";
-    // o ano em curso só tem pontos até o mês corrente; os outros, o ano todo
-    const pontos = series[ano]
-      .map((v, i) => (atual && i > ultimoMesAtual) ? null : `${x(i)},${y(v)}`)
-      .filter(Boolean).join(" ");
-    g += `<polyline fill="none" points="${pontos}" stroke="${cores[ano]}"
-            stroke-width="${atual ? 2.5 : 2}"
-            opacity="${atual ? 1 : (0.4 + k * 0.18)}"/>`;
-    if (atual) {
-      g += `<circle data-serie-padrao cx="${x(ultimoMesAtual)}"
-              cy="${y(series[ano][ultimoMesAtual])}" r="4" fill="var(--s1)"
+  chart.setOption({
+    animation: false,
+    grid: { left: 8, right: 92, top: 12, bottom: 8, containLabel: true },
+    xAxis: { type: "category", data: MES, boundaryGap: false,
+      axisLine: { lineStyle: { color: COR_EIXO } }, axisTick: { show: false },
+      axisLabel: ROT_TXT },
+    yAxis: { type: "value", min: 0, axisLabel: { ...ROT_TXT,
+        formatter: v => compacto(v).replace("R$ ", "") },
+      splitLine: { lineStyle: { color: COR_EIXO, opacity: .55 } } },
+    series: anos.map((ano, k) => {
+      const atual = ano === String(anoAtual);
+      cores[ano] = atual ? "var(--s1)" : "var(--muted)";
+      // o ano em curso só tem pontos até o mês corrente; os outros, o ano todo
+      return { name: ano, type: "line", symbol: "none", silent: true,
+        data: series[ano].map((v, i) => (atual && i > ultimoMesAtual) ? null : v),
+        lineStyle: { color: cores[ano], width: atual ? 2.5 : 2 },
+        opacity: atual ? 1 : (0.4 + k * 0.18) };
+    })
+  });
+  const larguraPx = alvoChart.clientWidth, alturaPx = alvoChart.clientHeight;
+  overlay.setAttribute("width", larguraPx);
+  overlay.setAttribute("height", alturaPx);
+  const pxCoord = (i, v) => chart.convertToPixel({ gridIndex: 0 }, [i, v]);
+
+  let g = "";
+  anos.forEach(ano => {
+    if (ano === String(anoAtual)) {
+      const [cx, cy] = pxCoord(ultimoMesAtual, series[ano][ultimoMesAtual]);
+      g += `<circle data-serie-padrao cx="${cx}" cy="${cy}" r="4" fill="var(--s1)"
               stroke="var(--surface)" stroke-width="2" opacity="1"/>
             <text data-serie-padrao class="val" opacity="1"
-              x="${x(ultimoMesAtual) + 10}" y="${y(series[ano][ultimoMesAtual]) - 2}"
-              fill="var(--s1)" font-weight="600">${ano} · ${
+              x="${cx + 10}" y="${cy - 2}"
+              fill="var(--s1)" font-weight="600">${esc(ano)} · ${
                 compacto(series[ano][ultimoMesAtual])}</text>`;
     } else {
-      g += `<text class="rot" x="${x(11) + 10}" y="${y(series[ano][11]) + 4}"
-              >${ano}</text>`;
+      const [ex, ey] = pxCoord(11, series[ano][11]);
+      g += `<text class="rot" x="${ex + 10}" y="${ey + 4}">${esc(ano)}</text>`;
     }
   });
   // corte vertical: começa invisível (opacity 0), a camada de interação
   // abaixo é quem liga. O retângulo de captura vem por último — precisa
   // estar por cima de tudo para nunca perder o ponteiro para uma linha.
-  g += `<line data-cross-guia x1="0" y1="18" x2="0" y2="${base}"
+  g += `<line data-cross-guia x1="0" y1="4" x2="0" y2="${alturaPx - 22}"
           stroke="var(--border)" stroke-width="1" opacity="0"/>`;
   anos.forEach(ano => g += `<circle data-cross-pt="${esc(ano)}" r="4"
     fill="${cores[ano]}" stroke="var(--surface)" stroke-width="2" opacity="0"/>`);
-  g += `<rect data-cross-hit x="46" y="14" width="${larg - 66}"
-          height="${base - 8}" fill="none" pointer-events="all"/>`;
-  const html = svg(larg, base + 30, g);
-  return { html, ligar(container) {
-    const raiz = container.querySelector("svg");
-    const hit = raiz.querySelector("[data-cross-hit]");
-    const guia = raiz.querySelector("[data-cross-guia]");
-    const pontosPadrao = raiz.querySelectorAll("[data-serie-padrao]");
-    const pontosCorte = {};
-    raiz.querySelectorAll("[data-cross-pt]").forEach(c =>
-      pontosCorte[c.dataset.crossPt] = c);
-    function mover(evt) {
-      evt.stopPropagation();
-      const r = raiz.getBoundingClientRect();
-      const px = (evt.clientX - r.left) * (larg / r.width);
-      const i = Math.max(0, Math.min(11, Math.round((px - 56) / passoX)));
-      guia.setAttribute("x1", x(i));
-      guia.setAttribute("x2", x(i));
-      guia.setAttribute("opacity", "1");
-      pontosPadrao.forEach(el => el.setAttribute("opacity", "0"));
-      const linhas = [];
-      anos.forEach(ano => {
-        const ponto = pontosCorte[ano];
-        if (ano === String(anoAtual) && i > ultimoMesAtual) {
-          ponto.setAttribute("opacity", "0");
-          return;
-        }
-        const v = series[ano][i];
-        ponto.setAttribute("cx", x(i));
-        ponto.setAttribute("cy", y(v));
-        ponto.setAttribute("opacity", "1");
-        linhas.push({ v: compacto(v), l: ano, cor: cores[ano] });
-      });
-      // ano corrente primeiro: é o que o leitor veio comparar
-      linhas.sort((a, b) => (b.l === String(anoAtual)) - (a.l === String(anoAtual)));
-      mostrarTt(evt.clientX, evt.clientY, linhas, MES[i]);
-    }
-    hit.addEventListener("pointermove", mover);
-    hit.addEventListener("pointerleave", (evt) => {
-      evt.stopPropagation();
-      guia.setAttribute("opacity", "0");
-      Object.values(pontosCorte).forEach(el => el.setAttribute("opacity", "0"));
-      pontosPadrao.forEach(el => el.setAttribute("opacity", "1"));
-      esconderTt();
+  g += `<rect data-cross-hit x="0" y="0" width="${larguraPx}" height="${alturaPx}"
+          fill="none" pointer-events="all"/>`;
+  overlay.innerHTML = g;
+
+  const hit = overlay.querySelector("[data-cross-hit]");
+  const guia = overlay.querySelector("[data-cross-guia]");
+  const pontosPadrao = overlay.querySelectorAll("[data-serie-padrao]");
+  const pontosCorte = {};
+  overlay.querySelectorAll("[data-cross-pt]").forEach(c =>
+    pontosCorte[c.dataset.crossPt] = c);
+  function mover(evt) {
+    // sem isto, o listener delegado de tooltip em #painel (ligarTooltips)
+    // via bolha o mesmo evento, não acha data-tip-v no alvo e chama
+    // esconderTt() por cima do que este handler acabou de mostrar
+    evt.stopPropagation();
+    const r = overlay.getBoundingClientRect();
+    const [iBruto] = chart.convertFromPixel({ gridIndex: 0 },
+      [evt.clientX - r.left, evt.clientY - r.top]);
+    const i = Math.max(0, Math.min(11, Math.round(iBruto)));
+    const [gx] = pxCoord(i, 0);
+    guia.setAttribute("x1", gx);
+    guia.setAttribute("x2", gx);
+    guia.setAttribute("opacity", "1");
+    pontosPadrao.forEach(pt => pt.setAttribute("opacity", "0"));
+    const linhas = [];
+    anos.forEach(ano => {
+      const ponto = pontosCorte[ano];
+      if (ano === String(anoAtual) && i > ultimoMesAtual) {
+        ponto.setAttribute("opacity", "0");
+        return;
+      }
+      const v = series[ano][i];
+      const [cx, cy] = pxCoord(i, v);
+      ponto.setAttribute("cx", cx);
+      ponto.setAttribute("cy", cy);
+      ponto.setAttribute("opacity", "1");
+      linhas.push({ v: compacto(v), l: ano, cor: cores[ano] });
     });
-  } };
+    // ano corrente primeiro: é o que o leitor veio comparar
+    linhas.sort((a, b) => (b.l === String(anoAtual)) - (a.l === String(anoAtual)));
+    mostrarTt(evt.clientX, evt.clientY, linhas, MES[i]);
+  }
+  hit.addEventListener("pointermove", mover);
+  hit.addEventListener("pointerleave", () => {
+    guia.setAttribute("opacity", "0");
+    Object.values(pontosCorte).forEach(pt => pt.setAttribute("opacity", "0"));
+    pontosPadrao.forEach(pt => pt.setAttribute("opacity", "1"));
+    esconderTt();
+  });
 }
 
 // ── deságio: economia à direita, estouro à esquerda do zero ───────────────
-function grafDesagio(desagios, larg = 500) {
-  if (!desagios.length)
-    return `<div class="vazio">Nenhuma contratação com valor estimado e
+function grafDesagio(el, desagios, larg = 500) {
+  if (!desagios.length) {
+    el.innerHTML = `<div class="vazio">Nenhuma contratação com valor estimado e
             homologado no exercício.</div>`;
-  const linha = 37, meio = Math.round(larg * 0.42);
+    return;
+  }
+  el.innerHTML = `<div class="graf-echart" style="height:${
+    Math.max(120, desagios.length * 34 + 10)}px"></div>
+    <div class="leg" style="justify-content:space-between">
+      <span>acima do estimado</span><span>economia</span></div>`;
+  const chart = _iniciarEchart(el.querySelector(".graf-echart"));
   const max = Math.max(20, ...desagios.map(d => Math.abs(d.pct)));
-  let g = `<line x1="${meio}" y1="10" x2="${meio}" y2="${desagios.length * linha + 6}"
-             class="eixo"/>`;
-  desagios.forEach((d, i) => {
-    const y = i * linha + 14;
-    const w = Math.max(3, (Math.abs(d.pct) / max) * (meio - 120));
-    const economia = d.pct >= 0;
-    g += `<rect x="${economia ? meio : meio - w}" y="${y}" width="${w}" height="17"
-            rx="4" fill="${economia ? "var(--s3)" : "var(--s2)"}"
-            ${dtip(pct(d.pct), `${d.modalidade} · ${
-              economia ? "de deságio" : "acima do estimado"} · ${d.n} ${
-              d.n === 1 ? "processo" : "processos"}`)}/>
-          <text class="val" x="${economia ? meio + w + 8 : meio - w - 8}"
-            y="${y + 14}" text-anchor="${economia ? "start" : "end"}"
-            >${pct(d.pct)}</text>
-          <text class="rot" x="${economia ? meio - 8 : meio - w - 52}" y="${y + 14}"
-            text-anchor="end">${esc(d.modalidade)}</text>`;
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 8, top: 8, bottom: 4, containLabel: true },
+    xAxis: { type: "value", min: -max, max, axisLabel: { show: false },
+      axisLine: { show: false }, splitLine: { show: false } },
+    yAxis: { type: "category", inverse: true,
+      data: desagios.map(d => d.modalidade ?? "–"),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+    series: [
+      { name: "economia", type: "bar", barWidth: 17,
+        data: desagios.map(d => d.pct >= 0 ? d.pct : null),
+        itemStyle: { color: "var(--s3)", borderRadius: [0, 4, 4, 0] },
+        emphasis: { disabled: true },
+        label: { show: true, position: "right", ...VAL_TXT,
+          formatter: p => pct(p.value) } },
+      { name: "estouro", type: "bar", barWidth: 17,
+        data: desagios.map(d => d.pct < 0 ? d.pct : null),
+        itemStyle: { color: "var(--s2)", borderRadius: [4, 0, 0, 4] },
+        emphasis: { disabled: true },
+        label: { show: true, position: "left", ...VAL_TXT,
+          formatter: p => pct(p.value) } }
+    ]
   });
-  const meia = (larg - meio) / 2;
-  g += `<text class="rot" x="${meio}" y="${desagios.length * linha + 22}"
-          text-anchor="middle">0%</text>
-        <text class="rot" x="${Math.max(70, meio - meia)}"
-          y="${desagios.length * linha + 22}" text-anchor="middle"
-          >acima do estimado</text>
-        <text class="rot" x="${meio + meia}" y="${desagios.length * linha + 22}"
-          text-anchor="middle">economia</text>`;
-  return svg(larg, desagios.length * linha + 30, g);
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    const d = desagios[p.dataIndex];
+    mostrarTt(..._ptEvento(p), [{ v: pct(d.pct), l: `${d.modalidade} · ${
+      d.pct >= 0 ? "de deságio" : "acima do estimado"} · ${d.n} ${
+      d.n === 1 ? "processo" : "processos"}` }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── concentração: curva do valor acumulado por fornecedor ─────────────────
 // O ponto e o rótulo padrão (10º fornecedor) valem em repouso; passar o
 // mouse troca para o fornecedor apontado, em qualquer posição da curva.
-function grafConcentracao(curva, total, larg = 500) {
-  if (curva.length < 3)
-    return { html: `<div class="vazio">Poucos fornecedores para medir
-             concentração.</div>` };
-  const alto = 190, x0 = 40, y0 = 160;
-  const px = (i) => x0 + (i / (curva.length - 1)) * (larg - 60);
-  const py = (v) => y0 - (v / 100) * (y0 - 20);
-  const pontos = curva.map((v, i) => `${px(i)},${py(v)}`).join(" ");
+function grafConcentracao(el, curva, total) {
+  if (curva.length < 3) {
+    el.innerHTML = `<div class="vazio">Poucos fornecedores para medir
+             concentração.</div>`;
+    return;
+  }
   // destacar o último ponto seria dizer "todos os fornecedores = 100%", que
   // não informa nada — e o rótulo cairia em cima do fim da curva
   const dez = Math.min(9, Math.max(0, curva.length - 2));
-  const aDireita = px(dez) < larg - 260;
-  const html = svg(larg, alto, `
-    <line class="eixo" x1="${x0}" y1="${y0}" x2="${larg - 20}" y2="${y0}"/>
-    <line class="eixo" x1="${x0}" y1="20" x2="${x0}" y2="${y0}"/>
-    <polyline fill="none" points="${px(0)},${y0} ${px(curva.length - 1)},${py(100)}"
-      stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>
-    <polyline fill="none" points="${px(0)},${y0} ${pontos}" stroke="var(--s1)"
-      stroke-width="2.5"/>
-    <circle data-serie-padrao cx="${px(dez)}" cy="${py(curva[dez])}" r="4"
-      fill="var(--s1)" stroke="var(--surface)" stroke-width="2" opacity="1"/>
+  el.innerHTML = `<div style="position:relative">
+    <div class="graf-echart" style="height:190px"></div>
+    <svg data-overlay aria-hidden="true"
+      style="position:absolute;inset:0"></svg></div>`;
+  const alvoChart = el.querySelector(".graf-echart");
+  const overlay = el.querySelector("svg[data-overlay]");
+  const chart = _iniciarEchart(alvoChart);
+  chart.setOption({
+    animation: false,
+    grid: { left: 8, right: 12, top: 8, bottom: 30, containLabel: true },
+    xAxis: { type: "value", min: 0, max: curva.length - 1, show: false },
+    yAxis: { type: "value", min: 0, max: 100, show: false },
+    series: [
+      { type: "line", symbol: "none", silent: true,
+        data: [[0, 0], [curva.length - 1, 100]],
+        lineStyle: { color: "var(--muted)", width: 1.5, type: "dashed",
+          opacity: .6 } },
+      { type: "line", symbol: "none", silent: true,
+        data: curva.map((v, i) => [i, v]),
+        lineStyle: { color: "var(--s1)", width: 2.5 } }
+    ]
+  });
+  const larguraPx = alvoChart.clientWidth, alturaPx = alvoChart.clientHeight;
+  overlay.setAttribute("width", larguraPx);
+  overlay.setAttribute("height", alturaPx);
+  const pxCoord = (i, v) => chart.convertToPixel({ gridIndex: 0 }, [i, v]);
+
+  const [px0] = pxCoord(0, 0), [pxN] = pxCoord(curva.length - 1, 0);
+  const [dx, dy] = pxCoord(dez, curva[dez]);
+  const aDireita = dx < px0 + (pxN - px0) * 0.7;
+  let g = `<text class="rot" x="0" y="${alturaPx - 6}">1</text>
+    <text class="rot" x="${larguraPx}" y="${alturaPx - 6}" text-anchor="end"
+      >${total}</text>
+    <text class="rot" x="${larguraPx / 2}" y="${alturaPx - 6}" text-anchor="middle"
+      >fornecedores, do maior para o menor</text>
+    <circle data-serie-padrao cx="${dx}" cy="${dy}" r="4" fill="var(--s1)"
+      stroke="var(--surface)" stroke-width="2" opacity="1"/>
     <text data-serie-padrao class="val" opacity="1"
-      x="${px(dez) + (aDireita ? 10 : -10)}"
-      y="${py(curva[dez]) + 20}"
+      x="${dx + (aDireita ? 10 : -10)}" y="${dy + 20}"
       text-anchor="${aDireita ? "start" : "end"}"
       >${dez + 1} ${dez ? "fornecedores" : "fornecedor"} = ${
         pct(curva[dez], 0)} do valor</text>
-    <text class="rot" x="${x0}" y="${y0 + 16}">1</text>
-    <text class="rot" x="${larg - 24}" y="${y0 + 16}" text-anchor="end">${total}</text>
-    <text class="rot" x="${larg / 2}" y="${y0 + 16}" text-anchor="middle"
-      >fornecedores, do maior para o menor</text>
-    <line data-cross-guia x1="0" y1="20" x2="0" y2="${y0}"
+    <line data-cross-guia x1="0" y1="4" x2="0" y2="${alturaPx - 22}"
       stroke="var(--border)" stroke-width="1" opacity="0"/>
     <circle data-cross-pt r="4" fill="var(--s1)" stroke="var(--surface)"
       stroke-width="2" opacity="0"/>
-    <rect data-cross-hit x="${x0}" y="14" width="${larg - 60}"
-      height="${y0 - 8}" fill="none" pointer-events="all"/>`);
-  return { html, ligar(container) {
-    const raiz = container.querySelector("svg");
-    const hit = raiz.querySelector("[data-cross-hit]");
-    const guia = raiz.querySelector("[data-cross-guia]");
-    const ponto = raiz.querySelector("[data-cross-pt]");
-    const padrao = raiz.querySelectorAll("[data-serie-padrao]");
-    function mover(evt) {
-      evt.stopPropagation();
-      const r = raiz.getBoundingClientRect();
-      const pxCursor = (evt.clientX - r.left) * (larg / r.width);
-      const i = Math.max(0, Math.min(curva.length - 1, Math.round(
-        (pxCursor - x0) / (larg - 60) * (curva.length - 1))));
-      guia.setAttribute("x1", px(i));
-      guia.setAttribute("x2", px(i));
-      guia.setAttribute("opacity", "1");
-      ponto.setAttribute("cx", px(i));
-      ponto.setAttribute("cy", py(curva[i]));
-      ponto.setAttribute("opacity", "1");
-      padrao.forEach(el => el.setAttribute("opacity", "0"));
-      mostrarTt(evt.clientX, evt.clientY, [{
-        v: `${pct(curva[i], 0)} do valor`,
-        l: `${i + 1} ${i ? "fornecedores" : "fornecedor"}` }]);
-    }
-    hit.addEventListener("pointermove", mover);
-    hit.addEventListener("pointerleave", (evt) => {
-      evt.stopPropagation();
-      guia.setAttribute("opacity", "0");
-      ponto.setAttribute("opacity", "0");
-      padrao.forEach(el => el.setAttribute("opacity", "1"));
-      esconderTt();
-    });
-  } };
+    <rect data-cross-hit x="0" y="0" width="${larguraPx}" height="${alturaPx}"
+      fill="none" pointer-events="all"/>`;
+  overlay.innerHTML = g;
+
+  const hit = overlay.querySelector("[data-cross-hit]");
+  const guia = overlay.querySelector("[data-cross-guia]");
+  const ponto = overlay.querySelector("[data-cross-pt]");
+  const padrao = overlay.querySelectorAll("[data-serie-padrao]");
+  function mover(evt) {
+    evt.stopPropagation();
+    const r = overlay.getBoundingClientRect();
+    const [iBruto] = chart.convertFromPixel({ gridIndex: 0 },
+      [evt.clientX - r.left, evt.clientY - r.top]);
+    const i = Math.max(0, Math.min(curva.length - 1, Math.round(iBruto)));
+    const [cx, cy] = pxCoord(i, curva[i]);
+    guia.setAttribute("x1", cx);
+    guia.setAttribute("x2", cx);
+    guia.setAttribute("opacity", "1");
+    ponto.setAttribute("cx", cx);
+    ponto.setAttribute("cy", cy);
+    ponto.setAttribute("opacity", "1");
+    padrao.forEach(pt => pt.setAttribute("opacity", "0"));
+    mostrarTt(evt.clientX, evt.clientY, [{
+      v: `${pct(curva[i], 0)} do valor`,
+      l: `${i + 1} ${i ? "fornecedores" : "fornecedor"}` }]);
+  }
+  hit.addEventListener("pointermove", mover);
+  hit.addEventListener("pointerleave", () => {
+    guia.setAttribute("opacity", "0");
+    ponto.setAttribute("opacity", "0");
+    padrao.forEach(pt => pt.setAttribute("opacity", "1"));
+    esconderTt();
+  });
 }
 
 // ── calor: processos por mês e modalidade, rampa de uma cor só ────────────
-function grafCalor(calor, meses, larg = 1000) {
+function grafCalor(el, calor, meses) {
   const linhas = Object.entries(calor);
   const todos = linhas.flatMap(([, v]) => v);
-  if (!todos.some(v => v)) return `<div class="vazio">Sem processos no exercício.</div>`;
+  if (!todos.some(v => v)) {
+    el.innerHTML = `<div class="vazio">Sem processos no exercício.</div>`;
+    return;
+  }
   const max = Math.max(...todos);
-  const cel = 96, alt = 24;
-  const passo = Math.min(cel, (larg - 180) / meses.length - 4);
-  let g = "";
-  linhas.forEach(([nome, valores], i) => {
-    const y = 22 + i * 34;
-    g += `<text class="rot" x="150" y="${y + 16}" text-anchor="end">${esc(nome)}</text>`;
-    valores.forEach((v, m) => {
-      const nivel = !v ? 1 : Math.min(5, 1 + Math.ceil((v / max) * 4));
-      g += `<rect x="${160 + m * (passo + 4)}" y="${y}" width="${passo}"
-              height="${alt}" rx="3" fill="var(--seq${nivel})"
-              ${dtip(`${v} ${v === 1 ? "processo" : "processos"}`,
-                `${MES[m]} · ${nome}`)}/>`;
-    });
+  const nivel = (v) => !v ? 1 : Math.min(5, 1 + Math.ceil((v / max) * 4));
+  // legenda alinhada à direita: em cima ela disputava espaço com a última
+  // coluna de meses e saía cortada
+  el.innerHTML = `<div class="graf-echart" style="height:${
+    linhas.length * 34 + 50}px"></div>
+    <div class="leg" style="justify-content:flex-end;align-items:center;gap:5px">
+      <span>menos</span>${[1, 2, 3, 4, 5].map(n =>
+        `<i style="width:22px;height:13px;border-radius:2px;background:var(--seq${n})"></i>`
+      ).join("")}<span>mais processos</span></div>`;
+  const chart = _iniciarEchart(el.querySelector(".graf-echart"));
+  const data = [];
+  linhas.forEach(([, valores], i) => valores.forEach((v, m) =>
+    data.push({ value: [m, i, v || 0], itemStyle: { color: `var(--seq${nivel(v)})` } })));
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 8, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: "category", data: meses.map(m => MES[m - 1]),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+    yAxis: { type: "category", inverse: true, data: linhas.map(([nome]) => nome),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+    series: [{ type: "heatmap", data,
+      itemStyle: { borderColor: "var(--surface)", borderWidth: 2, borderRadius: 3 },
+      emphasis: { disabled: true } }]
   });
-  meses.forEach((m, i) =>
-    g += `<text class="rot" x="${160 + i * (passo + 4) + passo / 2}"
-            y="${28 + linhas.length * 34}" text-anchor="middle">${MES[m - 1]}</text>`);
-  // legenda embaixo, alinhada à direita: em cima ela disputava espaço com a
-  // última coluna de meses e saía cortada
-  const ly = 42 + linhas.length * 34, lx = larg - 250;
-  g += `<text class="rot" x="${lx - 6}" y="${ly + 11}" text-anchor="end">menos</text>`;
-  for (let n = 1; n <= 5; n++)
-    g += `<rect x="${lx + (n - 1) * 28}" y="${ly}" width="26" height="14" rx="2"
-            fill="var(--seq${n})"/>`;
-  g += `<text class="rot" x="${lx + 146}" y="${ly + 11}">mais processos</text>`;
-  return svg(larg, ly + 22, g);
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    const [m, i, v] = p.value;
+    mostrarTt(..._ptEvento(p), [{ v: `${v} ${v === 1 ? "processo" : "processos"}`,
+      l: `${MES[m]} · ${linhas[i][0]}` }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── medidores do limite anual de dispensa ─────────────────────────────────
-function grafLimites(objetos, limite, larg = 500) {
-  if (!objetos.length)
-    return `<div class="vazio">Nenhuma dispensa registrada no exercício.</div>`;
-  const bloco = 66;
-  let g = "";
-  objetos.forEach((o, i) => {
-    const y = i * bloco + 16;
-    const cheio = larg - 60;
-    const w = Math.min(1, (o.pct || 0) / 100) * cheio;
-    const estourou = o.pct > 100;
-    const cor = o.pct >= 90 ? "var(--erro)" : o.pct >= 75 ? "var(--warn)"
-                                                          : "var(--s3)";
-    // barra cheia diz "chegou ao limite"; passar dele é outra informação, e
-    // "874%" numa barra igual à de 100% esconde justamente a gravidade
+function grafLimites(el, objetos, limite, larg = 500) {
+  if (!objetos.length) {
+    el.innerHTML = `<div class="vazio">Nenhuma dispensa registrada no exercício.</div>`;
+    return;
+  }
+  el.style.height = (objetos.length * 44 + 10) + "px";
+  const chart = _iniciarEchart(el);
+  const cor = (o) => o.pct >= 90 ? "var(--erro)" : o.pct >= 75 ? "var(--warn)"
+                                                                : "var(--s3)";
+  // barra cheia diz "chegou ao limite"; passar dele é outra informação, e
+  // "874%" numa barra igual à de 100% esconde justamente a gravidade — o
+  // valor em R$ (mais largo, variável) fica só no tooltip; o rótulo
+  // sempre visível é curto de propósito, pra nunca ser cortado pela borda
+  // do cartão (achado da verificação visual: "R$ 165.322,98 · 264% do..."
+  // saía cortado com grid.right estreito demais)
+  const rotuloStatus = (o) => {
     const vezes = (o.pct / 100).toFixed(1).replace(".", ",");
-    g += `<text class="rot" x="0" y="${y - 4}">${esc(o.objeto)} · ${o.n} ${
-            o.n === 1 ? "dispensa" : "dispensas"}</text>
-          <rect x="0" y="${y}" width="${cheio}" height="14" rx="4"
-            fill="var(--surface2)"/>
-          <rect x="0" y="${y}" width="${Math.max(3, w)}" height="14" rx="4"
-            fill="${cor}" ${dtip(dinheiro(o.total),
-              `${o.objeto} · de ${dinheiro(limite)}`)}/>${estourou ? `
-          <path d="M${cheio - 1},${y - 3} l10,10 l-10,10 z" fill="var(--erro)"
-            ${dtip("Acima do limite", o.objeto)}/>` : ""}
-          <text class="val" x="0" y="${y + 30}">${dinheiro(o.total)} · <tspan
-            fill="${cor}" font-weight="600">${estourou
-              ? `${vezes}× o limite` : `${pct(o.pct, 0)} do limite`}</tspan></text>`;
+    return o.pct > 100 ? `${vezes}× o limite` : `${pct(o.pct, 0)} do limite`;
+  };
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 110, top: 4, bottom: 4, containLabel: true },
+    xAxis: { type: "value", min: 0, max: 100, show: false },
+    yAxis: { type: "category", inverse: true,
+      data: objetos.map(o => `${o.objeto} · ${o.n} ${
+        o.n === 1 ? "dispensa" : "dispensas"}`),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+    series: [
+      { name: "trilho", type: "bar", barWidth: 14, barGap: "-100%", silent: true,
+        data: objetos.map(() => 100),
+        itemStyle: { color: "var(--surface2)", borderRadius: 4 } },
+      { name: "limite", type: "bar", barWidth: 14,
+        data: objetos.map(o => ({ value: Math.min(100, o.pct || 0),
+          itemStyle: { color: cor(o), borderRadius: 4 } })),
+        emphasis: { disabled: true },
+        // distance maior que o normal: a seta de estouro (abaixo) mora bem
+        // ali no fim da barra e sem essa folga o rótulo nascia por cima
+        // dela — achado da verificação visual (2026-08-13)
+        label: { show: true, position: "right", distance: 16, ...VAL_TXT,
+          formatter: p => rotuloStatus(objetos[p.dataIndex]) },
+        markPoint: { symbol: "triangle", symbolSize: 9, silent: true,
+          data: objetos.flatMap((o, i) => o.pct > 100
+            ? [{ coord: [100, i], itemStyle: { color: "var(--erro)" },
+                 symbolOffset: [6, 0], symbolRotate: 90 }] : []) }
+      }
+    ]
   });
-  return svg(larg, objetos.length * bloco + 6, g);
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series" || p.seriesName !== "limite") return;
+    const o = objetos[p.dataIndex];
+    mostrarTt(..._ptEvento(p),
+      [{ v: dinheiro(o.total), l: `${o.objeto} · de ${dinheiro(limite)}` }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── funil: onde os processos do exercício pararam ─────────────────────────
-function grafFunil(f, larg = 500) {
+function grafFunil(el, f, larg = 500) {
   const etapas = [["Publicadas", f.publicadas], ["Com resultado", f.com_resultado],
                   ["Com contrato", f.com_contrato], ["Vigentes hoje", f.vigentes]];
   const max = etapas[0][1] || 1;
-  let g = "";
-  etapas.forEach(([nome, v], i) => {
-    const y = i * 40 + 14, w = Math.max(6, (v / max) * (larg - 70));
-    g += `<rect x="0" y="${y}" width="${w}" height="26" rx="4" fill="var(--s1)"
-            opacity="${0.85 - i * 0.15}" ${dtip(v, nome)}/>
-          <text class="val" x="${w + 10}" y="${y + 18}">${v}</text>
-          <text class="val" x="10" y="${y + 18}"
-            fill="${i < 2 ? "var(--accent-fg)" : "var(--text)"}">${nome}</text>`;
+  el.style.height = (etapas.length * 40 + 10) + "px";
+  const chart = _iniciarEchart(el);
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 40, top: 4, bottom: 4, containLabel: true },
+    xAxis: { type: "value", max, show: false },
+    yAxis: { type: "category", inverse: true, data: etapas.map(([nome]) => nome),
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: VAL_TXT },
+    series: [{ type: "bar", barWidth: 26,
+      data: etapas.map(([, v], i) => ({ value: v,
+        itemStyle: { color: "var(--s1)", opacity: 0.85 - i * 0.15,
+                     borderRadius: [0, 4, 4, 0] } })),
+      emphasis: { disabled: true },
+      label: { show: true, position: "right", ...VAL_TXT } }]
   });
-  return svg(larg, etapas.length * 40 + 10, g);
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    mostrarTt(..._ptEvento(p), [{ v: p.value, l: etapas[p.dataIndex][0] }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── agenda dos próximos 90 dias ───────────────────────────────────────────
 // Vencimentos se amontoam: numa prefeitura pequena, meia dúzia de contratos
 // termina no mesmo dia. Por isso a marca é o DIA, não o contrato — o tamanho
 // dela conta quantos, e o rótulo nomeia o primeiro.
-function grafAgenda(itens, larg = 1000) {
-  if (!itens.length)
-    return `<div class="vazio">Nada vence nos próximos 90 dias.</div>`;
+function grafAgenda(el, itens) {
+  if (!itens.length) {
+    el.innerHTML = `<div class="vazio">Nada vence nos próximos 90 dias.</div>`;
+    return;
+  }
   const porDia = new Map();
   itens.forEach(it => {
     const d = Math.max(0, Math.min(90, it.dias ?? 0));
     (porDia.get(d) ?? porDia.set(d, []).get(d)).push(it);
   });
   const dias = [...porDia.keys()].sort((a, b) => a - b);
-  const y = 74;
-  const x = (d) => 40 + d / 90 * (larg - 80);
-  let g = `<line x1="40" y1="${y}" x2="${larg - 40}" y2="${y}" class="eixo"
-             stroke-width="2"/>`;
+  // eixo/marcas de dia e o corpo do balão saem do ECharts; a linha de base,
+  // as 4 marcas fixas (hoje/+30/+60/+90) e os rótulos de nome continuam à
+  // mão num overlay — a colisão de rótulo é lógica de layout, não depende
+  // de motor de gráfico nenhum
+  el.innerHTML = `<div style="position:relative">
+    <div class="graf-echart" style="height:130px"></div>
+    <svg data-overlay aria-hidden="true"
+      style="position:absolute;inset:0;pointer-events:none"></svg></div>`;
+  const alvoChart = el.querySelector(".graf-echart");
+  const overlay = el.querySelector("svg[data-overlay]");
+  const chart = _iniciarEchart(alvoChart);
+  chart.setOption({
+    animation: false,
+    grid: { left: 4, right: 4, top: 40, bottom: 34 },
+    xAxis: { type: "value", min: 0, max: 90, show: false },
+    yAxis: { type: "value", min: -1, max: 1, show: false },
+    series: [{ type: "scatter", data: dias.map(d => {
+      const grupo = porDia.get(d);
+      return { value: [d, 0], symbolSize: Math.min(22, 12 + grupo.length * 2),
+        itemStyle: { color: d <= 15 ? "var(--erro)" : d <= 60 ? "var(--warn)"
+                                                                : "var(--s3)" },
+        label: grupo.length > 1 ? { show: true, formatter: String(grupo.length),
+          color: "var(--accent-fg)", fontWeight: 600, fontSize: 11 } : undefined };
+    }), emphasis: { disabled: true } }]
+  });
+  chart.on("mouseover", (p) => {
+    if (p.componentType !== "series") return;
+    const d = dias[p.dataIndex], grupo = porDia.get(d);
+    mostrarTt(..._ptEvento(p), [{
+      v: `vence${grupo.length > 1 ? "m" : ""} em ${d} ${d === 1 ? "dia" : "dias"}`,
+      l: `${grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ")} · ${
+        dataBr(grupo[0].vigencia_fim)}` }]);
+  });
+  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+
+  const larguraPx = alvoChart.clientWidth, alturaPx = alvoChart.clientHeight;
+  overlay.setAttribute("width", larguraPx);
+  overlay.setAttribute("height", alturaPx);
+  const pxX = (d) => chart.convertToPixel({ gridIndex: 0 }, [d, 0])[0];
+  const yBase = chart.convertToPixel({ gridIndex: 0 }, [0, 0])[1];
+
+  let g = `<line x1="${pxX(0)}" y1="${yBase}" x2="${pxX(90)}" y2="${yBase}"
+             class="eixo" stroke-width="2"/>`;
   [0, 30, 60, 90].forEach(d =>
-    g += `<text class="rot" x="${x(d)}" y="${y + 30}" text-anchor="middle"
+    g += `<text class="rot" x="${pxX(d)}" y="${yBase + 30}" text-anchor="middle"
            >${d ? `+${d} dias` : "hoje"}</text>`);
   // Largura estimada de cada caractere do rótulo (.val, 11px, maiúsculas —
   // texto em caixa alta é mais largo por caractere que caixa mista comum).
@@ -517,17 +695,8 @@ function grafAgenda(itens, larg = 1000) {
   let direitaUltimoRotulo = -Infinity;
   dias.forEach(d => {
     const grupo = porDia.get(d);
-    const cor = d <= 15 ? "var(--erro)" : d <= 60 ? "var(--warn)" : "var(--s3)";
     const raio = Math.min(11, 6 + grupo.length);
-    const lista = grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ");
-    const cx = x(d);
-    g += `<circle cx="${cx}" cy="${y}" r="${raio}" fill="${cor}"
-            ${dtip(`vence${grupo.length > 1 ? "m" : ""} em ${d} ${
-              d === 1 ? "dia" : "dias"}`,
-              `${lista} · ${dataBr(grupo[0].vigencia_fim)}`)}/>`;
-    if (grupo.length > 1)
-      g += `<text class="val" x="${cx}" y="${y + 4}" text-anchor="middle"
-              fill="var(--accent-fg)" font-weight="600">${grupo.length}</text>`;
+    const cx = pxX(d);
     // corta o nome no que couber sem tocar o rótulo anterior — em vez de um
     // limiar fixo de pixels que não sabia quanto texto vinha depois, e por
     // isso deixava nomes longos vizinhos se sobreporem e virarem ruído
@@ -539,12 +708,12 @@ function grafAgenda(itens, larg = 1000) {
     if (charsCabem >= 3) {
       const bruto = fornecedorCurto(grupo[0].nome) ?? grupo[0].tipo;
       const nome = bruto.slice(0, charsCabem) + sufixo;
-      g += `<text class="val" x="${cx}" y="${y - raio - 8}"
+      g += `<text class="val" x="${cx}" y="${yBase - raio - 8}"
               text-anchor="middle">${esc(nome)}</text>`;
       direitaUltimoRotulo = cx + (nome.length * PX_POR_CHAR) / 2;
     }
   });
-  return svg(larg, y + 40, g);
+  overlay.innerHTML = g;
 }
 
 // ══ montagem das três vistas ══════════════════════════════════════════════
@@ -567,31 +736,31 @@ function cartaoGraf(titulo, chave, nota) {
 // Cada chave sabe se desenhar em qualquer largura. O redesenho acontece
 // depois da montagem e a cada mudança de tamanho da janela.
 const DESENHO = {
-  meses: (l) => grafMeses(P.dados.execucao.meses, l),
-  modalidades: (l) => grafBarras(P.dados.execucao.modalidades.slice(0, 6), {
+  meses: (el, l) => grafMeses(el, P.dados.execucao.meses, l),
+  modalidades: (el, l) => grafBarras(el, P.dados.execucao.modalidades.slice(0, 6), {
     valor: m => m.homologado || m.estimado || 0,
     rotulo: m => m.modalidade_nome ?? "–",
     sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}`}, l),
-  series: (l) => grafSeries(P.dados.analise.series, P.dados.ano, l),
-  desagio: (l) => grafDesagio(P.dados.analise.desagios, l),
-  concentracao: (l) => grafConcentracao(P.dados.analise.curva,
-                                        P.dados.analise.fornecedores_total, l),
-  calor: (l) => grafCalor(P.dados.analise.calor, P.dados.analise.meses_calor, l),
-  limites: (l) => grafLimites(P.dados.vigilancia.limites,
+  series: (el, l) => grafSeries(el, P.dados.analise.series, P.dados.ano),
+  desagio: (el, l) => grafDesagio(el, P.dados.analise.desagios, l),
+  concentracao: (el, l) => grafConcentracao(el, P.dados.analise.curva,
+                                        P.dados.analise.fornecedores_total),
+  calor: (el, l) => grafCalor(el, P.dados.analise.calor, P.dados.analise.meses_calor),
+  limites: (el, l) => grafLimites(el, P.dados.vigilancia.limites,
                               P.dados.vigilancia.limite_compras, l),
-  funil: (l) => grafFunil(P.dados.vigilancia.funil, l),
-  agenda: (l) => grafAgenda(P.dados.vigilancia.agenda, l),
-  economia_modalidade: (l) => grafBarras(P.dados.economia.por_modalidade, {
+  funil: (el, l) => grafFunil(el, P.dados.vigilancia.funil, l),
+  agenda: (el, l) => grafAgenda(el, P.dados.vigilancia.agenda),
+  economia_modalidade: (el, l) => grafBarras(el, P.dados.economia.por_modalidade, {
     valor: m => m.economizado || 0, rotulo: m => m.modalidade ?? "–",
     sub: m => `${m.n} ${m.n === 1 ? "processo" : "processos"}`}, l),
-  economia_familia: (l) => grafBarras(P.dados.economia.por_familia, {
+  economia_familia: (el, l) => grafBarras(el, P.dados.economia.por_familia, {
     valor: f => f.economizado || 0, rotulo: f => f.nome ?? "–",
     sub: f => `${f.n} ${f.n === 1 ? "item" : "itens"}`}, l),
-  economia_categoria: (l) => grafBarras(P.dados.economia.por_categoria, {
+  economia_categoria: (el, l) => grafBarras(el, P.dados.economia.por_categoria, {
     valor: c => c.economizado || 0, rotulo: c => c.nome ?? "–",
     sub: c => `${c.n} ${c.n === 1 ? "item" : "itens"}`}, l),
-  economia_series: (l) => grafSeries(P.dados.economia.series, P.dados.ano, l),
-  economia_fornecedor: (l) => grafBarras(P.dados.economia.por_fornecedor, {
+  economia_series: (el, l) => grafSeries(el, P.dados.economia.series, P.dados.ano),
+  economia_fornecedor: (el, l) => grafBarras(el, P.dados.economia.por_fornecedor, {
     valor: f => f.economizado || 0,
     rotulo: f => fornecedorCurto(f.nome) ?? "–",
     sub: f => `${f.n} ${f.n === 1 ? "item" : "itens"} · ${pct(f.pct, 0)}`}, l),
@@ -604,13 +773,14 @@ function desenharGraficos(raiz) {
     if (!largura) return;               // vista oculta: desenha ao aparecer
     if (el.dataset.largura === String(largura)) return;
     el.dataset.largura = String(largura);
-    // a maioria dos gráficos devolve HTML puro; os que têm corte vertical
-    // (grafSeries, grafConcentracao) devolvem { html, ligar } — ligar()
-    // prende os listeners do corte ao SVG recém-inserido
-    const saida = DESENHO[el.dataset.graf](largura);
+    // três contratos possíveis: string (HTML pronto), { html, ligar } (corte
+    // vertical) ou nada — gráficos ECharts recebem o próprio elemento e
+    // desenham direto nele (echarts.init precisa do nó real, não de uma
+    // string), então não há o que atribuir de volta aqui
+    const saida = DESENHO[el.dataset.graf](el, largura);
     if (typeof saida === "string") {
       el.innerHTML = saida;
-    } else {
+    } else if (saida && saida.html) {
       el.innerHTML = saida.html;
       saida.ligar?.(el);
     }

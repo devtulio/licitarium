@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.31.0 — 2026-08-13
+
+**Painel migrado para ECharts**
+
+Os 9 gráficos do Painel (colunas mensais, barras por modalidade/economia,
+deságio, funil, medidor de limite, mapa de calor, séries multi-ano,
+concentração de fornecedores e agenda de vencimentos) que ainda eram SVG
+desenhado à mão passam a usar ECharts, como Preços/Executivo/Economia já
+usavam. Cor sempre por `var(--token)` — segue o tema ao vivo na tela e
+resolve fixa no papel (o CSS de impressão do Painel já define os tokens),
+sem precisar do mecanismo de paleta fixa criado para os outros
+relatórios. Corte vertical, ponto padrão do ano corrente e a colisão de
+rótulo da agenda continuam com a mesma lógica de antes, agora sobre as
+coordenadas de pixel do próprio ECharts. Realce de hover (opacidade das
+irmãs, brilho da marca) passa a valer só para `<circle>` — barra também
+virou `<path>` no SVG do ECharts, e "path cresce no hover" deixou de
+identificar só os pontos.
+
 ## 1.30.1 — 2026-08-13
 
 **Correção: gráfico impresso vazava a cor do tema da tela**

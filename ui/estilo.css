@@ -560,6 +560,12 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
    corte vertical (ver painel.js), existe só para capturar o ponteiro numa
    área larga — se ele "acendesse" feito marca, a própria captura do corte
    pareceria um aceso sem sentido, sem relação com o mês apontado. */
+/* achado da migração pro ECharts (2026-08-13): barra também vira <path>
+   no renderer SVG do ECharts (arredondar canto exige path, não dá em
+   <rect>) — então "path cresce" deixou de significar "é ponto". Só
+   <circle> é ponto de verdade agora; os pontos/setas que ainda são path
+   à mão (ex.: seta de estouro do medidor) abrem mão do crescimento, e
+   está bem: o traço "path" nunca foi o teste, o dado nunca pode mentir. */
 .painel svg :is(rect, circle, path):not([data-cross-hit]) {
   transition:fill-opacity .15s ease, filter .15s ease, transform .15s ease;
   transform-box:fill-box; transform-origin:center; }
@@ -570,13 +576,13 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
         { fill-opacity:.38; }
 .painel svg :is(rect, circle, path):hover:not([data-cross-hit])
   { filter:brightness(1.16); }
-.painel svg :is(circle, path):hover:not([data-cross-hit])
+.painel svg circle:hover:not([data-cross-hit])
   { transform:scale(1.22); stroke:var(--surface); stroke-width:2;
     paint-order:stroke; }
 
 @media (prefers-reduced-motion: reduce) {
   .painel svg :is(rect, circle, path) { transition:none; }
-  .painel svg :is(circle, path):hover { transform:none; }
+  .painel svg circle:hover { transform:none; }
 }
 
 /* ── tooltip próprio: substitui o <title> nativo, aparece na hora e segue
