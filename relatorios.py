@@ -4,6 +4,7 @@ Gera HTML standalone timbrado (imprimível pelo navegador, título vira nome do
 PDF) e CSV para as relações. Só stdlib.
 """
 import csv
+import hashlib
 import html
 import json
 import math
@@ -1486,9 +1487,40 @@ PALETA_DOCUMENTO = dict(
     bg="#ffffff", superficie="#ffffff", zebra="#f6f7f8",
     cabecalho="#eef0f2", texto="#17181a", suave="#5b6066",
     borda="#d3d6da", acento="#1f2933", detalhe="#b8bec4",
-    alerta="#a6231b", atencao="#7a5c0e")
+    alerta="#a6231b", atencao="#7a5c0e", azul="#2f4b7c", verde="#2c6149")
 
 _VARS = " ".join(f"--{chave}:{cor};" for chave, cor in PALETA_DOCUMENTO.items())
+
+# Selo de procedência (achado 2026-08-13, portado do diagnóstico de
+# identidade do licitarium-relatorios): a cor do documento codifica o TIPO
+# de trabalho — como a CGU distingue apuração/avaliação/consultoria na
+# capa — não decora, informa antes de abrir. Cadastral (relação factual) em
+# preto/grafite; analítico (execução, economia) em azul; vigilância (teto,
+# fracionamento) reaproveita o alerta — é literalmente o assunto do
+# documento; planejamento (PCA, preços) em verde.
+CATEGORIA_RELATORIO = {
+    "contratacoes": ("Cadastral", "acento"),
+    "contratos": ("Cadastral", "acento"),
+    "atas": ("Cadastral", "acento"),
+    "executivo": ("Analítico", "azul"),
+    "economia": ("Analítico", "azul"),
+    "fracionamento": ("Vigilância", "alerta"),
+    "minuta_pca": ("Planejamento", "verde"),
+    "precos": ("Planejamento", "verde"),
+}
+
+
+def _acervo_atual(db):
+    """Data/hora do dado mais recente sincronizado — a "prova de
+    procedência" que entra na faixa do cabeçalho e no rodapé de cada
+    relatório: de que fotografia do acervo este documento saiu.
+    """
+    r = db.execute(
+        """SELECT MAX(v) FROM (
+             SELECT MAX(sync_em) v FROM contratacoes
+             UNION SELECT MAX(sync_em) FROM contratos
+             UNION SELECT MAX(sync_em) FROM atas)""").fetchone()
+    return r[0] if r else None
 
 
 def _css(paisagem, papel="A4"):
@@ -1547,12 +1579,29 @@ def _css(paisagem, papel="A4"):
   p.disp b {{ color:var(--texto); }}
   td.sem-motivo {{ color:var(--alerta); font-style:italic; }}
   .card {{ background:var(--superficie); border:1px solid var(--borda);
+           border-top:3px solid var(--cor-categoria, var(--acento));
            border-radius:3px;
-           padding:10px 12px; break-inside:avoid; flex:1 1 auto; }}
+           padding:9px 12px 10px; break-inside:avoid; flex:1 1 auto; }}
   .card .n {{ font-family:Georgia,serif; font-size:17px; color:var(--acento);
               white-space:nowrap; }}
-  .card .l {{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase;
+  /* versalete no lugar do negrito (achado 2026-08-13, portado do
+     diagnóstico de identidade): o texto de origem já vem em minúsculas —
+     small-caps lê como rótulo sem gritar tanto quanto caixa alta */
+  .card .l {{ font-size:10.5px; letter-spacing:.03em; font-variant:small-caps;
               color:var(--suave); margin-top:2px; }}
+  /* selo de procedência: etiqueta da categoria acima do cabeçalho, régua e
+     faixa de acervo abaixo dele — mesmo padrão CGU (cor = tipo de
+     trabalho), sem competir com o brasão do município */
+  .etiqueta {{ display:inline-block; font-size:9px;
+               font-family:'Segoe UI',system-ui,sans-serif;
+               letter-spacing:.12em; text-transform:uppercase; color:#fff;
+               background:var(--cor-categoria, var(--acento));
+               padding:3px 9px; border-radius:2px; margin-bottom:10px; }}
+  .regua {{ height:2px; border:none;
+            background:var(--cor-categoria, var(--acento)); margin:14px 0 6px; }}
+  .faixa-acervo {{ font-family:Consolas,monospace; font-size:9.5px;
+                    letter-spacing:.03em; color:var(--suave);
+                    margin-bottom:16px; }}
   .barra {{ background:var(--detalhe); height:10px; display:inline-block;
             vertical-align:middle; border-radius:2px; }}
   .caixa-aviso {{ background:var(--superficie); border:1px solid var(--borda);
@@ -1576,32 +1625,57 @@ def _css(paisagem, papel="A4"):
 
 
 def _pagina(titulo_doc, corpo, municipio, uf, periodo_txt, paisagem,
-            papel="A4", estilo_extra="", brasao=None):
+            papel="A4", estilo_extra="", brasao=None, categoria=None,
+            acervo=None):
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     # o brasão do município (Configurações) toma o lugar do estandarte do
     # Licitarium na frente do documento — o produto continua assinado no
     # rodapé ("LICITARIVM · SVB HASTA PVBLICA"), só quem imprime muda
     marca = (f'<img src="{_e(brasao)}" alt="Brasão do município"'
              f' style="height:88px;width:auto">' if brasao else ESTANDARTE)
+    # selo de procedência (achado 2026-08-13): sem `categoria`, nenhuma
+    # etiqueta/régua/faixa aparece — o Painel e a ficha de detalhe (que já
+    # têm identidade visual própria) chamam `_pagina` sem esse parâmetro e
+    # continuam exatamente como antes
+    estilo_body = (f' style="--cor-categoria:var(--{categoria[1]});"'
+                   if categoria else '')
+    etiqueta_html = f'<span class="etiqueta">{_e(categoria[0])}</span>' \
+        if categoria else ''
+    faixa_html = ''
+    if categoria and acervo:
+        hash_curto = hashlib.sha1(str(acervo).encode()).hexdigest()[:6].upper()
+        faixa_html = (f'<hr class="regua"><div class="faixa-acervo">'
+                      f'Acervo sincronizado em {data_br(acervo)} · {hash_curto}'
+                      f'</div>')
+    elif categoria:
+        faixa_html = '<hr class="regua">'
+    rodape_proc = (f'Apurado a partir do PNCP · acervo sincronizado em '
+                   f'{data_br(acervo)}' if acervo else
+                   'Documento gerado automaticamente a partir de dados '
+                   'públicos do PNCP')
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>{_e(titulo_doc)}</title>
-<style>{_css(paisagem, papel)}{estilo_extra}</style></head><body>
+<style>{_css(paisagem, papel)}{estilo_extra}</style></head>
+<body{estilo_body}>
 <div class="no-print"><button onclick="print()">🖨 Imprimir</button></div>
 <div class="pagina">
+{etiqueta_html}
 <header>{marca}
   <div><h1>{_e(titulo_doc)}</h1>
   <div class="meta">{_e(municipio)} — {_e(uf)} · {_e(periodo_txt)}<br>
   Fonte: Portal Nacional de Contratações Públicas (PNCP) · Lei 14.133/2021<br>
   Gerado pelo Licitarium em {agora}</div></div>
 </header>
+{faixa_html}
 {corpo}
 <footer><span>LICITARIVM · SVB HASTA PVBLICA</span>
-<span>Documento gerado automaticamente a partir de dados públicos do PNCP</span></footer>
+<span>{rodape_proc}</span></footer>
 </div></body></html>"""
 
 
-def render_contratacoes(d, municipio, uf, periodo_txt, brasao=None):
+def render_contratacoes(d, municipio, uf, periodo_txt, brasao=None,
+                        categoria=None, acervo=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['sequencial'])}/{_e(l['ano'])}</td>
       <td class="ctr">{_e(l['modalidade_nome'])}</td>
@@ -1615,7 +1689,11 @@ def render_contratacoes(d, municipio, uf, periodo_txt, brasao=None):
     t = d["totais"]
     desagio = f" · Deságio médio: {t['desagio']:.1f}%".replace(".", ",") \
         if t["desagio"] is not None else ""
-    corpo = f"""<table>
+    corpo = f"""<div class="caixa-aviso">Relação de <b>todas as contratações
+publicadas</b> pelo município no período, extraída do PNCP — inclui
+processos em andamento (sem homologação) e já concluídos. Valor estimado é
+o do edital; valor homologado é o valor final, quando já há resultado.</div>
+<table>
 <thead><tr><th class="ctr">Processo</th><th class="ctr">Modalidade</th>
 <th class="ctr">Amparo legal</th>
 <th>Objeto</th><th class="ctr">Unidade</th><th class="num">Valor estimado</th>
@@ -1626,10 +1704,11 @@ def render_contratacoes(d, municipio, uf, periodo_txt, brasao=None):
 <td class="num">{moeda(t['homologado'])}</td><td></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratacoes']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   brasao=brasao)
+                   brasao=brasao, categoria=categoria, acervo=acervo)
 
 
-def render_contratos(d, municipio, uf, periodo_txt, brasao=None):
+def render_contratos(d, municipio, uf, periodo_txt, brasao=None,
+                     categoria=None, acervo=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(num_contrato(l['numero'], l['ano_contrato'])
                           or l['numero_controle'])}</td>
@@ -1641,7 +1720,11 @@ def render_contratos(d, municipio, uf, periodo_txt, brasao=None):
       <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
       for l in d["linhas"])
     t = d["totais"]
-    corpo = f"""<table>
+    corpo = f"""<div class="caixa-aviso">Relação de <b>contratos firmados</b>
+pelo município, extraída do PNCP. Contrato é o instrumento definitivo —
+decorrente de uma contratação já homologada, com fornecedor e vigência
+definidos.</div>
+<table>
 <thead><tr><th class="ctr">Contrato</th><th class="ctr">Fornecedor</th><th>Objeto</th>
 <th class="num">Valor global</th><th class="num">Vigência</th>
 <th class="num">Publicação</th></tr></thead>
@@ -1650,10 +1733,11 @@ def render_contratos(d, municipio, uf, periodo_txt, brasao=None):
 <td class="num">{moeda(t['valor'])}</td><td colspan="2"></td></tr></tfoot></table>"""
     titulo = f"{TITULOS['contratos']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   brasao=brasao)
+                   brasao=brasao, categoria=categoria, acervo=acervo)
 
 
-def render_atas(d, municipio, uf, periodo_txt, brasao=None):
+def render_atas(d, municipio, uf, periodo_txt, brasao=None, categoria=None,
+                acervo=None):
     linhas = "".join(f"""<tr>
       <td class="ctr">{_e(l['numero'])}/{_e(l['ano_ata'])}</td>
       <td class="ctr">{_e(l['contratacao_controle'])}</td>
@@ -1661,17 +1745,22 @@ def render_atas(d, municipio, uf, periodo_txt, brasao=None):
       <td class="num">{data_br(l['vigencia_inicio'])} – {data_br(l['vigencia_fim'])}</td>
       <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
       for l in d["linhas"])
-    corpo = f"""<table>
+    corpo = f"""<div class="caixa-aviso">Relação de <b>atas de registro de
+preços</b> vigentes ou já encerradas, extraída do PNCP. A ata registra o
+preço para contratações futuras dentro do prazo de vigência — não é, em
+si, uma despesa executada.</div>
+<table>
 <thead><tr><th class="ctr">Ata</th><th class="ctr">Contratação de origem</th><th>Objeto</th>
 <th class="num">Vigência</th><th class="num">Publicação</th></tr></thead>
 <tbody>{linhas or '<tr><td colspan="5">Nenhum registro no período.</td></tr>'}</tbody>
 <tfoot><tr><td colspan="5">Total: {d['totais']['n']} atas</td></tr></tfoot></table>"""
     titulo = f"{TITULOS['atas']} — {municipio} — {periodo_txt}"
     return _pagina(titulo, corpo, municipio, uf, periodo_txt, paisagem=True,
-                   brasao=brasao)
+                   brasao=brasao, categoria=categoria, acervo=acervo)
 
 
-def render_fracionamento(d, municipio, uf, brasao=None):
+def render_fracionamento(d, municipio, uf, brasao=None, categoria=None,
+                         acervo=None):
     def farol(pct):
         if pct >= 100:
             return '<span class="farol-alerta">ACIMA DO LIMITE</span>'
@@ -1737,10 +1826,12 @@ de outro ente.</div>
     titulo = f"{TITULOS['fracionamento']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf,
                    f"Exercício {d['ano']} · uso interno", paisagem=True,
-                   estilo_extra=CSS_PAINEL, brasao=brasao)
+                   estilo_extra=CSS_PAINEL, brasao=brasao,
+                   categoria=categoria, acervo=acervo)
 
 
-def render_minuta_pca(d, municipio, uf, brasao=None):
+def render_minuta_pca(d, municipio, uf, brasao=None, categoria=None,
+                      acervo=None):
     linhas = "".join(f"""<tr>
       <td class="num">{i+1}</td>
       <td class="obj">{_e(l['descricao'])}</td>
@@ -1791,7 +1882,8 @@ pela <b>{est}</b> dos valores homologados.</div>
 <tbody>{linhas or '<tr><td colspan="8">Minuta vazia.</td></tr>'}</tbody></table>"""
     titulo = f"{TITULOS['minuta_pca']} {d['ano']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {d['ano']}",
-                   paisagem=True, brasao=brasao)
+                   paisagem=True, brasao=brasao, categoria=categoria,
+                   acervo=acervo)
 
 
 def _desconsiderados_html(d):
@@ -1849,7 +1941,8 @@ def _LEITURA_CV(cv):
     return "amostra muito dispersa; confira a comparabilidade dos itens"
 
 
-def render_precos(d, municipio, uf, brasao=None, grafico_html=None):
+def render_precos(d, municipio, uf, brasao=None, grafico_html=None,
+                  categoria=None, acervo=None):
     r = d["resumo"]
     periodo = f"Exercício {d['ano']}" if d.get("ano") else "Todo o acervo"
     if not r:
@@ -1857,7 +1950,7 @@ def render_precos(d, municipio, uf, brasao=None, grafico_html=None):
                  f'para <b>{_e(d["termo"])}</b> no acervo local.</div>')
         return _pagina(f"{TITULOS['precos']} — {_e(d['termo'])}", corpo,
                        municipio, uf, periodo, paisagem=True,
-                       brasao=brasao)
+                       brasao=brasao, categoria=categoria, acervo=acervo)
     # no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
     val = moeda_fina if d.get("por_conteudo") else moeda
     # "mediana por unidade" no modo por conteúdo; fora dele, os de sempre
@@ -1977,10 +2070,12 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 }{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
-                   estilo_extra=CSS_PAINEL, brasao=brasao)
+                   estilo_extra=CSS_PAINEL, brasao=brasao,
+                   categoria=categoria, acervo=acervo)
 
 
-def render_executivo(d, municipio, uf, brasao=None, graficos=None):
+def render_executivo(d, municipio, uf, brasao=None, graficos=None,
+                     categoria=None, acervo=None):
     """Reformulado (2026-08-08, pedido do usuário) para usar os mesmos
     gráficos do Painel — hero com sparkline, colunas mensais pareadas e
     barras por modalidade — em vez de só tabelas. `d` é o retorno de
@@ -2086,7 +2181,12 @@ def render_executivo(d, municipio, uf, brasao=None, graficos=None):
       <td class="num">{data_br(v['vigencia_fim'])}</td>
       <td class="num">{v['dias']} dias</td></tr>"""
       for v in ex["vencendo"])
-    corpo = f"""{hero}
+    corpo = f"""<div class="caixa-aviso">Resumo executivo da execução do
+exercício, extraído do PNCP — contratações publicadas, deságio sobre o
+estimado e prazos vencendo. A comparação com o exercício anterior é
+cortada no mesmo dia do calendário, para não medir ano inteiro contra ano
+em curso.</div>
+{hero}
 {charts}
 <h2>Contratações por modalidade</h2>
 <table><thead><tr><th>Modalidade</th><th class="num">Qtde</th>
@@ -2106,10 +2206,11 @@ def render_executivo(d, municipio, uf, brasao=None, graficos=None):
     titulo = f"{TITULOS['executivo']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
                    paisagem=True, estilo_extra=CSS_PAINEL,
-                   brasao=brasao)
+                   brasao=brasao, categoria=categoria, acervo=acervo)
 
 
-def render_economia(d, municipio, uf, brasao=None, graficos=None):
+def render_economia(d, municipio, uf, brasao=None, graficos=None,
+                    categoria=None, acervo=None):
     """Quanto foi economizado no ano, por modalidade, família de item e
     categoria do PNCP. `d` é o retorno de `dados_painel` — mesmos números
     da vista Economia do Painel, num documento que se gera sem abrir o
@@ -2200,7 +2301,13 @@ de bom fornecedor: pode ser estimativa inflada na origem.</div></div>"""
 </table>"""
 
     mod_linhas = [{"nome": m["modalidade"], **m} for m in e["por_modalidade"]]
-    corpo = f"""{hero}
+    corpo = f"""<div class="caixa-aviso">Economia por modalidade, família de
+item, categoria e fornecedor, extraída do PNCP — mede o que foi
+<b>estimado</b> contra o que foi de fato <b>homologado</b>. Não é auditoria
+de preço: estimativa alta nem sempre significa preço de mercado mal
+calculado, e homologado sem estimativa comparável fica de fora da
+soma.</div>
+{hero}
 {charts}
 {_tabela("Economia por modalidade", "Modalidade", mod_linhas)}
 {_tabela("Economia por família de item", "Família", e["por_familia"])}
@@ -2211,7 +2318,7 @@ de bom fornecedor: pode ser estimativa inflada na origem.</div></div>"""
     titulo = f"{TITULOS['economia']} {ano} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, f"Exercício {ano}",
                    paisagem=True, estilo_extra=CSS_PAINEL,
-                   brasao=brasao)
+                   brasao=brasao, categoria=categoria, acervo=acervo)
 
 
 # ── geração (HTML + CSV) ────────────────────────────────────────────────────
@@ -2238,7 +2345,8 @@ _CSS_PAINEL_RESTO = """
   .f-11 { grid-template-columns:1fr 1fr; }
   .f-3 { grid-template-columns:1fr 1fr 1fr; }
   .card { background:var(--superficie); border:1px solid var(--borda);
-          border-radius:3px; padding:12px 14px; break-inside:avoid; }
+          border-top:3px solid var(--cor-categoria, var(--acento));
+          border-radius:3px; padding:11px 14px 12px; break-inside:avoid; }
   .card h3 { font-size:9.5pt; color:var(--suave); font-weight:600;
              letter-spacing:.05em; text-transform:uppercase; margin-bottom:8px; }
   .hero .n { font-size:26pt; font-weight:700; line-height:1.05; }
@@ -2373,12 +2481,18 @@ def gerar(db, tipo, params, municipio, uf, destino):
     linha_brasao = db.execute(
         "SELECT valor FROM config WHERE chave='brasao'").fetchone()
     brasao = linha_brasao[0] if linha_brasao else None
+    # selo de procedência (achado 2026-08-13): categoria e acervo passam
+    # por todo `render_*` até `_pagina`, igual `brasao` — mesma fotografia
+    # do acervo em toda a tarja/faixa/rodapé de um mesmo documento
+    categoria = CATEGORIA_RELATORIO.get(tipo)
+    acervo = _acervo_atual(db)
     if tipo == "executivo":
         if not ano:
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
         conteudo = render_executivo(d, municipio, uf, brasao=brasao,
-                                    graficos=params.get("graficos"))
+                                    graficos=params.get("graficos"),
+                                    categoria=categoria, acervo=acervo)
         nome = f"resumo_executivo_{ano}"
         linhas_csv = None
     elif tipo == "economia":
@@ -2386,7 +2500,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
             ano = date.today().year
         d = dados_painel(db, ano, orgao, params.get("limites"))
         conteudo = render_economia(d, municipio, uf, brasao=brasao,
-                                   graficos=params.get("graficos"))
+                                   graficos=params.get("graficos"),
+                                   categoria=categoria, acervo=acervo)
         nome = f"economia_comparativo_{ano}"
         linhas_csv = d["economia"]["por_familia"]
     elif tipo == "minuta_pca":
@@ -2398,7 +2513,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
         d = {"ano": ano, "itens": itens,
              "totais": pca_builder.totais(itens),
              "parametros": json.loads(cfg[0]) if cfg else {}}
-        conteudo = render_minuta_pca(d, municipio, uf, brasao=brasao)
+        conteudo = render_minuta_pca(d, municipio, uf, brasao=brasao,
+                                     categoria=categoria, acervo=acervo)
         nome = f"minuta_pca_{ano}"
         linhas_csv = [{k: i[k] for k in ("descricao", "unidade", "categoria",
                                          "quantidade", "valor_unitario",
@@ -2414,7 +2530,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
                          params.get("corrigir_ipca"),
                          exigir_selecao=True)
         conteudo = render_precos(d, municipio, uf, brasao=brasao,
-                                 grafico_html=params.get("grafico_html"))
+                                 grafico_html=params.get("grafico_html"),
+                                 categoria=categoria, acervo=acervo)
         limpo = re.sub(r"[^\w-]+", "_", termo.lower())[:40]
         nome = f"pesquisa_precos_{limpo}"
         linhas_csv = d["linhas"]
@@ -2422,7 +2539,8 @@ def gerar(db, tipo, params, municipio, uf, destino):
         if not ano:
             ano = date.today().year
         d = dados_fracionamento(db, ano, orgao, params.get("limites"))
-        conteudo = render_fracionamento(d, municipio, uf, brasao=brasao)
+        conteudo = render_fracionamento(d, municipio, uf, brasao=brasao,
+                                        categoria=categoria, acervo=acervo)
         nome = f"alerta_fracionamento_{ano}"
         linhas_csv = d["dispensas"]
     else:
@@ -2431,15 +2549,18 @@ def gerar(db, tipo, params, municipio, uf, destino):
         if tipo == "contratacoes":
             d = dados_contratacoes(db, ano, params.get("modalidade"), orgao)
             conteudo = render_contratacoes(d, municipio, uf, periodo_txt,
-                                           brasao=brasao)
+                                           brasao=brasao, categoria=categoria,
+                                           acervo=acervo)
         elif tipo == "contratos":
             d = dados_contratos(db, ano, vigentes, orgao)
             conteudo = render_contratos(d, municipio, uf, periodo_txt,
-                                        brasao=brasao)
+                                        brasao=brasao, categoria=categoria,
+                                        acervo=acervo)
         elif tipo == "atas":
             d = dados_atas(db, ano, vigentes, orgao)
             conteudo = render_atas(d, municipio, uf, periodo_txt,
-                                   brasao=brasao)
+                                   brasao=brasao, categoria=categoria,
+                                   acervo=acervo)
         else:
             raise ValueError(f"tipo de relatório desconhecido: {tipo}")
         sufixo = "vigentes" if vigentes else (str(ano) if ano else "completo")

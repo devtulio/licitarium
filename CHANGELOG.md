@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.30.0 — 2026-08-13
+
+**Selo de procedência nos relatórios (identidade sem logotipo)**
+
+Portado do diagnóstico de identidade visual feito pro projeto irmão
+licitarium-relatorios (Rationarium): "identidade forte de fornecedor
+num documento oficial não passa por sofisticação, passa por material
+publicitário dentro de autos" — o teto real é procedência, não marca.
+
+- **Tarja por tipo de relatório**: etiqueta colorida acima do
+  cabeçalho — Cadastral (contratações/contratos/atas), Analítico
+  (executivo/economia), Vigilância (fracionamento), Planejamento
+  (PCA/preços). Mesmo princípio da CGU: a cor da capa codifica o tipo
+  de trabalho, não decora.
+- **Faixa de acervo**: "Acervo sincronizado em {data} · {hash}"
+  abaixo do cabeçalho — a mesma fotografia do banco (mesmo hash) em
+  todo documento gerado na mesma sincronização, sem precisar de
+  consulta nova.
+- **Rodapé de procedência**: "Apurado a partir do PNCP · acervo
+  sincronizado em {data}" no lugar de "Documento gerado
+  automaticamente".
+- **Nota de método** em Contratações, Contratos, Atas, Executivo e
+  Economia — os 5 relatórios que não tinham (Fracionamento, Minuta do
+  PCA e Preços já tinham).
+- **Card com aba superior** (cor da categoria) e **rótulos em
+  versalete** no lugar de caixa alta.
+- Painel e a ficha impressa do modal de detalhe **não mudam** — já
+  têm identidade visual própria; chamam `_pagina` sem `categoria`.
+
+372 pytest + 152 E2E.
+
 ## 1.29.0 — 2026-08-12
 
 **Cinco correções portadas do licitarium-relatorios (Django)**

@@ -507,6 +507,78 @@ def test_render_fracionamento_mostra_tipo_e_orgao_quando_ha_mais_de_um(
     assert "Compras" in html
 
 
+def test_categoria_relatorio_cobre_os_oito_tipos_em_quatro_cores():
+    """Selo de procedência (achado 2026-08-13, portado do diagnóstico de
+    identidade do licitarium-relatorios): cada tipo de relatório tem uma
+    categoria e uma cor — cadastral/analítico/vigilância/planejamento,
+    como a CGU distingue apuração/avaliação/consultoria na capa."""
+    tipos_com_pagina = {"contratacoes", "contratos", "atas", "executivo",
+                        "economia", "fracionamento", "minuta_pca", "precos"}
+    assert set(relatorios.CATEGORIA_RELATORIO) == tipos_com_pagina
+    cores = {cor for _, cor in relatorios.CATEGORIA_RELATORIO.values()}
+    assert len(cores) == 4
+    rotulos = {rotulo for rotulo, _ in relatorios.CATEGORIA_RELATORIO.values()}
+    assert rotulos == {"Cadastral", "Analítico", "Vigilância", "Planejamento"}
+
+
+def test_pagina_sem_categoria_fica_como_antes(db, tmp_path):
+    """Painel e ficha de detalhe já têm identidade visual própria e chamam
+    `_pagina` sem `categoria` — nenhuma etiqueta, régua ou faixa de acervo
+    deve aparecer nesse caso, e o rodapé mantém o texto de sempre."""
+    html = relatorios._pagina("Título", "<p>corpo</p>", "T", "SP", "período",
+                              paisagem=False)
+    assert 'class="etiqueta"' not in html
+    assert 'class="regua"' not in html
+    assert 'class="faixa-acervo"' not in html
+    assert "Documento gerado automaticamente a partir de dados públicos" \
+        in html
+
+
+def test_gerar_traz_etiqueta_da_categoria_e_faixa_de_acervo(db, tmp_path):
+    """`gerar()` computa o acervo uma vez (MAX(sync_em) entre as três
+    tabelas) e passa a mesma fotografia — mesmo hash — pra qualquer tipo
+    de relatório gerado a partir do mesmo estado do banco."""
+    db.execute("UPDATE contratacoes SET sync_em='2026-08-13T10:22:00'")
+    db.execute("UPDATE contratos SET sync_em='2026-08-13T10:22:00'")
+    db.commit()
+
+    r1 = relatorios.gerar(db, "contratacoes", {"ano": 2026}, "T", "SP", tmp_path)
+    html1 = Path(r1["html"]).read_text(encoding="utf-8")
+    assert '<span class="etiqueta">Cadastral</span>' in html1
+    assert "Acervo sincronizado em 13/08/2026 ·" in html1
+    assert "Apurado a partir do PNCP · acervo sincronizado em 13/08/2026" \
+        in html1
+
+    r2 = relatorios.gerar(db, "contratos", {"ano": 2026}, "T", "SP", tmp_path)
+    html2 = Path(r2["html"]).read_text(encoding="utf-8")
+    hash1 = html1.split("Acervo sincronizado em 13/08/2026 · ")[1][:6]
+    hash2 = html2.split("Acervo sincronizado em 13/08/2026 · ")[1][:6]
+    assert hash1 == hash2   # mesmo estado do banco, mesmo hash
+
+
+def test_metodo_e_categoria_nos_cinco_relatorios_que_nao_tinham(db):
+    """Achado 2026-08-13 (portado do diagnóstico de identidade): contratações,
+    contratos, atas, executivo e economia não tinham nenhuma nota de método
+    — só fracionamento, minuta e preços tinham. Os cinco ganham uma."""
+    d_rel = relatorios.dados_contratacoes(db, ano=2026)
+    assert '<div class="caixa-aviso">' in relatorios.render_contratacoes(
+        d_rel, "T", "SP", "período", categoria=("Cadastral", "acento"))
+
+    d_ct = relatorios.dados_contratos(db, ano=2026)
+    assert '<div class="caixa-aviso">' in relatorios.render_contratos(
+        d_ct, "T", "SP", "período")
+
+    d_at = relatorios.dados_atas(db, ano=2026)
+    assert '<div class="caixa-aviso">' in relatorios.render_atas(
+        d_at, "T", "SP", "período")
+
+    d_pn = relatorios.dados_painel(db, 2026)
+    assert '<div class="caixa-aviso">' in relatorios.render_executivo(
+        d_pn, "T", "SP")
+    assert '<div class="caixa-aviso">' in relatorios.render_economia(
+        d_pn, "T", "SP")
+
+
 def test_documento_sai_com_a_paleta_institucional(db, tmp_path):
     """Documento oficial não tem tema (reversão consciente da v1.14.4).
 
