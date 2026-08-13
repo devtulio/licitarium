@@ -44,11 +44,15 @@ jobs:
       - run: pyinstaller --clean Licitarium.spec
       - name: Anexar exe à release
         # o nome do exe carrega a versão ("Licitarium v1.2.4.exe"), então o
-        # caminho vem por glob; falha explicitamente se não gerou exatamente um
+        # caminho vem por glob; falha explicitamente se não gerou exatamente um.
+        # --clobber: o release "solta a X.Y.Z" já sobe o exe na hora de criar
+        # o release (gh release create ... exe) — sem --clobber, este job
+        # sempre achava o asset já lá e falhava (achado 2026-08-13, todo tag
+        # desde pelo menos v1.30.1 mostrava ✗ vermelho por causa disso)
         shell: pwsh
         run: |
           $exe = @(Get-ChildItem dist/*.exe)
           if ($exe.Count -ne 1) { throw "esperava 1 exe em dist/, achei $($exe.Count)" }
-          gh release upload ${{ github.ref_name }} $exe[0].FullName
+          gh release upload ${{ github.ref_name }} $exe[0].FullName --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
