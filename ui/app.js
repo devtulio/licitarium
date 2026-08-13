@@ -646,7 +646,7 @@ function _jitterPorValor(n, passo = 15) {
   }
   return niveis;
 }
-function desenharBoxplotPreco(el, s) {
+function desenharBoxplotPreco(el, s, paraImpressao) {
   if (!window.echarts || s.q1 == null) {
     // limpa o que sobrou de um desenho anterior — sem isso, um contêiner
     // oculto (o da prévia de impressão, sem tela pra esconder visualmente)
@@ -656,9 +656,9 @@ function desenharBoxplotPreco(el, s) {
     return;
   }
   el.classList.remove("oculto");
-  const s1 = _corTemaEchart("--s1", "#2a78d6"), s2 = _corTemaEchart("--s2", "#eb6834"),
-    erro = _corTemaEchart("--erro", "#a6231b"), warn = _corTemaEchart("--warn", "#7a5c0e"),
-    muted = _corTemaEchart("--muted", "#5b6066"), border = _corTemaEchart("--border", "#d3d6da");
+  const s1 = _corTemaEchart("--s1", "#2a78d6", paraImpressao), s2 = _corTemaEchart("--s2", "#eb6834", paraImpressao),
+    erro = _corTemaEchart("--erro", "#a6231b", paraImpressao), warn = _corTemaEchart("--warn", "#7a5c0e", paraImpressao),
+    muted = _corTemaEchart("--muted", "#5b6066", paraImpressao), border = _corTemaEchart("--border", "#d3d6da", paraImpressao);
   const val = s.por_conteudo ? dinheiroFino : dinheiro;
   const fmt = v => val(v);
   const itens = s.itens || [];
@@ -730,7 +730,17 @@ function desenharBoxplotPreco(el, s) {
   });
 }
 
-function _corTemaEchart(nome, fallback) {
+// paleta fixa do papel — mesma paleta que relatorios.py usa no documento
+// impresso (SERIE_DOCUMENTO), independente do tema ativo na tela. Achado
+// 2026-08-13: gráfico ECharts capturado pro papel herdava o tema da tela
+// (Pergaminho/Observatório nunca validados pra fundo branco do PDF).
+const PALETA_PAPEL = {
+  "--s1": "#2a78d6", "--s2": "#eb6834",
+  "--erro": "#a6231b", "--warn": "#7a5c0e",
+  "--muted": "#5b6066", "--border": "#d3d6da",
+};
+function _corTemaEchart(nome, fallback, paraImpressao) {
+  if (paraImpressao) return PALETA_PAPEL[nome] || fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
   return v || fallback;
 }
@@ -743,7 +753,7 @@ function _corTemaEchart(nome, fallback) {
 // direto do banco pro papel; ganham motor aqui como Preços já ganhou.
 function desenharBarrasEcharts(el, itens, { valor, rotulo, sub }) {
   if (!window.echarts || !itens || !itens.length) { el.innerHTML = ""; return; }
-  const s1 = _corTemaEchart("--s1", "#2a78d6"), muted = _corTemaEchart("--muted", "#5b6066");
+  const s1 = _corTemaEchart("--s1", "#2a78d6", true), muted = _corTemaEchart("--muted", "#5b6066", true);
   if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
   const chart = echarts.init(el, null, { renderer: "svg" });
   el.__echart = chart;
@@ -768,9 +778,9 @@ function desenharBarrasEcharts(el, itens, { valor, rotulo, sub }) {
 // contrato de relatorios.py:_grafico_meses / ui/painel.js:grafMeses.
 function desenharColunasEcharts(el, meses, corVar) {
   if (!window.echarts || !meses) { el.innerHTML = ""; return; }
-  const s1 = _corTemaEchart(corVar || "--s1", "#2a78d6"),
-    muted = _corTemaEchart("--muted", "#5b6066"),
-    border = _corTemaEchart("--border", "#d3d6da");
+  const s1 = _corTemaEchart(corVar || "--s1", "#2a78d6", true),
+    muted = _corTemaEchart("--muted", "#5b6066", true),
+    border = _corTemaEchart("--border", "#d3d6da", true);
   const hoje = new Date().getMonth() + 1;
   let ultimo = 0;
   meses.forEach((m, i) => { if (m.valor || m.estimado) ultimo = i + 1; });
@@ -1763,7 +1773,7 @@ $("rel-gerar").addEventListener("click", async () => {
       params.termo, params.ano, params.orgao, params.excluidos,
       false, false);
     if (g?.ok) {
-      desenharBoxplotPreco($("grafico-oculto"), g.resumo);
+      desenharBoxplotPreco($("grafico-oculto"), g.resumo, true);
       params.grafico_html = $("grafico-oculto").innerHTML;
     }
   }

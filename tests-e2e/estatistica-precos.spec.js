@@ -1,6 +1,11 @@
 const { test, expect } = require("@playwright/test");
 const { abrirApp } = require("./harness");
 
+// paleta fixa do papel, espelhando ui/app.js:PALETA_PAPEL — precisa ser um
+// valor literal aqui (não lido do app) pra provar que o gráfico capturado
+// NÃO segue a --erro do tema ativo na tela
+const ERRO_PAPEL = "#a6231b";
+
 test.beforeEach(async ({ page }) => abrirApp(page));
 
 async function abrirPrecos(page, termo = "papel") {
@@ -144,6 +149,28 @@ test("filtro por unidade de medida só existe na aba Preços",
   const depois = await page.evaluate(() => window.__chamadas
     .filter(c => c.metodo === "listar").pop());
   expect(depois.filtros.unidade).toBeFalsy();
+});
+
+test("gráfico do relatório de preços usa a cor fixa do papel, não a do tema da tela",
+    async ({ page }) => {
+  // achado 2026-08-13 (/dataviz): o box-plot capturado pra impressão
+  // herdava a --erro do tema ativo na tela (Pergaminho/Observatório nunca
+  // validados pra fundo branco) — documento oficial não tem tema
+  for (const tema of ["pergaminho", "observatorio"]) {
+    await abrirApp(page, { tema, temaBanco: tema });
+    const erroTema = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--erro").trim());
+    expect(erroTema).not.toBe(ERRO_PAPEL);
+
+    await abrirPrecos(page);
+    await page.locator("#btn-rel-precos").click();
+    await page.locator("#rel-gerar").click();
+    const chamada = await page.evaluate(() => window.__chamadas
+      .filter(c => c.metodo === "gerar_relatorio").pop());
+    // extremo (R$ 249,80) sempre na --erro do papel, nunca na do tema
+    expect(chamada.params.grafico_html).toContain(`fill="${ERRO_PAPEL}"`);
+    expect(chamada.params.grafico_html).not.toContain(`fill="${erroTema}"`);
+  }
 });
 
 test("coluna Qtde ordena como as demais", async ({ page }) => {

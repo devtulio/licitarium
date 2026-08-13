@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.30.1 — 2026-08-13
+
+**Correção: gráfico impresso vazava a cor do tema da tela**
+
+Achado por auditoria /dataviz. O box-plot de Preços e as barras/colunas de
+Executivo/Economia, capturados via ECharts para o papel, liam a cor viva
+do tema ativo na tela (`getComputedStyle`) — Pergaminho e Observatório
+nunca foram validados para o fundo branco do documento impresso.
+Documento oficial não tem tema: os 3 gráficos agora sempre usam a mesma
+paleta fixa validada do papel, independente do tema em uso na tela.
+
 ## 1.30.0 — 2026-08-13
 
 **Selo de procedência nos relatórios (identidade sem logotipo)**
