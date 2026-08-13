@@ -388,6 +388,125 @@ def test_fracionamento_tem_o_medidor_de_limite(db, tmp_path):
     assert "var(--erro)" in html        # cor de estouro
 
 
+def test_teto_da_dispensa_classifica_pelo_amparo_nao_pela_modalidade():
+    """Achado 2026-08-12, portado do licitarium-relatorios: `modalidade_id=8`
+    (Dispensa) não é sinônimo de "sujeita ao limite do art. 75, II" — o
+    amparo (lido do `raw`) é quem decide, e três situações precisam de
+    tratamento diferente."""
+    # art. 75, II — compras/serviços comuns: responde ao teto de compras
+    assert relatorios.teto_da_dispensa(
+        "Lei 14.133/2021, Art. 75, II", 100.0, 200.0) == 100.0
+    # formato curto (sem "Lei 14.133/2021,") também casa
+    assert relatorios.teto_da_dispensa("Art. 75, II", 100.0, 200.0) == 100.0
+    # art. 75, I — obras/serviços de engenharia: teto PRÓPRIO
+    assert relatorios.teto_da_dispensa(
+        "Lei 14.133/2021, Art. 75, I", 100.0, 200.0) == 200.0
+    # inciso III (e demais) não tem teto por valor — "I" não pode casar
+    # como prefixo de "III"
+    assert relatorios.teto_da_dispensa(
+        "Lei 14.133/2021, Art. 75, III", 100.0, 200.0) is None
+    # outra lei (agricultura familiar etc.): dispensa própria, sem teto
+    assert relatorios.teto_da_dispensa("Lei 11.947/2009", 100.0, 200.0) \
+        is None
+    # amparo ausente: conservador — não afirma limite que não se sabe
+    assert relatorios.teto_da_dispensa(None, 100.0, 200.0) is None
+
+
+def test_dispensa_sem_teto_por_valor_nao_soma_e_fica_declarada(db):
+    """O falso positivo real que motivou a correção: R$ 1.057.448,50 de
+    agricultura familiar (dispensa própria, Lei 11.947/2009, sem teto por
+    valor) aparecia como "1688% do limite" — o maior valor da lista, sem
+    irregularidade nenhuma."""
+    raw_af = json.dumps({"amparoLegal": {"nome": "Lei 11.947/2009"}})
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, unidade, modalidade_id, modalidade_nome, objeto,"
+        " valor_homologado, data_publicacao, referencia, raw)"
+        " VALUES ('AF1',2026,50,'111','Sec. Adm',8,'Dispensa',"
+        " 'Gêneros da agricultura familiar',1057448.50,'2026-06-01',0,?)",
+        (raw_af,))
+    db.execute("UPDATE contratacoes SET modalidade_id=8, unidade='Sec. Adm'"
+               " WHERE ano=2026 AND numero_controle IN ('A','B')")
+    db.commit()
+
+    d = relatorios.dados_fracionamento(db, 2026, limites={"compras": 100})
+    # a dispensa sem teto não conta no total nem nas unidades...
+    assert d["total"] == 280.0
+    assert all(u["total"] != pytest.approx(1057448.50) for u in d["unidades"])
+    # ...mas também não desaparece: sai declarada à parte
+    assert len(d["fora_do_limite_legal"]) == 1
+    assert d["fora_do_limite_legal"][0]["objeto"] == \
+        "Gêneros da agricultura familiar"
+
+
+def test_obra_e_medida_contra_o_limite_de_obras_nao_de_compras(db):
+    """Art. 75, I (obras/serviços de engenharia) tem teto PRÓPRIO — antes,
+    tudo caía no limite de compras e uma obra de R$ 150 mil marcava 150%
+    quando o certo era medir contra o limite dobrado."""
+    raw_obra = json.dumps({"amparoLegal": {"nome": "Lei 14.133/2021, Art. 75, I"}})
+    db.execute(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, unidade, modalidade_id, modalidade_nome, objeto,"
+        " valor_homologado, data_publicacao, referencia, raw)"
+        " VALUES ('OB1',2026,60,'111','Obras',8,'Dispensa',"
+        " 'Reforma de telhado',150000.0,'2026-06-01',0,?)", (raw_obra,))
+    db.commit()
+
+    d = relatorios.dados_fracionamento(
+        db, 2026, limites={"compras": 100000, "obras": 200000})
+    obra = next(u for u in d["unidades"] if u["unidade"] == "Obras")
+    assert obra["tipo"] == "obras"
+    assert obra["pct"] == pytest.approx(75.0)   # 150.000 / 200.000, não / 100.000
+
+
+def test_dois_orgaos_sob_o_teto_nao_somam_pra_estourar(db):
+    """O teto do art. 75 é "por órgão ou entidade" (§1º) — Prefeitura e
+    Câmara que dispensam a mesma coisa têm cada uma o seu limite. Somar as
+    duas contra um teto só acusaria fracionamento onde há duas compras
+    legais."""
+    raw_ii = json.dumps({"amparoLegal": {"nome": "Art. 75, II"}})
+    db.executemany(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, orgao_nome, unidade, modalidade_id, modalidade_nome,"
+        " objeto, valor_homologado, data_publicacao, referencia, raw)"
+        " VALUES (?,2026,?,?,?,'Sec. Adm',8,'Dispensa','Material',"
+        " 60000.0,'2026-06-01',0,?)",
+        [("PREF1", 70, "111", "PREFEITURA", raw_ii),
+         ("CAM1", 71, "222", "CÂMARA", raw_ii)])
+    db.commit()
+
+    d = relatorios.dados_fracionamento(db, 2026, limites={"compras": 100000})
+    pcts = {u["orgao_nome"]: u["pct"] for u in d["unidades"]
+           if u["total"] == pytest.approx(60000.0)}
+    assert pcts == {"PREFEITURA": pytest.approx(60.0),
+                    "CÂMARA": pytest.approx(60.0)}
+    # nenhuma das duas passa de 100% sozinha — juntas passariam (120%)
+    assert all(pct < 100 for pct in pcts.values())
+
+
+def test_render_fracionamento_mostra_tipo_e_orgao_quando_ha_mais_de_um(
+        db, tmp_path):
+    """Coluna Tipo (Obras/Compras) sempre aparece; coluna Órgão só quando
+    há mais de um órgão com dispensa no exercício — mesmo padrão da
+    coluna Unidade em Contratações."""
+    raw_ii = json.dumps({"amparoLegal": {"nome": "Art. 75, II"}})
+    db.executemany(
+        "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+        " orgao_cnpj, orgao_nome, unidade, modalidade_id, modalidade_nome,"
+        " objeto, valor_homologado, data_publicacao, referencia, raw)"
+        " VALUES (?,2026,?,?,?,'Sec. Adm',8,'Dispensa','Material',"
+        " 1000.0,'2026-06-01',0,?)",
+        [("PREF2", 80, "111", "PREFEITURA", raw_ii),
+         ("CAM2", 81, "222", "CÂMARA", raw_ii)])
+    db.commit()
+
+    r = relatorios.gerar(db, "fracionamento", {"ano": 2026}, "T", "SP", tmp_path)
+    html = Path(r["html"]).read_text(encoding="utf-8")
+    assert "<th>Órgão</th>" in html
+    assert "PREFEITURA" in html and "CÂMARA" in html
+    assert "Compras" in html
+
+
 def test_documento_sai_com_a_paleta_institucional(db, tmp_path):
     """Documento oficial não tem tema (reversão consciente da v1.14.4).
 

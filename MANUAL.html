@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Manual Operacional — Licitarium v1.28.1</title>
+<title>Manual Operacional — Licitarium v1.29.0</title>
 <style>
   @page {
     size: A4; margin: 2cm 1.8cm;
-    @top-center { content: "Licitarium v1.28.1 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
+    @top-center { content: "Licitarium v1.29.0 — Manual Operacional"; font-size: 9pt; color: #6f5b3e; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages);
                     font-size: 9pt; color: #6f5b3e; }
   }
@@ -151,7 +151,7 @@
           fill="var(--text)" text-anchor="middle">MMXXVI</text>
   </svg>
   <h1 class="mark">LICITARI<b>V</b>M</h1>
-  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.28.1</div>
+  <div class="subtitulo">MANUAL DO USUÁRIO · VERSÃO 1.29.0</div>
 </header>
 
 <h2>1. O que é o Licitarium</h2>
@@ -166,7 +166,7 @@ sincronizado e se atualiza sozinho a cada abertura. O Licitarium apenas
 <h2>2. Instalação</h2>
 <h3>Pelo executável (recomendado)</h3>
 <ol>
-  <li>Baixe o <code>Licitarium.v1.28.1.exe</code> na página de releases do
+  <li>Baixe o <code>Licitarium.v1.29.0.exe</code> na página de releases do
       projeto — o nome do arquivo traz a versão, então dá para saber qual
       você tem sem abrir o programa.</li>
   <li>Execute. Não precisa instalar, nem ter Python, nem direitos de administrador.</li>
@@ -771,10 +771,13 @@ de Contas e para prestação de contas interna:</p>
     documento sai sobre a série que você curou, nunca sobre tudo que a busca
     trouxe</td></tr>
   <tr><td>Alerta de Fracionamento</td><td><b>Uso interno</b>: soma das
-    dispensas por unidade comparada aos limites do art. 75 (parametrizáveis
-    nas configurações), com farol de atenção e a lista completa para o gestor
-    avaliar o agrupamento por natureza — o enquadramento legal é sempre
-    avaliação do gestor</td></tr>
+    dispensas por unidade, órgão e tipo (compras × art. 75, II; obras ×
+    art. 75, I — cada teto é parametrizável nas configurações), com farol
+    de atenção e a lista completa para o gestor avaliar o agrupamento por
+    natureza. Dispensa amparada em outro inciso do art. 75 (emergência,
+    licitação deserta, agricultura familiar etc.) ou em lei própria não
+    tem teto por valor — fica declarada à parte, sem entrar na soma. O
+    enquadramento legal é sempre avaliação do gestor</td></tr>
 </table>
 <p>O relatório abre no navegador (🖨 para imprimir; o nome do PDF já vem
 correto). As relações geram também um <b>CSV</b> na mesma pasta

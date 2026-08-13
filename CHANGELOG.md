@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.29.0 — 2026-08-12
+
+**Cinco correções portadas do licitarium-relatorios (Django)**
+
+Auditoria cruzada entre os dois projetos irmãos (mesmos dados do PNCP,
+motores diferentes) achou 5 bugs de lógica de negócio que também
+existiam no Desktop — nenhum específico do motor de impressão (esses
+ficaram de fora, o Desktop imprime via navegador).
+
+- **Categoria morta**: o PNCP preenche `categoria` com "Não se
+  aplica" em quase todos os itens — o `COALESCE` nunca caía no
+  fallback (`material_servico`) porque a string é truthy. "Economia
+  por categoria" saía com uma barra só, sem informação nenhuma.
+- **Preço fora da curva marcado só por cor** (WCAG 1.4.1): a linha
+  destoante da Pesquisa de Preços virava vermelha só via `style`
+  inline. Agora leva `*` no valor + nota de rodapé explicando o
+  critério — quem imprime em P&B ou não distingue vermelho lê o
+  mesmo alerta.
+- **"Economia por modalidade" ordenava errado**: a lista ordenava
+  pelo valor estimado, mas o gráfico desenha o economizado. As outras
+  três (família/categoria/fornecedor) já ordenavam certo.
+- **Modalidade não é amparo legal**: `modalidade_id=8` (Dispensa)
+  virava sinônimo de "sujeita ao limite do art. 75, II" — uma compra
+  de agricultura familiar (dispensa própria, sem teto por valor)
+  podia acusar centenas de % do limite sem irregularidade nenhuma.
+  Novo `teto_da_dispensa()` classifica pelo amparo real (art. 75, I =
+  teto de obras; art. 75, II = teto de compras; demais incisos e
+  outras leis = sem teto, declarado à parte em
+  `fora_do_limite_legal`).
+- **Teto de dispensa somava por município, não por órgão**: o art. 75
+  fala em teto "por órgão ou entidade" (§1º) — Prefeitura e Câmara
+  dispensando a mesma coisa somavam contra um teto só, o que pode
+  acusar fracionamento (crime, art. 337-E do CP) onde há duas compras
+  legais. `dados_fracionamento` e o alerta do Painel agora segregam
+  por (órgão, unidade/objeto, teto).
+
+O relatório de Fracionamento ganha coluna "Tipo" (Obras/Compras) e
+coluna "Órgão" (só quando há mais de um órgão com dispensa no
+exercício).
+
+368 pytest + 152 E2E.
+
 ## 1.28.1 — 2026-08-12
 
 **Nome do PDF: ficha impressa de contratações**

@@ -34,9 +34,10 @@ def api(tmp_path, monkeypatch):
             " valor_estimado, valor_homologado, data_publicacao,"
             " data_encerramento_proposta, referencia, raw)"
             " VALUES (?,?,1,'111',8,?,?,?,?,?,?,"
-            " datetime('now','+10 day'),?,'{}')",
+            " datetime('now','+10 day'),?,?)",
             (controle, ANO, f"Dispensa {controle}", f"Situacao {controle}",
-             f"Objeto {controle}", valor, valor, f"{ANO}-02-01", ref))
+             f"Objeto {controle}", valor, valor, f"{ANO}-02-01", ref,
+             '{"amparoLegal": {"nome": "Lei 14.133/2021, Art. 75, II"}}'))
         db.execute(
             "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
             " numero_item, descricao, unidade, quantidade,"

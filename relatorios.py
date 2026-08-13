@@ -44,8 +44,60 @@ TITULOS = {"contratacoes": "Relação de Contratações",
 LIMITE_PADRAO_OBRAS = 125279.84
 LIMITE_PADRAO_COMPRAS = 62639.92
 
+
+def teto_da_dispensa(amparo, limite_compras, limite_obras):
+    """Qual teto de valor se aplica a uma dispensa — ou `None` quando não há.
+
+    `modalidade_id=8` (Dispensa) NÃO é sinônimo de "sujeita ao limite do
+    art. 75, II" — o amparo legal (lido do `raw`, não é campo da tabela)
+    distingue três situações:
+
+    - **Art. 75, II** — compras e serviços comuns: é o único que responde
+      ao limite de compras.
+    - **Art. 75, I** — obras e serviços de engenharia: teto PRÓPRIO
+      (`LIMITE_PADRAO_OBRAS`, o dobro do de compras).
+    - **Demais incisos** (emergência, licitação deserta, agricultura
+      familiar/Lei 11.947 etc.) e **outras leis**: a dispensa vem da
+      natureza do objeto, não do valor — não há teto contra o qual
+      comparar.
+
+    Achado 2026-08-12, portado da varredura do licitarium-relatorios: uma
+    compra de R$ 1.057.448,50 de gêneros da agricultura familiar (Lei
+    11.947/2009, dispensa PRÓPRIA, sem teto por valor) aparecia como
+    "1688% do limite do art. 75, II" — falso positivo grave, acusação
+    sobre o maior valor da lista onde não havia irregularidade nenhuma.
+
+    Amparo ausente é tratado como "sem teto" — conservador: sem saber o
+    amparo não se afirma que um limite se aplica. Casa "Art. 75, I"/"Art.
+    75, II" em qualquer ponto da string (com ou sem o "Lei 14.133/2021,"
+    na frente — o PNCP varia a formatação) — o `\\b` depois do algarismo
+    garante que "III" (ou incisos maiores) nunca casa como "II".
+    """
+    if not amparo:
+        return None
+    m = re.search(r"Art\.\s*75,\s*(I{1,2})\b", amparo)
+    if not m:
+        return None
+    if m.group(1) == "II":
+        return limite_compras
+    return limite_obras
+
 MESES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun",
               "jul", "ago", "set", "out", "nov", "dez"]
+
+# O PNCP preenche `categoria` com "Não se aplica" na quase totalidade dos
+# itens — a string é truthy, então um `COALESCE`/`or` simples nunca cai pro
+# fallback e "Economia por categoria" sai com UMA barra sem informação
+# nenhuma. `material_servico` tem conteúdo de verdade. Achado 2026-08-12,
+# portado da varredura do licitarium-relatorios (Django).
+CATEGORIA_VAZIA = {"não se aplica", "nao se aplica",
+                   "não informado", "nao informado"}
+
+
+def _categoria_util(categoria, material_servico):
+    if (categoria or "").strip().lower() in CATEGORIA_VAZIA:
+        categoria = None
+    return categoria or material_servico or "(sem categoria)"
 
 
 def _e(v):
@@ -482,10 +534,22 @@ def dados_executivo(db, ano, orgao=None):
 
 
 def dados_fracionamento(db, ano, orgao=None, limites=None):
-    """Dispensas do exercício somadas por unidade, contra os limites do art. 75.
+    """Dispensas do exercício somadas por unidade, contra o teto legal de
+    cada uma (ver `teto_da_dispensa`).
 
     O agrupamento legal correto é por "objeto de mesma natureza" — juízo do
-    gestor; aqui a soma por unidade é um termômetro de autocontrole.
+    gestor; aqui a soma por unidade é um termômetro de autocontrole. Agrupa
+    também por ÓRGÃO — o teto do art. 75 é "por órgão ou entidade" (§1º):
+    Prefeitura e Câmara que dispensam a mesma coisa têm cada uma o seu
+    limite, e somar as duas contra um teto só acusaria fracionamento (crime,
+    art. 337-E do CP) onde há duas compras legais — e por TETO, porque a
+    mesma unidade pode ter dispensa de compra e de obra, com limites
+    diferentes. Achado 2026-08-12, portado da varredura do
+    licitarium-relatorios.
+
+    Dispensa sem teto por valor (amparo em outro inciso do art. 75 ou em
+    lei própria) não soma no termômetro nem no total — sai declarada à
+    parte em `fora_do_limite_legal`, pra não desaparecer do relatório.
     """
     ano = int(ano)
     limites = limites or {}
@@ -499,22 +563,37 @@ def dados_fracionamento(db, ano, orgao=None, limites=None):
     limite_obras = _limite(limites.get("obras"), LIMITE_PADRAO_OBRAS)
     og = " AND orgao_cnpj=?" if orgao else ""
     og_args = [orgao] if orgao else []
-    unidades = [dict(r) for r in db.execute(
-        f"""SELECT COALESCE(unidade,'(sem unidade)') unidade, COUNT(*) n,
-                   SUM(COALESCE(valor_homologado, valor_estimado, 0)) total
-            FROM contratacoes
-            WHERE referencia=0 AND ano=? AND modalidade_id=8{og}
-            GROUP BY 1 ORDER BY total DESC""", [ano] + og_args)]
-    for u in unidades:
-        u["pct"] = u["total"] / limite_compras * 100 if limite_compras else 0
-    dispensas = [dict(r) for r in db.execute(
-        f"""SELECT sequencial, ano, unidade, objeto,
-                   COALESCE(valor_homologado, valor_estimado) valor,
-                   data_publicacao
+    linhas = [dict(r) for r in db.execute(
+        f"""SELECT sequencial, ano, orgao_cnpj, orgao_nome,
+                   COALESCE(unidade,'(sem unidade)') unidade, objeto,
+                   COALESCE(valor_homologado, valor_estimado, 0) valor,
+                   data_publicacao,
+                   json_extract(raw, '$.amparoLegal.nome') amparo
             FROM contratacoes
             WHERE referencia=0 AND ano=? AND modalidade_id=8{og}
             ORDER BY unidade, data_publicacao""", [ano] + og_args)]
+
+    dispensas, fora = [], []
+    grupos = {}
+    for l in linhas:
+        teto = teto_da_dispensa(l["amparo"], limite_compras, limite_obras)
+        if teto is None:
+            fora.append(l)
+            continue
+        dispensas.append(l)
+        chave = (l["orgao_cnpj"], l["unidade"], teto)
+        g = grupos.setdefault(chave, {
+            "unidade": l["unidade"], "orgao_nome": l["orgao_nome"], "n": 0,
+            "total": 0.0, "limite": teto,
+            "tipo": "obras" if teto == limite_obras else "compras"})
+        g["n"] += 1
+        g["total"] += l["valor"] or 0
+    unidades = sorted(grupos.values(), key=lambda u: -u["total"])
+    for u in unidades:
+        u["pct"] = u["total"] / u["limite"] * 100 if u["limite"] else 0
+
     return {"ano": ano, "unidades": unidades, "dispensas": dispensas,
+            "fora_do_limite_legal": fora,
             "limite_compras": limite_compras, "limite_obras": limite_obras,
             "total": sum(d["valor"] or 0 for d in dispensas),
             "n": len(dispensas)}
@@ -600,17 +679,22 @@ def dados_painel(db, ano, orgao=None, limites=None):
                 FROM contratacoes
                 WHERE referencia=0 AND ano=? AND valor_estimado > 0
                   AND valor_homologado IS NOT NULL{og}
-                GROUP BY 1 ORDER BY 3 DESC""", [ano] + og_args):
+                GROUP BY 1""", [ano] + og_args):
         desagios.append({"modalidade": r[0], "n": r[1],
                          "estimado": r[2] or 0, "homologado": r[3] or 0,
                          "economizado": (r[2] or 0) - (r[3] or 0),
                          "pct": (1 - (r[3] or 0) / r[2]) * 100 if r[2] else 0})
+    # ordena pelo que o gráfico desenha (economizado), não pelo estimado —
+    # achado 2026-08-12, portado do licitarium-relatorios: as outras três
+    # listas (família/categoria/fornecedor) já ordenam por economizado, só
+    # esta estava com a métrica errada
+    desagios.sort(key=lambda d: -d["economizado"])
 
     # economia por família de item e por categoria bruta do PNCP — a mesma
     # pergunta do deságio por modalidade, só que descendo ao item; uma
     # consulta só em `itens` alimenta as duas listas
     itens_economia = [dict(r) for r in db.execute(
-        f"""SELECT descricao, COALESCE(categoria, material_servico) categoria,
+        f"""SELECT descricao, categoria, material_servico,
                    fornecedor_ni, fornecedor_nome,
                    valor_total_estimado est, valor_total_homologado hom
               FROM itens
@@ -626,7 +710,7 @@ def dados_painel(db, ano, orgao=None, limites=None):
         alvo["n"] += 1
         alvo["estimado"] += it["est"] or 0
         alvo["homologado"] += it["hom"] or 0
-        cat = it["categoria"] or "(sem categoria)"
+        cat = _categoria_util(it["categoria"], it["material_servico"])
         alvo_cat = por_categoria.setdefault(
             cat, {"nome": cat, "n": 0, "estimado": 0.0, "homologado": 0.0})
         alvo_cat["n"] += 1
@@ -724,25 +808,35 @@ def dados_painel(db, ano, orgao=None, limites=None):
     # O campo "unidade" do PNCP costuma trazer o nome do órgão — no acervo
     # do piloto, todas as dispensas caem em "MUNICIPIO DE ORINDIUVA" e o
     # medidor vira uma linha só. Agrupar por objeto é também o critério
-    # legal: o art. 75 fala em objeto de mesma natureza.
+    # legal: o art. 75 fala em objeto de mesma natureza. Mesma correção de
+    # `dados_fracionamento` (achado 2026-08-12): só entra dispensa com
+    # teto por valor (`teto_da_dispensa`), agrupada também por órgão — o
+    # alerta do Painel tinha o mesmo defeito copiado.
     por_objeto = {}
     for r in db.execute(
-            f"""SELECT objeto, COALESCE(valor_homologado, valor_estimado, 0)
+            f"""SELECT objeto, orgao_cnpj,
+                       COALESCE(valor_homologado, valor_estimado, 0),
+                       json_extract(raw, '$.amparoLegal.nome')
                   FROM contratacoes
                  WHERE referencia=0 AND ano=? AND modalidade_id=8{og}""",
             [ano] + og_args):
+        teto = teto_da_dispensa(r[3], fracionamento["limite_compras"],
+                                fracionamento["limite_obras"])
+        if teto is None:
+            continue
         # duas palavras significativas: com três, "PAPEL A4" e "PAPEL A4
         # SULFITE" viram objetos distintos e o limite deixa de somar o que
         # a lei manda somar; com uma, "MATERIAL" engoliria meio acervo
-        chave = pca_builder.chave_agrupamento(r[0], palavras=2)             or "(sem descrição)"
-        alvo = por_objeto.setdefault(chave, {"objeto": chave, "n": 0,
-                                             "total": 0.0})
+        chave_objeto = pca_builder.chave_agrupamento(r[0], palavras=2) \
+            or "(sem descrição)"
+        alvo = por_objeto.setdefault((r[1], chave_objeto, teto),
+                                     {"objeto": chave_objeto, "n": 0,
+                                      "total": 0.0, "limite": teto})
         alvo["n"] += 1
-        alvo["total"] += r[1] or 0
-    limite = fracionamento["limite_compras"]
+        alvo["total"] += r[2] or 0
     objetos = sorted(por_objeto.values(), key=lambda o: -o["total"])
     for o in objetos:
-        o["pct"] = o["total"] / limite * 100 if limite else 0
+        o["pct"] = o["total"] / o["limite"] * 100 if o["limite"] else 0
     perto_do_limite = [o for o in objetos if o["pct"] >= 75]
 
     return {
@@ -1426,6 +1520,10 @@ def _css(paisagem, papel="A4"):
         text-transform:uppercase; }}
   tr {{ break-inside:avoid; }}
   tbody tr:nth-child(even) td {{ background:var(--zebra); }}
+  /* linha fora da faixa esperada (Pesquisa de Preços): cor nunca sozinha
+     (WCAG 1.4.1) — o "*" no valor e a nota de rodapé carregam o mesmo
+     alerta pra quem imprime em P&B ou não distingue vermelho */
+  tr.fora td {{ color:var(--alerta); }}
   /* colunas curtas (valores, datas, qtde): centro nos dois eixos */
   td.num, th.num {{ text-align:center; font-variant-numeric:tabular-nums;
                     white-space:nowrap; }}
@@ -1580,7 +1678,14 @@ def render_fracionamento(d, municipio, uf, brasao=None):
         if pct >= 75:
             return '<span class="farol-atencao">Atenção</span>'
         return "ok"
-    unid = "".join(f"""<tr><td>{_e(u['unidade'])}</td>
+    # a coluna Órgão só aparece quando há mais de um com dispensa (mesmo
+    # padrão da coluna Unidade): sem ela, duas linhas do mesmo objeto
+    # pareceriam duplicata, quando são dois entes com teto próprio cada um
+    varios_orgaos = len({u["orgao_nome"] for u in d["unidades"]}) > 1
+    unid = "".join(f"""<tr>{
+      f'<td>{_e(u["orgao_nome"])}</td>' if varios_orgaos else ''}
+      <td>{_e(u['unidade'])}</td>
+      <td>{'Obras' if u['tipo'] == 'obras' else 'Compras'}</td>
       <td class="num">{u['n']}</td>
       <td class="num">{moeda(u['total'])}</td>
       <td class="num">{u['pct']:.0f}%</td>
@@ -1591,23 +1696,40 @@ def render_fracionamento(d, municipio, uf, brasao=None):
       <td class="num">{moeda(l['valor'])}</td>
       <td class="num">{data_br(l['data_publicacao'])}</td></tr>"""
       for l in d["dispensas"])
+    n_colunas = 6 if varios_orgaos else 5
+    fora = d.get("fora_do_limite_legal") or []
+    nota_fora = (f'<p class="nota">Cada linha é medida contra o teto do seu '
+                 f'próprio inciso — obra tem limite dobrado em relação a '
+                 f'compra, e dispensa do mesmo órgão nunca soma com a de '
+                 f'outro. Outras {len(fora)} dispensa'
+                 f'{"s" if len(fora) != 1 else ""} do exercício ficaram '
+                 f'fora deste quadro por não terem teto por valor — amparo '
+                 f'em outro inciso do art. 75 (emergência, licitação '
+                 f'deserta, agricultura familiar etc.) ou em lei própria '
+                 f'decorre da natureza do objeto, não do valor.</p>'
+                 if fora else '')
     corpo = f"""<div class="caixa-aviso">Instrumento de <b>autocontrole
 interno</b>. A soma por unidade é um termômetro: o enquadramento legal do
 fracionamento considera despesas de <b>mesma natureza</b> (art. 75, §1º, Lei
 14.133/2021), avaliação que cabe ao gestor. Limites parametrizados nas
 configurações — confira o decreto de atualização vigente.
-Limite adotado para compras/serviços: <b>{moeda(d['limite_compras'])}</b> ·
-obras/serviços de engenharia: <b>{moeda(d['limite_obras'])}</b>.</div>
+Limite adotado para compras/serviços (art. 75, II): <b>{moeda(d['limite_compras'])}</b> ·
+obras/serviços de engenharia (art. 75, I): <b>{moeda(d['limite_obras'])}</b>.
+Cada dispensa é medida contra o teto do próprio órgão — nunca somada com a
+de outro ente.</div>
 <div class="cards">
 <div class="card"><div class="n">{d['n']}</div><div class="l">dispensas no exercício</div></div>
 <div class="card"><div class="n">{moeda(d['total'])}</div><div class="l">total em dispensas</div></div>
 </div>
-<h2>Soma de dispensas por unidade × limite de compras/serviços</h2>
+<h2>Soma de dispensas por unidade × teto legal</h2>
 <div class="card">{_grafico_limites(d["unidades"])}</div>
-<table><thead><tr><th>Unidade</th><th class="num">Dispensas</th>
-<th class="num">Total</th><th class="num">% do limite</th>
+<table><thead><tr>{
+  '<th>Órgão</th>' if varios_orgaos else ''}<th>Unidade</th><th>Teto</th>
+<th class="num">Dispensas</th>
+<th class="num">Total</th><th class="num">% do teto</th>
 <th class="ctr">Situação</th></tr></thead>
-<tbody>{unid or '<tr><td colspan="5">Nenhuma dispensa no exercício.</td></tr>'}</tbody></table>
+<tbody>{unid or f'<tr><td colspan="{n_colunas}">Nenhuma dispensa com teto por valor no exercício.</td></tr>'}</tbody></table>
+{nota_fora}
 <h2>Dispensas do exercício (para agrupamento por natureza pelo gestor)</h2>
 <table><thead><tr><th class="ctr">Processo</th><th class="ctr">Unidade</th>
 <th>Objeto</th><th class="num">Valor</th><th class="num">Publicação</th></tr></thead>
@@ -1795,12 +1917,14 @@ def render_precos(d, municipio, uf, brasao=None, grafico_html=None):
             cards += f'<div class="card">{grafico}</div>'
     coluna_conteudo = d.get("por_conteudo")
     coluna_corrigido = d.get("corrigido")
+    tem_fora_da_curva = any(l.get("fora_da_curva") for l in d["linhas"])
     linhas = "".join(f"""<tr{
-      ' style="color:var(--erro)"' if l.get("fora_da_curva") else ""}>
+      ' class="fora"' if l.get("fora_da_curva") else ""}>
       <td class="obj">{_e(l['descricao'])}</td>
       <td class="unid">{_e(l['unidade'])}</td>
       <td class="num">{quantidade(l['quantidade_homologada'])}</td>
-      <td class="num">{moeda(l['valor_unitario_homologado'])}</td>{
+      <td class="num">{moeda(l['valor_unitario_homologado'])}{
+        ' *' if l.get("fora_da_curva") else ''}</td>{
         f'<td class="num">{moeda(l["corrigido"])}</td>'
         if coluna_corrigido else ''}{
         f'<td class="num">{moeda_fina(l["por_conteudo"]["valor"])}</td>'
@@ -1846,7 +1970,11 @@ O número do processo leva à página oficial no PNCP, para conferência.{
 <th class="num">Total</th><th class="forn">Fornecedor</th>
 <th class="muni">Município</th>
 <th class="ctr">Processo</th><th class="num">Resultado</th></tr></thead>
-<tbody>{linhas}</tbody></table>{_desconsiderados_html(d)}"""
+<tbody>{linhas}</tbody></table>{
+  '<p class="nota">* preço fora da faixa esperada (critério de Tukey ou '
+  'escore Z modificado) — vale conferir se o item é mesmo comparável antes '
+  'de usá-lo na média.</p>' if tem_fora_da_curva else ''
+}{_desconsiderados_html(d)}"""
     titulo = f"{TITULOS['precos']} — {d['termo']} — {municipio}"
     return _pagina(titulo, corpo, municipio, uf, periodo, paisagem=True,
                    estilo_extra=CSS_PAINEL, brasao=brasao)

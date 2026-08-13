@@ -36,13 +36,20 @@ def api(tmp_path, monkeypatch):
         ("D3", ANO - 1, 8, "Saúde", 20000.0, 18000.0, f"{ANO - 1}-04-01"),
     ]
     for id_, ano, mod, uni, est, hom, pub in contratacoes:
+        # dispensa (mod=8) precisa de amparo legal com teto por valor
+        # (art. 75, II — compras/serviços comuns) pra contar no medidor de
+        # fracionamento: achado 2026-08-12, teto_da_dispensa() trata amparo
+        # ausente como "sem teto" (conservador), então sem isto as dispensas
+        # da fixture ficariam de fora do termômetro por padrão
+        raw = '{"amparoLegal": {"nome": "Lei 14.133/2021, Art. 75, II"}}' \
+            if mod == 8 else '{}'
         db.execute(
             "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
             " orgao_cnpj, unidade, modalidade_id, modalidade_nome, objeto,"
             " valor_estimado, valor_homologado, data_publicacao, referencia,"
-            " raw) VALUES (?,?,1,'111',?,?,?,'Objeto',?,?,?,0,'{}')",
+            " raw) VALUES (?,?,1,'111',?,?,?,'Objeto',?,?,?,0,?)",
             (id_, ano, uni, mod, "Dispensa" if mod == 8 else "Pregão",
-             est, hom, pub))
+             est, hom, pub, raw))
     # item homologado: é o que faz a contratação contar como "com resultado"
     db.execute("INSERT INTO itens (id, contratacao_controle, ano, descricao,"
                " unidade, valor_unitario_homologado, raw)"
@@ -163,7 +170,8 @@ def test_medidor_de_limite_agrupa_por_objeto(api):
                    " objeto, valor_estimado, valor_homologado, data_publicacao,"
                    " referencia, raw) VALUES ('D9',?,9,'111','Saúde',8,"
                    " 'Dispensa','CONTRATAÇÃO DE MANUTENÇÃO PREDIAL',9000,9000,"
-                   " ?,0,'{}')", (ANO, f"{ANO}-05-05"))
+                   " ?,0,?)", (ANO, f"{ANO}-05-05",
+                   '{"amparoLegal": {"nome": "Lei 14.133/2021, Art. 75, II"}}'))
         db.commit()
     finally:
         db.close()
@@ -580,6 +588,32 @@ def test_economia_por_modalidade_traz_valor_em_reais(api):
     assert por_mod["Dispensa"]["economizado"] == pytest.approx(3000.0)
 
 
+def test_economia_por_modalidade_ordena_pelo_economizado_nao_pelo_estimado(api):
+    """Achado 2026-08-12 (portado do licitarium-relatorios): a lista
+    ordenava por `valor_estimado` (SQL `ORDER BY 3`), mas o gráfico desenha
+    `economizado` — as outras três listas (família/categoria/fornecedor) já
+    ordenavam certo, só esta estava com a métrica errada. Modalidade com
+    estimado ALTO e economia baixa não pode vir antes de uma com estimado
+    baixo mas economia alta."""
+    db = _db()
+    try:
+        db.executemany(
+            "INSERT INTO contratacoes (numero_controle, ano, sequencial,"
+            " orgao_cnpj, modalidade_nome, objeto, valor_estimado,"
+            " valor_homologado, data_publicacao, referencia)"
+            " VALUES (?,?,?,?,?,?,?,?,?,0)",
+            [("MOD-1", ANO, 900, "111", "Concorrência", "obra grande",
+              100000.0, 99000.0, f"{ANO}-01-01"),   # estimado alto, economia mínima
+             ("MOD-2", ANO, 901, "111", "Inexigibilidade", "serviço técnico",
+              20000.0, 5000.0, f"{ANO}-01-01")])    # estimado baixo, economia alta
+        db.commit()
+    finally:
+        db.close()
+
+    nomes = [m["modalidade"] for m in api.painel(ANO)["economia"]["por_modalidade"]]
+    assert nomes.index("Inexigibilidade") < nomes.index("Concorrência")
+
+
 def test_economia_por_familia_agrupa_como_o_medidor_de_limite(api):
     """Mesma chave de agrupamento do fracionamento (pca_builder.chave_agrupamento):
     os dois "papel A4" do PNCP caem na mesma família."""
@@ -626,6 +660,30 @@ def test_economia_por_categoria_usa_material_servico_quando_falta_categoria(api)
                for c in api.painel(ANO)["economia"]["por_categoria"]}
     assert "Serviço de manutenção" in por_cat
     assert por_cat["Serviço de manutenção"]["economizado"] == pytest.approx(1000.0)
+
+
+def test_economia_por_categoria_usa_material_servico_quando_categoria_e_nao_se_aplica(api):
+    """Achado 2026-08-12 (portado do licitarium-relatorios): o PNCP preenche
+    `categoria` com "Não se aplica" — string truthy, `categoria or material`
+    nunca caía pro fallback e "Economia por categoria" saía com uma barra
+    só chamada "Não se aplica", sem informação nenhuma."""
+    db = _db()
+    try:
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, categoria, material_servico, valor_total_estimado,"
+            " valor_total_homologado, referencia, raw)"
+            " VALUES ('P1#serv','P1','111',?,'MANUTENÇÃO DE VEÍCULO',"
+            "'Não se aplica','Serviço',6000.0,5000.0,0,'{}')", (ANO,))
+        db.commit()
+    finally:
+        db.close()
+
+    por_cat = {c["nome"]: c
+               for c in api.painel(ANO)["economia"]["por_categoria"]}
+    assert "Não se aplica" not in por_cat
+    assert "Serviço" in por_cat
+    assert por_cat["Serviço"]["economizado"] == pytest.approx(1000.0)
 
 
 def test_economia_por_fornecedor_agrupa_pelo_documento(api):

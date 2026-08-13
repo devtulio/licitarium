@@ -205,9 +205,37 @@ def test_papel_marca_a_linha_extrema_e_mostra_sensibilidade_e_concentracao(
 
     html = relatorios.render_precos(d, "T", "SP")
     db.close()
-    assert 'style="color:var(--erro)"' in html
+    # cor nunca sozinha (WCAG 1.4.1) — achado 2026-08-12, portado do
+    # licitarium-relatorios: quem imprime em P&B ou não distingue vermelho
+    # lê pelo "*" no valor e pela nota de rodapé, não só pela cor da linha
+    assert 'class="fora"' in html
+    assert "1.490,00 *" in html
+    assert "preço fora da faixa esperada" in html
     assert "Sensibilidade" in html and "213,97" in html
     assert "Concentração" in html and "1 processo" in html
+
+
+def test_papel_sem_extremo_nao_explica_asterisco_que_nao_existe(
+        api, tmp_path, selecionar_tudo):
+    """Nota de rodapé do "*" só sai quando há linha marcada — sem isso o
+    documento explicaria um símbolo que não aparece em lugar nenhum."""
+    db = licitarium.abrir_db()
+    for i, v in enumerate([10.0, 20.0, 30.0, 40.0, 50.0], 1):
+        db.execute(
+            "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
+            " descricao, unidade, valor_unitario_homologado,"
+            " quantidade_homologada, referencia, raw)"
+            " VALUES (?,'K','111',2026,'AQUISIÇÃO DE PAPEL A4','RESMA',"
+            "?,10,0,'{}')", (f"J{i}", v))
+        db.execute("INSERT OR IGNORE INTO precos_selecionados"
+                   " (termo, item_id, criado_em) VALUES ('papel a4',?,'')",
+                   (f"J{i}",))
+    db.commit()
+    d = relatorios.dados_precos(db, "papel a4")
+    html = relatorios.render_precos(d, "T", "SP")
+    db.close()
+    assert 'class="fora"' not in html
+    assert "preço fora da faixa esperada" not in html
 
 
 def _linhas_y(svg, classe):
