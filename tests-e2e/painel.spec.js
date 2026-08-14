@@ -530,25 +530,39 @@ test("chip.aviso não herda margin-top da classe .aviso genérica",
   for (const y of ys) expect(y).toBe(ys[0]);
 });
 
-test("rótulos da agenda nunca se sobrepõem, mesmo com vizinhos lotados",
+test("a agenda é um calendário de três meses, com os dias da semana",
     async ({ page }) => {
-  // achado da auditoria de design (2026-08-08): o acervo de exemplo tem
-  // grupos de 11 e 12 fornecedores em dias vizinhos (8 e 23) — os dois
-  // rótulos, cada um já longo por causa do "+N", entravam um no outro.
-  // Medindo a caixa real de cada <text>, não só contando quantos apareceram.
+  // Substituiu a linha do tempo de 90 dias (escolha do usuário entre quatro
+  // desenhos, 2026-08-14). O teste antigo aqui media colisão de rótulo —
+  // problema que só existia porque 40 vencimentos disputavam o primeiro
+  // terço de uma linha. No calendário eles caem em datas distintas.
   await page.locator('.subabas button[data-vista="vigilancia"]').click();
-  await page.waitForTimeout(150);
-  const rotulos = page.locator('[data-graf="agenda"] svg text.val');
-  const caixas = await rotulos.evaluateAll(els => els
-    // só os rótulos de nome (o número dentro do círculo também é .val,
-    // mas tem font-weight:600 e y diferente — filtra pelo texto)
-    .filter(el => !/^\d+$/.test(el.textContent.trim()))
-    .map(el => el.getBoundingClientRect())
-    .map(r => ({ left: r.left, right: r.right, texto: "" }))
-    .sort((a, b) => a.left - b.left));
-  expect(caixas.length).toBeGreaterThan(1);
-  for (let i = 1; i < caixas.length; i++)
-    expect(caixas[i].left).toBeGreaterThanOrEqual(caixas[i - 1].right);
+  const cal = page.locator('[data-graf="agenda"]');
+  await expect(cal.locator(".cal-mes")).toHaveCount(3);
+  for (const mes of await cal.locator(".cal-sem").all())
+    await expect(mes).toHaveText("DomSegTerQuaQuiSexSáb");
+});
+
+test("o dia e a quantidade de vencimentos não disputam o mesmo lugar",
+    async ({ page }) => {
+  // No protótipo a célula acesa mostrava só a contagem, e "3" tanto podia
+  // ser o dia 3 quanto três vencimentos. O dia fica no corpo da célula; a
+  // contagem, num selo à parte.
+  await page.locator('.subabas button[data-vista="vigilancia"]').click();
+  const celulas = await page.locator('[data-graf="agenda"] .cal-dia.venc')
+    .evaluateAll(cs => cs.map(c => ({
+      dia: c.firstChild.textContent.trim(),
+      selo: c.querySelector("b")?.textContent.trim() ?? null })));
+  expect(celulas.length).toBeGreaterThan(2);
+  for (const c of celulas) {
+    expect(+c.dia, "dia do mês").toBeGreaterThanOrEqual(1);
+    expect(+c.dia).toBeLessThanOrEqual(31);
+    expect(+c.selo, "selo de contagem").toBeGreaterThanOrEqual(1);
+  }
+  // o acervo de exemplo tem um dia com 11 e outro com 12 vencimentos: é o
+  // amontoado que derrubava a linha do tempo, e que aqui vira número
+  const selos = celulas.map(c => +c.selo);
+  expect(Math.max(...selos)).toBeGreaterThanOrEqual(10);
 });
 
 test("trocar de subaba não vai ao banco de novo", async ({ page }) => {

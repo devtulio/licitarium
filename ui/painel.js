@@ -706,95 +706,81 @@ function grafFunil(el, f, larg = 500) {
 // Vencimentos se amontoam: numa prefeitura pequena, meia dúzia de contratos
 // termina no mesmo dia. Por isso a marca é o DIA, não o contrato — o tamanho
 // dela conta quantos, e o rótulo nomeia o primeiro.
+const SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const MES_EXT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+                 "julho", "agosto", "setembro", "outubro", "novembro",
+                 "dezembro"];
+
+// Chave de dia montada à mão. `toISOString()` converte para UTC e, depois
+// das 21h no fuso de Brasília, devolve o dia seguinte — o mesmo defeito que
+// já mordeu a família inteira (`_isoLocal` no esqueleto do SGx).
+const _chaveDia = (d) => `${d.getFullYear()}-${
+  String(d.getMonth() + 1).padStart(2, "0")}-${
+  String(d.getDate()).padStart(2, "0")}`;
+
+// ── agenda: calendário de três meses ──────────────────────────────────────
+// Era uma linha do tempo de 90 dias com um ponto por vencimento, e não
+// funcionava porque vencimento não se espalha: ele se amontoa em cinco ou
+// seis datas. Quarenta registros disputavam o primeiro terço da linha, os
+// rótulos colidiam (havia lógica de corte por caractere só para isso) e dois
+// terços do cartão ficavam vazios. No calendário o amontoado cai onde ele
+// pertence — na data — e vira informação em vez de estorvo.
+// Escolha do usuário entre quatro desenhos propostos, 2026-08-14.
+//
+// O dia fica SEMPRE visível e a contagem vai num selo à parte: no protótipo
+// a célula acesa mostrava só a quantidade, e "3" tanto podia ser o dia 3
+// quanto três vencimentos.
 function grafAgenda(el, itens) {
   if (!itens.length) {
     el.innerHTML = `<div class="vazio">Nada vence nos próximos 90 dias.</div>`;
     return;
   }
-  const porDia = new Map();
+  const porData = new Map();
   itens.forEach(it => {
-    const d = Math.max(0, Math.min(90, it.dias ?? 0));
-    (porDia.get(d) ?? porDia.set(d, []).get(d)).push(it);
+    const k = (it.vigencia_fim || "").slice(0, 10);
+    if (!k) return;
+    (porData.get(k) ?? porData.set(k, []).get(k)).push(it);
   });
-  const dias = [...porDia.keys()].sort((a, b) => a - b);
-  // eixo/marcas de dia e o corpo do balão saem do ECharts; a linha de base,
-  // as 4 marcas fixas (hoje/+30/+60/+90) e os rótulos de nome continuam à
-  // mão num overlay — a colisão de rótulo é lógica de layout, não depende
-  // de motor de gráfico nenhum
-  el.innerHTML = `<div style="position:relative">
-    <div class="graf-echart" style="height:130px"></div>
-    <svg data-overlay aria-hidden="true"
-      style="position:absolute;inset:0;pointer-events:none"></svg></div>`;
-  const alvoChart = el.querySelector(".graf-echart");
-  const overlay = el.querySelector("svg[data-overlay]");
-  const chart = _iniciarEchart(alvoChart);
-  chart.setOption({
-    animation: false,
-    grid: { left: 4, right: 4, top: 40, bottom: 34 },
-    xAxis: { type: "value", min: 0, max: 90, show: false },
-    yAxis: { type: "value", min: -1, max: 1, show: false },
-    series: [{ type: "scatter", data: dias.map(d => {
-      const grupo = porDia.get(d);
-      return { value: [d, 0], symbolSize: Math.min(22, 12 + grupo.length * 2),
-        itemStyle: { color: d <= 15 ? "var(--erro)" : d <= 60 ? "var(--warn)"
-                                                                : "var(--s3)" },
-        label: grupo.length > 1 ? { show: true, formatter: String(grupo.length),
-          color: "var(--accent-fg)", fontWeight: 600, fontSize: 11 } : undefined };
-    }), emphasis: { disabled: true } }]
-  });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    const d = dias[p.dataIndex], grupo = porDia.get(d);
-    mostrarTt(..._ptEvento(p), [{
-      v: `vence${grupo.length > 1 ? "m" : ""} em ${d} ${d === 1 ? "dia" : "dias"}`,
-      l: `${grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ")} · ${
-        dataBr(grupo[0].vigencia_fim)}` }]);
-  });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const kHoje = _chaveDia(hoje);
 
-  const larguraPx = alvoChart.clientWidth, alturaPx = alvoChart.clientHeight;
-  overlay.setAttribute("width", larguraPx);
-  overlay.setAttribute("height", alturaPx);
-  const pxX = (d) => chart.convertToPixel({ gridIndex: 0 }, [d, 0])[0];
-  const yBase = chart.convertToPixel({ gridIndex: 0 }, [0, 0])[1];
-
-  let g = `<line x1="${pxX(0)}" y1="${yBase}" x2="${pxX(90)}" y2="${yBase}"
-             class="eixo" stroke-width="2"/>`;
-  // As duas pontas ancoram para dentro: centralizadas em pxX(0)/pxX(90),
-  // que são as bordas da grade, metade do "hoje" e do "+90 dias" caía fora
-  // do cartão. As marcas do meio seguem centralizadas no ponto.
-  [0, 30, 60, 90].forEach(d =>
-    g += `<text class="rot" x="${pxX(d)}" y="${yBase + 30}"
-           text-anchor="${d === 0 ? "start" : d === 90 ? "end" : "middle"}"
-           >${d ? `+${d} dias` : "hoje"}</text>`);
-  // Largura estimada de cada caractere do rótulo (.val, 11px, maiúsculas —
-  // texto em caixa alta é mais largo por caractere que caixa mista comum).
-  // O rótulo é centralizado no ponto (text-anchor:middle), então a borda
-  // esquerda fica em cx - largura/2: é essa borda que não pode invadir a
-  // direita do rótulo anterior.
-  const PX_POR_CHAR = 6.4, MARGEM = 6;
-  let direitaUltimoRotulo = -Infinity;
-  dias.forEach(d => {
-    const grupo = porDia.get(d);
-    const raio = Math.min(11, 6 + grupo.length);
-    const cx = pxX(d);
-    // corta o nome no que couber sem tocar o rótulo anterior — em vez de um
-    // limiar fixo de pixels que não sabia quanto texto vinha depois, e por
-    // isso deixava nomes longos vizinhos se sobreporem e virarem ruído
-    const sufixo = grupo.length > 1 ? ` +${grupo.length - 1}` : "";
-    const espacoLivre = cx - direitaUltimoRotulo;
-    const larguraMax = 2 * (espacoLivre - MARGEM);
-    const charsCabem = Math.min(22,
-      Math.floor(larguraMax / PX_POR_CHAR) - sufixo.length);
-    if (charsCabem >= 3) {
-      const bruto = fornecedorCurto(grupo[0].nome) ?? grupo[0].tipo;
-      const nome = bruto.slice(0, charsCabem) + sufixo;
-      g += `<text class="val" x="${cx}" y="${yBase - raio - 8}"
-              text-anchor="middle">${esc(nome)}</text>`;
-      direitaUltimoRotulo = cx + (nome.length * PX_POR_CHAR) / 2;
+  const meses = [0, 1, 2].map(salto => {
+    const base = new Date(hoje.getFullYear(), hoje.getMonth() + salto, 1);
+    const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const celulas = [];
+    for (let i = 0; i < base.getDay(); i++)
+      celulas.push(`<div class="cal-dia fora" aria-hidden="true"></div>`);
+    for (let d = 1; d <= ultimo; d++) {
+      const k = _chaveDia(new Date(base.getFullYear(), base.getMonth(), d));
+      const grupo = porData.get(k);
+      const marca = k === kHoje ? " hoje" : "";
+      if (!grupo) {
+        celulas.push(`<div class="cal-dia${marca}">${d}</div>`);
+        continue;
+      }
+      const prazo = grupo[0].dias ?? 0;
+      const faixa = prazo <= 15 ? "u" : prazo <= 60 ? "a" : "t";
+      const quem = grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ");
+      const quantos = `${grupo.length} vencimento${grupo.length > 1 ? "s" : ""}`;
+      celulas.push(`<div class="cal-dia venc ${faixa}${marca}"
+        data-tip-v="${esc(quantos)} em ${esc(dataBr(k))}"
+        data-tip-l="${esc(quem)}" title="${esc(quantos)} — ${esc(quem)}"
+        >${d}<b>${grupo.length}</b></div>`);
     }
+    // o ano só aparece quando a janela de 90 dias vira o calendário
+    const ano = base.getFullYear() !== hoje.getFullYear()
+      ? ` de ${base.getFullYear()}` : "";
+    return `<div class="cal-mes"><h4>${MES_EXT[base.getMonth()]}${ano}</h4>
+      <div class="cal-sem" aria-hidden="true">${
+        SEMANA.map(s => `<span>${s}</span>`).join("")}</div>
+      <div class="cal-grade">${celulas.join("")}</div></div>`;
   });
-  overlay.innerHTML = g;
+  el.innerHTML = `<div class="cal">${meses.join("")}</div>
+    <div class="leg">
+      <span><i style="background:var(--erro)"></i>vence em até 15 dias</span>
+      <span><i style="background:var(--warn)"></i>16 a 60 dias</span>
+      <span><i style="background:var(--s3)"></i>61 a 90 dias</span></div>`;
 }
 
 // ══ montagem das três vistas ══════════════════════════════════════════════
@@ -986,8 +972,10 @@ function vistaVigilancia(d) {
               resultado registrado no PNCP.`)}
   </div>
   ${cartaoGraf("Agenda dos próximos 90 dias", "agenda",
-           `Vermelho vence em menos de 15 dias; âmbar, em 60; verde, além
-            disso.`)}`;
+           `O número no canto do dia é quantos contratos ou atas vencem nele
+            — passe o mouse para ver quais. Vencimento se concentra em
+            poucas datas, e é isso que o calendário mostra melhor que uma
+            linha do tempo.`)}`;
 }
 
 function vistaEconomia(d) {

@@ -632,6 +632,43 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .painel.carregando .painel-topo button { cursor:progress; }
 .painel svg text { font-family:var(--font-ui); }
 .painel .rot { font-size:10.5px; fill:var(--muted); }
+
+/* ── agenda: calendário de três meses ─────────────────────────────────────
+   Substituiu a linha do tempo de 90 dias. É HTML, não SVG: a impressão do
+   painel captura o innerHTML da vista, então uma grade CSS sai no papel
+   sem passo nenhum de conversão. */
+.cal { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+.cal-mes h4 { font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+              color:var(--muted); font-weight:600; margin-bottom:7px; }
+.cal-sem, .cal-grade { display:grid; grid-template-columns:repeat(7, 1fr);
+                       gap:3px; }
+.cal-sem { margin-bottom:3px; }
+.cal-sem span { font-size:11px; color:var(--muted); text-align:center;
+                letter-spacing:.03em; }
+.cal-dia { aspect-ratio:1; border-radius:4px; background:var(--surface2);
+           display:grid; place-items:center; font-size:11px;
+           color:var(--muted); position:relative; }
+.cal-dia.fora { background:none; }
+/* Dia com vencimento usa a receita do selo (.badge): fundo em mistura e
+   tinta escurecida por --badge-tom. Cor cheia sob número de 11px não
+   alcança 4,5:1 nos temas claros — o mesmo motivo de lá. */
+.cal-dia.venc { font-weight:700; }
+.cal-dia.venc.u { background:color-mix(in srgb, var(--erro) 16%, var(--surface));
+  color:color-mix(in srgb, var(--erro) var(--badge-tom), black); }
+.cal-dia.venc.a { background:color-mix(in srgb, var(--warn) 16%, var(--surface));
+  color:color-mix(in srgb, var(--warn) var(--badge-tom), black); }
+.cal-dia.venc.t { background:color-mix(in srgb, var(--s3) 16%, var(--surface));
+  color:color-mix(in srgb, var(--s3) var(--badge-tom), black); }
+/* selo da contagem: o dia continua sendo o número do meio, e a quantidade
+   não disputa o mesmo lugar com ele */
+.cal-dia b { position:absolute; top:-5px; right:-5px; min-width:17px;
+             height:17px; padding:0 4px; border-radius:99px; font-size:11px;
+             line-height:17px; text-align:center; font-weight:700;
+             color:var(--surface); border:1.5px solid var(--surface); }
+.cal-dia.venc.u b { background:var(--erro); }
+.cal-dia.venc.a b { background:var(--warn); }
+.cal-dia.venc.t b { background:var(--s3); }
+.cal-dia.hoje { outline:2px solid var(--accent); outline-offset:1px; }
 .painel .val { font-size:11px; fill:var(--text);
                font-variant-numeric:tabular-nums; }
 .painel .eixo { stroke:var(--border); stroke-width:1; }

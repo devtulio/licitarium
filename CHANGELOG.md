@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.40.0 — 2026-08-14
+
+**A agenda dos próximos 90 dias vira um calendário**
+
+Era uma linha do tempo: um ponto por vencimento, espalhados de hoje até
+noventa dias. Só que vencimento não se espalha — ele se amontoa. No acervo
+de exemplo, quarenta contratos e atas caem em sete datas, e onze deles no
+mesmo dia. O resultado era previsível: quarenta pontos disputando o primeiro
+terço da linha, nomes se atropelando, e dois terços do cartão vazios.
+
+No lugar entram três meses de calendário, com os dias da semana no
+cabeçalho. O amontoado passa a cair onde ele pertence — na data — e vira
+informação: dá para ver que a segunda semana de agosto concentra quase tudo.
+
+Cada dia com vencimento acende na cor do prazo (vermelho até 15 dias, âmbar
+até 60, verde além disso) e ganha um selo no canto com **quantos** vencem
+nele. O número do dia continua no meio da célula: no protótipo a célula
+acesa mostrava só a contagem, e "3" tanto podia ser o dia 3 quanto três
+vencimentos. Passar o mouse lista quais são.
+
+Some junto a lógica que existia só para impedir que os nomes colidissem na
+linha — cortar o texto pelo espaço livre até o rótulo anterior. Sem linha,
+sem colisão.
+
 ## 1.39.0 — 2026-08-14
 
 **O deságio por modalidade volta a começar junto dos nomes**

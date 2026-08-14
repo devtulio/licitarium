@@ -187,6 +187,13 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   onde subir *significa* melhor (economia). Para valor gasto vale `.dir`:
   a seta carrega a direção em tinta neutra. Pintar "gastamos 73% a mais" de
   verde era o programa dizendo o que o dado não diz.
+- **A agenda é calendário, não linha do tempo (1.40.0).** Vencimento se
+  amontoa em poucas datas — 40 registros em 7 dias no acervo de exemplo —,
+  então a linha de 90 dias empilhava tudo no primeiro terço e exigia lógica
+  de corte de rótulo só para evitar colisão. O calendário põe o amontoado na
+  data. É HTML/CSS grid, não SVG: a impressão do painel captura o innerHTML
+  da vista, então sai no papel sem conversão. Dia no corpo da célula,
+  contagem em selo à parte — um número por lugar.
 - **Eixo divergente só quando há divergência.** No deságio o eixo vai de
   `min(0, …)` a `max(…)`: sem nenhuma modalidade acima do estimado ele
   encosta à esquerda e o gráfico vira barra comum, alinhada ao rótulo como
