@@ -601,3 +601,40 @@ test("nenhum rótulo de gráfico escapa do cartão, nas quatro vistas",
     await expect.poll(transbordos, { message: `vista ${v}` }).toEqual([]);
   }
 });
+
+test("a barra fica com o grosso do cartão, não o texto em volta",
+    async ({ page }) => {
+  // A marca é o dado; rótulo e valor são legenda. Reservar a margem direita
+  // pela medida certa, sem piso, derrubou a barra mais longa para 14% do
+  // cartão nos cartões estreitos da Economia — o texto ficava com 4/5.
+  const proporcoes = () => page.evaluate(() => {
+    const out = {};
+    document.querySelectorAll(".vista:not(.oculto) .graf[data-graf]")
+      .forEach(el => {
+        const svg = el.querySelector("svg");
+        // só os que usam grafBarras — `economia_series` é linha, não barra
+        if (!svg || !["modalidades", "economia_modalidade", "economia_familia",
+                      "economia_categoria", "economia_fornecedor"]
+                     .includes(el.dataset.graf)) return;
+        const larg = el.getBoundingClientRect().width;
+        const marcas = [...svg.querySelectorAll("path")]
+          .filter(p => (p.getAttribute("fill") || "none") !== "none")
+          .map(p => p.getBoundingClientRect().width);
+        if (marcas.length)
+          out[el.dataset.graf] = Math.round(Math.max(...marcas) / larg * 100);
+      });
+    return out;
+  });
+  const conferir = async (vista) => {
+    const p = await proporcoes();
+    expect(Object.keys(p).length, `${vista} sem gráfico de barras`)
+      .toBeGreaterThan(0);
+    for (const [graf, pct] of Object.entries(p))
+      expect(pct, `${graf}: barra mais longa com só ${pct}% do cartão`)
+        .toBeGreaterThanOrEqual(30);
+  };
+  await conferir("execucao");
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  await page.waitForTimeout(400);
+  await conferir("economia");
+});

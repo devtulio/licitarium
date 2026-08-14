@@ -238,21 +238,33 @@ function grafBarras(el, itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 3
   }
   el.style.height = Math.max(120, itens.length * 36 + 20) + "px";
   const chart = _iniciarEchart(el);
-  const rotulosValor = itens.map(
+  // A barra É o dado: rótulo e valor são legenda em volta dela. Reservar a
+  // margem direita pela medida certa (correto) sem piso nenhum encolheu a
+  // marca para 14% do cartão nos cartões estreitos da vista Economia — o
+  // texto passou a ocupar 4/5 do gráfico. Daí o chão abaixo.
+  const CHAO_BARRA = 0.38;
+  const largura = el.clientWidth;
+  const medir = (rs) => Math.ceil(Math.max(
+    ...rs.map(t => _larguraTexto(t, VAL_TXT.fontSize)))) + 8;  // 5 do gap + 3
+  let rotulosValor = itens.map(
     it => compacto(valor(it)) + (sub ? " · " + sub(it) : ""));
-  // 5 px é a distância padrão entre o fim da barra e o rótulo; +3 de folga
-  // para o arredondamento da medição não deixar o último caractere na borda
-  const folgaDireita = Math.ceil(Math.max(
-    ...rotulosValor.map(t => _larguraTexto(t, VAL_TXT.fontSize)))) + 8;
-  // o que sobra do cartão depois do valor, com um terço reservado à barra:
-  // sem esse teto o rótulo do eixo cresce até engolir a área de plotagem
-  const larguraRotulo = Math.max(
-    64, Math.floor((el.clientWidth - folgaDireita) * 0.62));
+  let folgaDireita = medir(rotulosValor);
+  // cartão apertado: o sufixo ("· 29 processos") sai do gráfico antes da
+  // barra encolher — ele continua inteiro no tooltip
+  if (largura - folgaDireita < largura * (CHAO_BARRA + 0.3)) {
+    rotulosValor = itens.map(it => compacto(valor(it)));
+    folgaDireita = medir(rotulosValor);
+  }
+  // teto do rótulo do eixo: ele nunca come o que sobrou para a barra
+  const larguraRotulo = Math.max(56, Math.floor(Math.min(
+    largura * 0.42, largura - folgaDireita - largura * CHAO_BARRA)));
   chart.setOption({
     animation: false,
     grid: { left: 4, right: folgaDireita, top: 8, bottom: 8,
             containLabel: true },
-    xAxis: { type: "value", show: false },
+    // max no dado, não no "número redondo": o eixo é invisível, então o
+    // arredondamento só encurtava a barra mais longa sem informar nada
+    xAxis: { type: "value", show: false, max: "dataMax" },
     yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
       axisLine: { show: false }, axisTick: { show: false },
       // Teto no rótulo do eixo: "Serviços de Terceiros - Pessoa Jurídica"

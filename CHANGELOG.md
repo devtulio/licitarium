@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.37.1 — 2026-08-14
+
+**A barra volta a ser o maior elemento do gráfico**
+
+Correção de uma regressão da 1.37.0. Ao reservar corretamente a margem para
+o valor no fim da barra, o desenho passou a caber — mas nos cartões
+estreitos da vista Economia a barra ficou com apenas **14% da largura**, e o
+texto em volta com os outros 86%. Numa barra, quem carrega o dado é a barra;
+rótulo e valor são legenda.
+
+Agora a barra tem um piso garantido de espaço. Quando o cartão é apertado
+demais para tudo caber, o que sai do gráfico é o sufixo do valor — o
+"· 29 processos" — e não o tamanho da barra; o texto completo continua no
+balão que aparece ao passar o mouse. O eixo também deixou de arredondar o
+valor máximo para um "número redondo": como ele é invisível, o
+arredondamento só encurtava a barra mais longa sem informar nada.
+
+Medido nas quatro vistas: a barra mais longa saiu de 14–23% para 35–44% da
+largura do cartão nos cartões estreitos, e de 61% para 67% no cartão largo.
+Há teste que falha se ela cair abaixo de 30%.
+
 ## 1.37.0 — 2026-08-14
 
 **Nome de modalidade não é mais cortado no gráfico**
