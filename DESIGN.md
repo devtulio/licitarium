@@ -187,6 +187,11 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   onde subir *significa* melhor (economia). Para valor gasto vale `.dir`:
   a seta carrega a direção em tinta neutra. Pintar "gastamos 73% a mais" de
   verde era o programa dizendo o que o dado não diz.
+- **Âmbar custa: só marca o que tem consequência.** `.aviso` (cor de alerta)
+  é para o que a pessoa precisa observar — trocar de município apaga o
+  acervo; o limite legal desatualizado produz alerta de fracionamento errado.
+  Texto que só explica o que o card faz usa `.ajuda` (tinta neutra). Quando
+  todo texto auxiliar sai em âmbar, o âmbar deixa de significar alguma coisa.
 - **Ao medir a tela, esperar a transição fechar.** `body` anima `background`
   e `color` por 250 ms; `getComputedStyle` no meio disso devolve o valor
   interpolado e produz razão de contraste que na tela parada não existe.

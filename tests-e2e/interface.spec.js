@@ -138,6 +138,31 @@ test("valor gasto não é pintado de verde por ter subido", async ({ page }) => 
                             "#p-economia .card.hero .r .down")).toHaveCount(1);
 });
 
+test("cor de alerta só marca o que tem consequência", async ({ page }) => {
+  // Explicação do que o card faz não é aviso. Quando todo texto auxiliar
+  // sai em âmbar, o âmbar deixa de significar alguma coisa — e as duas
+  // frases que realmente avisam (trocar de município apaga o acervo; o
+  // limite legal pode estar desatualizado) somem no meio das outras.
+  await page.locator("#btn-config").click();
+  const textos = await page.evaluate(() => {
+    const ler = (sel) => [...document.querySelectorAll(sel)]
+      .map(e => e.textContent.replace(/\s+/g, " ").trim().slice(0, 130));
+    return { aviso: ler("#veu-config .aviso"), ajuda: ler("#veu-config .ajuda") };
+  });
+  // o que sobra em âmbar é consequência: uma apaga o acervo, a outra
+  // alimenta o alerta de fracionamento com número que pode estar velho
+  expect(textos.aviso).toHaveLength(2);
+  expect(textos.aviso.join(" | ")).toMatch(/reinicia o acervo/);
+  expect(textos.aviso.join(" | ")).toMatch(/valor vigente/);
+  expect(textos.ajuda.length).toBeGreaterThanOrEqual(3);
+
+  const cores = await page.evaluate(() => ({
+    aviso: getComputedStyle(document.querySelector("#veu-config .aviso")).color,
+    ajuda: getComputedStyle(document.querySelector("#veu-config .ajuda")).color,
+  }));
+  expect(cores.aviso).not.toBe(cores.ajuda);
+});
+
 test("os cards de uma fileira têm a mesma anatomia", async ({ page }) => {
   // um card com duas linhas ao lado de irmãos com três quebrava a linha de
   // base da fileira, e a diferença não queria dizer nada

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.38.1 — 2026-08-14
+
+**Só avisa o que é aviso**
+
+Em Configurações, todo texto explicativo saía na cor de alerta — o âmbar
+reservado a "preste atenção nisto". Eram cinco blocos, e três deles apenas
+descreviam o que o card faz: como a coleta funciona, que formato de imagem
+o brasão aceita, para que serve a cópia do acervo. Quando tudo é âmbar,
+nada é, e as duas frases que realmente avisam se perdiam no meio.
+
+Esses três passam a texto comum. Continuam em âmbar as duas que trazem
+consequência: **trocar de município reinicia o acervo** e o **limite legal
+pode estar desatualizado** — este alimenta o Alerta de Fracionamento, então
+um número velho ali produz alerta errado.
+
+Tem teste: falha se um texto de ajuda for pintado de alerta, e também se um
+dos dois avisos de verdade for despromovido a texto comum.
+
 ## 1.38.0 — 2026-08-14
 
 **Sete correções de interface, saídas de uma auditoria medida**
