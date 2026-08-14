@@ -637,7 +637,12 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
    Substituiu a linha do tempo de 90 dias. É HTML, não SVG: a impressão do
    painel captura o innerHTML da vista, então uma grade CSS sai no papel
    sem passo nenhum de conversão. */
-.cal { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+/* Teto na célula: com `1fr` puro num cartão de página inteira cada quadrado
+   passava de 90 px e o calendário virava um tabuleiro — três meses ocupando
+   mais altura que o resto da vista junta. 34 px cabe o dia e o selo com
+   folga; o que sobra de largura fica de margem, não de célula. */
+.cal { display:grid; grid-template-columns:repeat(3, minmax(0, 266px));
+       gap:24px; }
 .cal-mes h4 { font-size:11px; letter-spacing:.09em; text-transform:uppercase;
               color:var(--muted); font-weight:600; margin-bottom:7px; }
 .cal-sem, .cal-grade { display:grid; grid-template-columns:repeat(7, 1fr);

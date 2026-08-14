@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.41.0 — 2026-08-14
+
+**O calendário voltava quebrado na impressão**
+
+Defeito da 1.40.0, encontrado ao conferir o PDF de verdade. Na tela o
+calendário estava certo; no papel a grade sumia e os 92 dias saíam
+empilhados numa coluna única, sem cor, ocupando duas páginas.
+
+A causa é uma fronteira que não estava documentada: o painel impresso **não
+carrega o mesmo arquivo de estilo da tela**. Ele leva só o conteúdo das
+visões, e quem o formata é um estilo próprio, escrito para papel. O
+calendário era novo e ninguém tinha escrito as regras dele desse lado.
+
+Agora há um teste que compara o que a tela emite com o que o documento sabe
+formatar, e falha antes de o problema chegar à impressora.
+
+**O painel passa a sair em A4 paisagem**
+
+Era A3 — papel que quase nenhuma impressora de secretaria tem, e que obrigava
+a escolher "ajustar à página" na hora de imprimir. Agora sai em A4 deitado,
+direto. Quem quiser A3 escolhe na caixa de impressão do navegador: o desenho
+acompanha o papel, sem precisar de ajuste.
+
+**Os quadrados do calendário diminuíram**
+
+Num cartão de página inteira cada quadrado passava de 90 pixels e o
+calendário virava um tabuleiro — três meses ocupando mais altura que o resto
+da visão junto. Agora o quadrado tem teto: 35 pixels, o suficiente para o dia
+e o selo de contagem. O que sobra de largura fica de margem.
+
 ## 1.40.1 — 2026-08-14
 
 **Um balão só ao passar o mouse no calendário**

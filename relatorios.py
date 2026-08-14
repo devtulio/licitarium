@@ -2365,6 +2365,36 @@ _CSS_PAINEL_RESTO = """
   .badge.ok { background:#e6f4ea; color:#2f7d32; }
   .badge.warn { background:#fdf1dc; color:var(--atencao); }
   .badge.err { background:#fbe9e7; color:var(--alerta); }
+  /* Calendário da agenda. PRECISA estar aqui: o painel impresso não carrega
+     o ui/estilo.css — ele leva só o HTML das vistas e é este bloco que o
+     formata. Sem estas regras a grade some e os 92 dias saem empilhados
+     numa coluna, ocupando duas páginas (achado ao conferir o PDF real,
+     2026-08-14; eu havia escrito no DESIGN.md que "sai no papel sem
+     conversão" sem imprimir para conferir). */
+  .cal { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+  .cal-mes h4 { font-size:8pt; letter-spacing:.08em; text-transform:uppercase;
+                color:var(--suave); font-weight:600; margin-bottom:5px; }
+  .cal-sem, .cal-grade { display:grid; grid-template-columns:repeat(7, 1fr);
+                         gap:2px; }
+  .cal-sem { margin-bottom:2px; }
+  .cal-sem span { font-size:7pt; color:var(--suave); text-align:center; }
+  .cal-dia { aspect-ratio:1; border-radius:3px; background:var(--cabecalho);
+             display:grid; place-items:center; font-size:7.5pt;
+             color:var(--suave); position:relative; }
+  .cal-dia.fora { background:none; }
+  .cal-dia.venc { font-weight:700; }
+  .cal-dia.venc.u { background:#fbe9e7; color:var(--alerta); }
+  .cal-dia.venc.a { background:#fdf1dc; color:var(--atencao); }
+  .cal-dia.venc.t { background:#e6f4ea; color:#2f7d32; }
+  .cal-dia b { position:absolute; top:-4px; right:-4px; min-width:13px;
+               height:13px; padding:0 3px; border-radius:99px; font-size:7pt;
+               line-height:13px; text-align:center; font-weight:700;
+               color:#fff; border:1px solid var(--superficie); }
+  .cal-dia.venc.u b { background:var(--alerta); }
+  .cal-dia.venc.a b { background:var(--atencao); }
+  .cal-dia.venc.t b { background:#2f7d32; }
+  /* o contorno de "hoje" é orientação de tela; no papel a data já está lá */
+  .cal-dia.hoje { outline:none; }
   /* instrução de clique não faz sentido no papel */
   .so-tela { display:none; }
   .secao-painel { break-after:page; }
@@ -2407,7 +2437,11 @@ def render_painel(vistas, municipio, uf, ano, brasao=None):
         f'</h2>{html}</section>'
         for nome, html in vistas if html)
     return _pagina(f"Painel — {municipio} — {ano}", corpo, municipio, uf,
-                   f"Exercício {ano}", paisagem=True, papel="A3",
+                   # A4 deitado: é o papel que toda impressora de
+                   # secretaria tem. Quem quiser A3 pede na caixa de
+                   # impressão do navegador, e o desenho acompanha —
+                   # a grade é fluida, não tem medida travada em pixel.
+                   f"Exercício {ano}", paisagem=True, papel="A4",
                    estilo_extra=CSS_PAINEL, brasao=brasao)
 
 

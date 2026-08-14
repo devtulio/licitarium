@@ -191,9 +191,19 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   amontoa em poucas datas — 40 registros em 7 dias no acervo de exemplo —,
   então a linha de 90 dias empilhava tudo no primeiro terço e exigia lógica
   de corte de rótulo só para evitar colisão. O calendário põe o amontoado na
-  data. É HTML/CSS grid, não SVG: a impressão do painel captura o innerHTML
-  da vista, então sai no papel sem conversão. Dia no corpo da célula,
-  contagem em selo à parte — um número por lugar.
+  data. Dia no corpo da célula, contagem em selo à parte — um número por lugar.
+- **O painel impresso NÃO carrega o `ui/estilo.css`.** `imprimir_painel` leva
+  só o HTML das vistas; quem o formata é o `CSS_PAINEL` de relatorios.py.
+  Classe nova no `ui/painel.js` sem regra correspondente lá sai **sem estilo
+  nenhum** no papel — o calendário da 1.40.0 virou uma coluna de 92 dias em
+  duas páginas, e ninguém percebeu porque a suíte não imprime. Corrigido na
+  1.41.0, com `test_toda_classe_do_painel_tem_estilo_no_documento_impresso`
+  fechando a fronteira. Antes disso este documento afirmava que a captura
+  "sai no papel sem conversão": era falso, e escrito sem imprimir para
+  conferir.
+- **Papel do painel: A4 paisagem (1.41.0).** Era A3, que quase nenhuma
+  impressora de secretaria tem. Quem quiser A3 escolhe na caixa de impressão
+  do navegador — a grade é fluida e acompanha.
 - **Eixo divergente só quando há divergência.** No deságio o eixo vai de
   `min(0, …)` a `max(…)`: sem nenhuma modalidade acima do estimado ele
   encosta à esquerda e o gráfico vira barra comum, alinhada ao rótulo como

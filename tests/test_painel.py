@@ -408,7 +408,7 @@ def test_ano_ausente_usa_o_mais_recente_do_acervo(api):
 
 # ── o painel impresso ───────────────────────────────────────────────────
 
-def test_documento_sai_em_a3_paisagem(tmp_path, monkeypatch):
+def test_documento_sai_em_a4_paisagem(tmp_path, monkeypatch):
     monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
     monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
     licitarium.abrir_db().close()
@@ -419,7 +419,7 @@ def test_documento_sai_em_a3_paisagem(tmp_path, monkeypatch):
          ["analise", "<svg><rect/></svg>"]], ANO)
     assert r["ok"]
     html = Path(r["arquivo"]).read_text(encoding="utf-8")
-    assert "size: A3 landscape" in html
+    assert "size: A4 landscape" in html
     # o navegador "economiza tinta" por padrão e devolveria barras cinzentas
     assert "print-color-adjust: exact" in html
     assert "Execução do exercício" in html and "Análise comparativa" in html
@@ -807,3 +807,44 @@ def test_filtro_de_orgao_nao_quebra_o_painel(api):
     vazio = api.painel(ANO, "000")
     assert vazio["execucao"]["cards"]["n"] == 0
     assert vazio["vigilancia"]["funil"]["publicadas"] == 0
+
+
+# ── a fronteira entre a tela e o papel ──────────────────────────────────────
+
+def test_toda_classe_do_painel_tem_estilo_no_documento_impresso():
+    """O painel impresso NÃO carrega `ui/estilo.css`.
+
+    `imprimir_painel` leva só o HTML das vistas; quem o formata é o
+    `CSS_PAINEL`, montado à parte em relatorios.py. Classe nova no
+    `ui/painel.js` que não ganhe regra lá sai sem estilo nenhum no papel —
+    foi o que aconteceu com o calendário da agenda na v1.40.0: a grade sumiu
+    e os 92 dias saíram empilhados numa coluna, ocupando duas páginas. O
+    defeito só apareceu quando alguém imprimiu de verdade e olhou o PDF.
+
+    A regra aqui é: classe que o painel emite ou está no CSS do documento,
+    ou está na lista de dispensadas abaixo — com motivo. Nunca em silêncio.
+    """
+    import re
+    js = (Path(licitarium.DIR_APP) / "ui" / "painel.js").read_text(encoding="utf-8")
+    # class="a b ${expr}" — só os literais interessam; a parte interpolada é
+    # sempre modificador (u/a/t, hoje, on) e vem coberta pelos literais
+    emitidas = set()
+    for bloco in re.findall(r'class="([^"$]*)', js):
+        emitidas.update(c for c in bloco.split() if c)
+
+    # Dispensadas, cada uma por um motivo:
+    DISPENSADAS = {
+        # existem só na tela e são escondidas ou irrelevantes no papel
+        "graf", "graf-echart", "graf-tt", "so-tela", "chips", "chip",
+        "subabas", "painel-topo", "cresce", "carregando",
+        # modificadores sem geometria própria (herdam da classe base)
+        "on", "oculto", "hoje", "venc", "fora", "u", "a", "t",
+        "grave", "aviso", "info", "ok", "warn", "err", "up", "down", "dir",
+        # o documento tem tipografia própria para estes
+        "num", "obj", "dim", "base",
+    }
+    faltando = sorted(c for c in emitidas - DISPENSADAS
+                      if f".{c}" not in relatorios.CSS_PAINEL)
+    assert not faltando, (
+        "classes emitidas pelo painel sem regra no CSS do documento impresso "
+        f"(nem dispensadas): {faltando}")

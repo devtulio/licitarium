@@ -1,7 +1,7 @@
 // ══ Painel: gráficos do acervo, desenhados aqui mesmo ══════════════════════
 // SVG escrito à mão, sem biblioteca: o programa roda offline dentro de um exe,
 // e uma dependência de gráfico custaria mais que estas funções. As mesmas
-// marcas vão para a tela e para a impressão em A3 — uma fonte de desenho só.
+// marcas vão para a tela e para a impressão — uma fonte de desenho só.
 //
 // Convenções que valem para todos os gráficos daqui (design/DASHBOARD.md):
 //   · um eixo só, nunca dois; escala sempre a partir do zero;
@@ -1167,7 +1167,7 @@ async function prepararPainel(estadoInicial) {
     orgao.add(new Option(o.nome ?? o.cnpj, o.cnpj)));
 }
 
-// A impressão leva as três vistas, cada uma numa página A3 deitada: o SVG é
+// A impressão leva as quatro vistas, cada uma numa página A4 deitada: o SVG é
 // vetorial, então sai na resolução da impressora, não na da tela.
 $("btn-imprimir-painel").addEventListener("click", async () => {
   if (!P.dados || !api.imprimir_painel) return;
