@@ -220,22 +220,50 @@ def _paginar(caminho, params, tamanho_pagina, pacing=True):
 
 
 def _baixar(caminho, consultas, tamanho_pagina):
-    """Baixa várias consultas independentes e devolve (rótulo, registros).
+    """Baixa várias consultas independentes: (rótulo, registros, erro|None).
 
     Só as requisições vão para as threads — a gravação fica com quem chama,
     numa conexão só. Os lotes chegam fora de ordem, por isso o rótulo.
+
+    A consulta que falha vem com `erro` preenchido em vez de derrubar as
+    demais. O portal recusa em rajada — 13 de 60 requisições voltaram 429
+    numa medição de 2026-08-14, e o mesmo endpoint alternou entre responder
+    em 0,3 s e devolver 500 depois de 60 s —, e antes disso uma única janela
+    ruim no meio das 78 da fase 1 jogava fora todas as outras.
+
+    Quem chama decide o que fazer com a falha; o que **não** pode é dar a
+    fase por completa, porque aí `last_sync_<tipo>` avança sobre uma janela
+    que nunca foi baixada e o buraco fica no acervo para sempre.
     """
-    conexoes = min(_paralelismo_atual(), len(consultas))
-    if conexoes <= 1:
-        for rotulo, params in consultas:
-            yield rotulo, list(_paginar(caminho, params, tamanho_pagina))
-        return
-    with concurrent.futures.ThreadPoolExecutor(conexoes) as ex:
-        futuros = {ex.submit(lambda p=p: list(_paginar(
-            caminho, p, tamanho_pagina, pacing=False))): rotulo
-            for rotulo, p in consultas}
-        for f in concurrent.futures.as_completed(futuros):
-            yield futuros[f], f.result()
+    # Em levas curtas de propósito: é ENTRE uma leva e outra que
+    # `_paralelismo_atual` é relido, e portanto que o recuo por 429 tem chance
+    # de valer. A fase 1 manda as 13 modalidades × N janelas de uma vez só —
+    # com uma leva única, a escada 4 → 2 → 1 nunca era relida e a fase inteira
+    # seguia a 4 conexões contra um portal que já estava recusando. O preço da
+    # leva é uma barreira: a próxima só começa quando a atual fecha.
+    pendentes = list(consultas)
+    while pendentes:
+        conexoes = min(_paralelismo_atual(), len(pendentes))
+        leva, pendentes = pendentes[:4 * conexoes], pendentes[4 * conexoes:]
+        if conexoes <= 1:
+            for rotulo, params in leva:
+                try:
+                    lote, erro = list(_paginar(caminho, params,
+                                               tamanho_pagina)), None
+                except PncpErro as e:
+                    lote, erro = [], e
+                yield rotulo, lote, erro
+            continue
+        with concurrent.futures.ThreadPoolExecutor(conexoes) as ex:
+            futuros = {ex.submit(lambda p=p: list(_paginar(
+                caminho, p, tamanho_pagina, pacing=False))): rotulo
+                for rotulo, p in leva}
+            for f in concurrent.futures.as_completed(futuros):
+                try:
+                    lote, erro = f.result(), None
+                except PncpErro as e:
+                    lote, erro = [], e
+                yield futuros[f], lote, erro
 
 
 # servem para dizer ao usuário o tamanho da encrenca antes de ele mandar
@@ -473,15 +501,28 @@ def sync_contratacoes(db, codigo_ibge, inicio, fim, progresso=None,
                          "codigoMunicipioIbge": codigo_ibge})
                  for codigo, nome in MODALIDADES.items()
                  for a, b in _janelas(inicio, fim)]
-    total = 0
-    for feitas, (nome, lote) in enumerate(
+    total, falhas = 0, []
+    for feitas, (nome, lote, erro) in enumerate(
             _baixar("/v1/contratacoes/atualizacao", consultas, 50), 1):
         if progresso:
             progresso(f"Contratações — {nome} ({feitas}/{len(consultas)})…")
+        if erro:
+            falhas.append(f"{nome}: {erro}")
+            continue
         for item in lote:
             total += _upsert_contratacao(db, item, codigo_ibge,
                                          referencia)
         db.commit()  # transação curta por lote: não segurar trava
+    if falhas:
+        # O que baixou já está gravado (upsert é idempotente); levantar aqui
+        # é o que impede `last_sync_contratacoes` de avançar sobre a janela
+        # que faltou — sem isso a falha viraria buraco silencioso no acervo.
+        # O contador vai na mensagem porque o `sync_log` grava 0 registros
+        # quando o tipo falha, e a tela de Configurações daria a entender que
+        # a passada inteira não serviu para nada.
+        raise PncpErro(f"{len(falhas)} de {len(consultas)} consultas "
+                       f"falharam ({total} registros gravados assim mesmo) "
+                       f"— {falhas[0]}")
     return total
 
 
@@ -520,11 +561,19 @@ def _sync_por_janela(db, caminho, upsert, params, inicio, fim,
     ini, fi = chaves_data
     consultas = [(a, {**params, ini: _amd(a), fi: _amd(b)})
                  for a, b in _janelas(inicio, fim)]
-    total = 0
-    for _, lote in _baixar(caminho, consultas, 500):
+    total, falhas = 0, []
+    for _, lote, erro in _baixar(caminho, consultas, 500):
+        if erro:
+            falhas.append(erro)
+            continue
         for item in lote:
             total += upsert(db, item)
         db.commit()  # transação curta por lote
+    if falhas:
+        # mesma regra da fase 1: grava o que veio, mas não deixa o tipo ser
+        # dado por sincronizado (quem chama já trata a exceção por CNPJ)
+        raise PncpErro(f"{len(falhas)} de {len(consultas)} janelas falharam "
+                       f"({total} registros gravados assim mesmo) — {falhas[0]}")
     return total
 
 

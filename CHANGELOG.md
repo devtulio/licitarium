@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.36.0 — 2026-08-14
+
+**Uma consulta que cai não leva a sincronização inteira junto**
+
+A coleta de contratações dispara 13 modalidades × uma janela por ano — 78
+consultas numa passada de cinco anos. Bastava **uma** delas esgotar as cinco
+tentativas para toda a fase ser descartada, inclusive as 77 que já tinham
+respondido. Agora o que chegou é gravado, e só o pedaço que faltou volta
+para a fila da próxima sincronização.
+
+A sincronização continua sendo marcada como falha nesse caso — de propósito.
+Se ela fosse dada por concluída, a data de corte avançaria por cima de uma
+janela que nunca foi baixada e o buraco ficaria no acervo para sempre. O
+aviso em **Configurações → Sincronizações recentes** passa a dizer quantas
+consultas caíram e quantos registros entraram mesmo assim.
+
+**O recuo automático agora vale no meio da coleta**
+
+O programa já reduzia o número de conexões simultâneas ao perceber o portal
+recusando, mas a fase de contratações decidia esse número uma única vez, no
+começo, e seguia com ele até o fim — justamente a fase que mais provoca
+recusa. As requisições passam a sair em levas curtas, e entre uma leva e
+outra o recuo é reavaliado.
+
+**Medições que motivaram a mudança** (PNCP, madrugada de 14/08/2026, contra a
+API real): 13 de 60 requisições voltaram `429` com uma conexão só, e o
+intervalo entre elas não explicou o padrão — 0,5 s deu 3 recusas em 12; 1,0 s
+deu 5; 1,5 s deu 5; 2,0 s e 3,0 s não deram nenhuma. Nenhuma resposta trouxe
+o cabeçalho `Retry-After`. Na mesma noite o mesmo endereço alternou entre
+responder em 0,3 s e devolver erro de banco de dados depois de 60 s. Como a
+recusa não é função do nosso ritmo, a defesa é aguentar a perda, não calibrar
+o ritmo contra um número que não é nosso.
+
+**Conferências de uso da API que não geraram mudança** — todas contra o
+portal real, no mesmo dia: o filtro por município é de fato aplicado no
+servidor (a mesma consulta vai de 67.606 registros para 1); a modalidade é
+mesmo obrigatória, então o laço de 13 não tem como sumir; o limite de página
+é 50 nas contratações e 500 nos contratos e atas, como o programa já usava —
+e agora há teste fixando os dois, porque trocá-los quebraria a coleta em
+silêncio; e não existe endereço que traga resultados de vários itens de uma
+vez, então o custo da fase de itens é da API, não do programa.
+
 ## 1.35.0 — 2026-08-14
 
 **O executável passa a se chamar `Licitarium Free vX.Y.Z.exe`**

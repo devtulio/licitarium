@@ -24,6 +24,11 @@ Fonte: `https://pncp.gov.br/api/consulta` (spec OpenAPI verificada em 2026-07-29
 - Todos os 4 tipos têm endpoint `/atualizacao` (por data de atualização global) —
   sync incremental sem janela retroativa artificial.
 - Paginação: contratações máx. 50/página; contratos/atas/PCA máx. 500/página.
+  Assimetria reconferida contra a API real em 2026-08-14: `/contratacoes/*`
+  responde `400 "Tamanho de página inválido"` já em 100, enquanto
+  `/contratos/atualizacao` e `/atas/atualizacao` devolvem 500 registros numa
+  página só. Trocar os dois números de lugar quebra a fase 1 em silêncio,
+  por isso há teste que os fixa.
 - Janelas de data fatiadas por ano (limite de range da API); volume municipal é pequeno.
 
 ## 3. Sync em 2 fases
@@ -49,9 +54,14 @@ Fase 2 — CONTRATOS / ATAS / PCA (chave: CNPJ do órgão)
 - **Estado**: `last_sync_<tipo>` em `config`; upsert idempotente → recomeço seguro após falha.
 - **Bootstrap** (primeira execução): mesma máquina, janela 2021-01-01 → hoje
   (PNCP existe desde ago/2021), com barra de progresso.
-- **Robustez**: retry 3× com backoff em 429/5xx/timeout; falha em um tipo não
+- **Robustez**: retry 5× com backoff em 429/5xx/timeout; falha em um tipo não
   bloqueia os demais; resultado em `sync_log`; API fora do ar → app funciona
   normal com dados locais + aviso.
+- **Falha parcial (1.36.0)**: `_baixar` devolve `(rótulo, registros, erro)` —
+  a consulta que esgota as tentativas não derruba as irmãs. Quem chama grava
+  o que veio e levanta `PncpErro` **no fim**, para que `last_sync_<tipo>` não
+  avance sobre janela que nunca foi baixada. Antes disso, uma janela ruim
+  entre as 78 da fase 1 jogava fora todo o resto da passada.
 - **Concorrência**: uma thread de sync por vez (lock); UI nunca bloqueia —
   abre com dados locais na hora, sync roda atrás com banner de progresso.
 - **Paralelismo (1.1.x)**: as três fases baixam com até 4 conexões (`_baixar`
@@ -63,6 +73,18 @@ Fase 2 — CONTRATOS / ATAS / PCA (chave: CNPJ do órgão)
   O recuo por 429 usa **janela de tempo** (`JANELA_BLOQUEIOS`), nunca contador
   acumulado: o portal oscila (502/503 e 429 em rajada, sem relação com a nossa
   taxa), e um contador que só cresce desligava o paralelismo para sempre.
+  **Remedição de 2026-08-14** (madrugada): o "nenhum 429" acima não se
+  sustenta mais — 13 de 60 requisições voltaram 429 numa thread só, e o
+  intervalo entre elas não explicou o padrão (0,5 s deu 3/12; 1,0 s deu 5/12;
+  1,5 s deu 5/12; 2,0 s e 3,0 s deram 0/12), o que confirma a rajada como
+  humor do portal, não como função da nossa taxa. Nenhuma resposta trouxe
+  cabeçalho `Retry-After`, então o backoff do código é sempre o de fallback.
+  Na mesma noite o mesmo endpoint alternou entre responder em 0,3 s e devolver
+  `500 "Erro na comunicação com o banco de dados"` depois de 60 s.
+  **Consequência de desenho**: não adianta calibrar pacing contra um número
+  que não é nosso — a defesa é tolerar a consulta perdida (falha parcial,
+  acima) e reler a escada de recuo entre levas curtas dentro de `_baixar`,
+  em vez de fixar a concorrência uma vez para a fase inteira.
 - **Municípios de referência (1.3.0)**: `referencia` (0/1) e `municipio_ibge`
   em `contratacoes` e `itens`, mais a tabela `municipios_referencia`. Para
   esses municípios roda **só a fase 1**; os itens saem na fase 3 junto com os

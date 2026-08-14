@@ -69,12 +69,100 @@ def test_baixar_nao_perde_nem_duplica_consulta(monkeypatch):
                         if params["pagina"] == 1 else None)
     consultas = [(f"r{i}", {"q": i}) for i in range(12)]
     colhido = list(pncp._baixar("/x", consultas, 50))
-    assert sorted(r for r, _ in colhido) == sorted(r for r, _ in consultas)
-    assert sorted(l[0]["de"] for _, l in colhido) == list(range(12))
+    assert sorted(r for r, _, _ in colhido) == sorted(r for r, _ in consultas)
+    assert sorted(l[0]["de"] for _, l, _ in colhido) == list(range(12))
+    assert all(e is None for _, _, e in colhido)
     # sem paralelismo o resultado é o mesmo, só que na ordem de entrada
     monkeypatch.setattr(pncp, "_paralelismo_atual", lambda: 1)
-    assert [r for r, _ in pncp._baixar("/x", consultas, 50)] == \
+    assert [r for r, _, _ in pncp._baixar("/x", consultas, 50)] == \
         [r for r, _ in consultas]
+
+
+@pytest.mark.parametrize("conexoes", [4, 1])
+def test_consulta_que_falha_nao_leva_as_outras_junto(monkeypatch, conexoes):
+    """Uma janela ruim entre 12 não pode descartar as 11 que responderam.
+
+    O portal recusa em rajada (429 medido em 13 de 60 requisições em
+    2026-08-14): antes, o `f.result()` de uma única consulta subia e a fase
+    inteira ia embora com ele.
+    """
+    def fake_get(caminho, params, **kw):
+        if params["q"] == 7:
+            raise pncp.PncpErro("HTTP 429 em /x")
+        return ({"data": [{"de": params["q"]}], "totalPaginas": 1}
+                if params["pagina"] == 1 else None)
+    monkeypatch.setattr(pncp, "_get", fake_get)
+    monkeypatch.setattr(pncp, "_paralelismo_atual", lambda: conexoes)
+    colhido = list(pncp._baixar("/x", [(f"r{i}", {"q": i}) for i in range(12)], 50))
+    assert len(colhido) == 12
+    falhas = {r: e for r, _, e in colhido if e}
+    assert list(falhas) == ["r7"] and isinstance(falhas["r7"], pncp.PncpErro)
+    assert sorted(l[0]["de"] for _, l, e in colhido if not e) == \
+        [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11]
+
+
+def test_tamanho_de_pagina_por_endpoint(db, monkeypatch):
+    """`/contratacoes/*` recusa acima de 50; contratos/atas aceitam 500.
+
+    Medido contra a API real em 2026-08-14: com 100 o portal devolve
+    `400 "Tamanho de página inválido"` nas contratações, e `/contratos`
+    entrega 60 registros numa página. Trocar os dois de lugar quebraria a
+    fase 1 inteira sem nenhum outro teste acusar.
+    """
+    vistos = []
+    monkeypatch.setattr(pncp, "_get", lambda caminho, params, **kw:
+                        vistos.append((caminho, params["tamanhoPagina"])))
+    pncp.sync_contratacoes(db, "3534203", date(2026, 1, 1), date(2026, 1, 2))
+    pncp.sync_contratos(db, "45148970000177", date(2026, 1, 1), date(2026, 1, 2))
+    pncp.sync_atas(db, "45148970000177", date(2026, 1, 1), date(2026, 1, 2))
+    por_caminho = {c: t for c, t in vistos}
+    assert por_caminho["/v1/contratacoes/atualizacao"] == 50
+    assert por_caminho["/v1/contratos/atualizacao"] == 500
+    assert por_caminho["/v1/atas/atualizacao"] == 500
+
+
+def test_baixar_rele_o_paralelismo_entre_as_levas(monkeypatch):
+    """O recuo por 429 só serve se for relido no meio da fase.
+
+    A fase 1 manda tudo numa chamada só de `_baixar`; enquanto a
+    concorrência era decidida uma vez, a escada 4 → 2 → 1 nunca chegava a
+    valer justamente na fase que mais dispara 429.
+    """
+    lidos = []
+    monkeypatch.setattr(pncp, "_get", lambda caminho, params, **kw:
+                        {"data": [{"de": params["q"]}], "totalPaginas": 1}
+                        if params["pagina"] == 1 else None)
+
+    def paralelismo():
+        lidos.append(len(lidos))
+        return 4 if len(lidos) == 1 else 1  # portal reclama depois da 1ª leva
+    monkeypatch.setattr(pncp, "_paralelismo_atual", paralelismo)
+    colhido = list(pncp._baixar("/x", [(f"r{i}", {"q": i}) for i in range(24)], 50))
+    assert len(colhido) == 24
+    # 1ª leva com 4 conexões leva 16; o resto sai de 4 em 4, já recuado
+    assert len(lidos) == 3
+    assert sorted(l[0]["de"] for _, l, _ in colhido) == list(range(24))
+
+
+def test_falha_parcial_grava_o_que_veio_mas_nao_da_a_fase_por_completa(
+        db, monkeypatch):
+    """Dispensa responde, pregão eletrônico cai: o que veio tem de ficar.
+
+    E `sincronizar_tudo` não pode carimbar `last_sync_contratacoes`, senão a
+    janela do pregão vira buraco permanente no acervo.
+    """
+    def fake_get(caminho, params, **kw):
+        if params["codigoModalidadeContratacao"] == 6:
+            raise pncp.PncpErro("HTTP 500 em /v1/contratacoes/atualizacao")
+        if params["codigoModalidadeContratacao"] == 8 and params["pagina"] == 1:
+            return {"data": [contratacao("PNCP-1")], "totalPaginas": 1}
+        return None
+    monkeypatch.setattr(pncp, "_get", fake_get)
+    with pytest.raises(pncp.PncpErro) as exc:
+        pncp.sync_contratacoes(db, "3534203", date(2026, 1, 1), date(2026, 3, 1))
+    assert "1 de 13 consultas" in str(exc.value)
+    assert db.execute("SELECT COUNT(*) FROM contratacoes").fetchone()[0] == 1
+    assert pncp._config(db, "last_sync_contratacoes") is None
 
 
 def test_sync_contratacoes_idempotente(db, monkeypatch):
