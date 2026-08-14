@@ -482,3 +482,82 @@ def test_valor_malformado_do_pncp_nao_vira_text_na_coluna_real(db, monkeypatch):
                        ).fetchone()
     assert linha["valor_estimado"] is None
     assert linha["valor_homologado"] is None
+
+
+# ── parada da coleta a pedido do usuário ────────────────────────────────
+
+def test_cancelamento_interrompe_e_nao_carimba_janela(db, monkeypatch):
+    """Parar no meio não pode deixar o acervo dizendo que sincronizou.
+
+    O `last_sync_<tipo>` é o que decide de onde a próxima coleta parte:
+    se ele avançasse numa coleta interrompida, a janela não coletada
+    ficaria para trás em silêncio, e só reapareceria se alguém mandasse
+    refazer tudo.
+    """
+    chamadas = []
+
+    def fake_get(caminho, params, base=None, **kw):
+        chamadas.append(caminho)
+        if base == pncp.BASE_PNCP:
+            return None
+        if "contratacoes" in caminho and params.get("pagina") == 1:
+            return {"data": [contratacao("PNCP-1")], "totalPaginas": 1}
+        return None
+
+    monkeypatch.setattr(pncp, "_get", fake_get)
+
+    def progresso(msg):                     # para na primeira etapa
+        raise pncp.SyncCancelado()
+
+    with pytest.raises(pncp.SyncCancelado):
+        pncp.sincronizar_tudo(db, "3534203", progresso)
+
+    # nenhuma janela foi dada como concluída
+    for tipo in ("contratacoes", "contratos", "atas", "itens"):
+        assert pncp._config(db, f"last_sync_{tipo}") is None, tipo
+
+
+def test_cancelamento_nao_e_engolido_pelo_tratamento_de_falha(db, monkeypatch):
+    """SyncCancelado não pode herdar de PncpErro.
+
+    `sincronizar_tudo` engole PncpErro de propósito, para que a falha de um
+    tipo não derrube os outros. Se o cancelamento caísse nesse mesmo balde,
+    a coleta seguiria para a fase seguinte em vez de parar.
+    """
+    assert not issubclass(pncp.SyncCancelado, pncp.PncpErro)
+
+    monkeypatch.setattr(pncp, "_get",
+                        lambda *a, **k: {"data": [], "totalPaginas": 0})
+    etapas = []
+
+    def progresso(msg):
+        etapas.append(msg)
+        if len(etapas) >= 2:                # deixa começar e então para
+            raise pncp.SyncCancelado()
+
+    with pytest.raises(pncp.SyncCancelado):
+        pncp.sincronizar_tudo(db, "3534203", progresso)
+    # parou de fato: não chegou nem perto de percorrer a coleta inteira
+    assert len(etapas) == 2
+
+
+def test_api_para_a_coleta_pelo_progresso(monkeypatch, tmp_path):
+    """A Api levanta o cancelamento de dentro da própria função de
+    progresso — é o ponto único por onde a coleta passa."""
+    api = licitarium.Api()
+    api._status["rodando"] = True
+
+    # sem pedido de parada, o progresso só registra a mensagem
+    api._progresso("Contratações — 1 de 3…")
+    assert api._status["msg"] == "Contratações — 1 de 3…"
+
+    r = api.parar_sync()
+    assert r == {"ok": True, "rodando": True}
+    with pytest.raises(pncp.SyncCancelado):
+        api._progresso("Contratações — 2 de 3…")
+
+
+def test_parar_sem_coleta_em_curso_nao_mente():
+    api = licitarium.Api()
+    assert api.parar_sync() == {"ok": False, "rodando": False}
+    assert not api._sync_parar.is_set()     # não deixa armadilha armada

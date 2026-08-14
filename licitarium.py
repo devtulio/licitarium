@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.33.0"
+VERSAO = "1.34.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -633,7 +633,12 @@ class Api:
         # atributo público do js_api, e a janela nativa entra em recursão
         self._janela = None  # definida em main()
         self._sync_ativo = threading.Lock()
-        self._status = {"rodando": False, "msg": "", "resumo": None, "erro": None}
+        # pedido de parada da coleta; quem lê é `_progresso`, no ponto de
+        # progresso seguinte. Event e não bool porque quem marca (thread da
+        # interface) e quem lê (thread da coleta) são diferentes.
+        self._sync_parar = threading.Event()
+        self._status = {"rodando": False, "msg": "", "resumo": None,
+                        "erro": None, "cancelado": False}
         self._municipios = None
 
     # ── estado e configuração ───────────────────────────────────────────
@@ -1622,14 +1627,30 @@ class Api:
         """
         if not self._sync_ativo.acquire(blocking=False):
             return False  # já rodando
+        # limpa um pedido de parada que tenha sobrado da coleta anterior,
+        # senão a próxima nasceria cancelada
+        self._sync_parar.clear()
         threading.Thread(target=self._rodar_sync, args=(bool(forcado),),
                          daemon=True).start()
         return True
 
+    def parar_sync(self):
+        """Pede que a coleta em curso pare no próximo ponto seguro.
+
+        Devolve se havia coleta rodando — a tela usa isso para não dizer
+        "parando…" quando não havia nada a parar.
+        """
+        if not self._status.get("rodando"):
+            return {"ok": False, "rodando": False}
+        self._sync_parar.set()
+        self._status["msg"] = "Parando após o passo atual…"
+        self._avisar_ui()
+        return {"ok": True, "rodando": True}
+
     def _rodar_sync(self, forcado=True):
         try:
             self._status.update(rodando=True, msg="Conectando ao PNCP…",
-                                resumo=None, erro=None)
+                                resumo=None, erro=None, cancelado=False)
             self._avisar_ui()
             db = abrir_db()
             try:
@@ -1641,14 +1662,23 @@ class Api:
                 self._status.update(resumo=resumo)
             finally:
                 db.close()
+        except pncp.SyncCancelado:
+            # parada a pedido não é erro: o acervo fica no estado em que
+            # deu, e a próxima coleta refaz a janela que não fechou
+            self._status.update(cancelado=True)
         except Exception as e:  # nunca derrubar a thread silenciosamente
             self._status.update(erro=str(e))
         finally:
             self._status.update(rodando=False, msg="")
+            self._sync_parar.clear()
             self._sync_ativo.release()
             self._avisar_ui(fim=True)
 
     def _progresso(self, msg):
+        # ponto único por onde a coleta passa a cada etapa — é daqui que o
+        # cancelamento sai, para não espalhar checagem por dentro do motor
+        if self._sync_parar.is_set():
+            raise pncp.SyncCancelado()
         self._status["msg"] = msg
         self._avisar_ui()
 

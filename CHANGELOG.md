@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.34.0 — 2026-08-13
+
+**Parar a sincronização, e identificação da edição**
+
+- **Botão "Parar sincronização"** em Configurações. A coleta encerra no
+  fim do passo em andamento, não no meio de uma consulta ao portal — na
+  prática, alguns segundos. Interromper é seguro por construção: o
+  programa só marca um período como concluído quando ele termina
+  inteiro, e as gravações são idempotentes, então o que já entrou fica e
+  a próxima coleta refaz só o que ficou pendente. A interrupção é
+  anunciada como interrupção, nunca como falha.
+- **Barra de título** passa a trazer produto, versão e município:
+  *Licitarium Free 1.34.0 — Orindiúva/SP*.
+- **Cabeçalho** ganha a linha da edição, abaixo da marca:
+  *Versão gratuita (1.34.0)*.
+
+**Correção achada no caminho**
+
+Ao terminar, a sincronização mandava recarregar a **lista**, sempre —
+mas a aba inicial do programa é o **Painel**, que não tem lista. O
+resultado era um erro dentro de código assíncrono, sem tela de aviso: o
+Painel simplesmente não se atualizava com os dados recém-baixados, e era
+preciso trocar de aba e voltar. Agora a atualização segue a vista que
+está aberta. O caso mais comum era o pior: a coleta automática de
+abertura terminando com o usuário parado no Painel.
+
 ## 1.33.0 — 2026-08-13
 
 **Revisão da identidade visual**

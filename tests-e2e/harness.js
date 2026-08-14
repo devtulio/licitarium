@@ -312,7 +312,14 @@ function scriptPonte(temaBanco = "portal") {
           municipio: "Orindiúva", exportado_em: "2026-08-05T09:00:00" };
       },
       sincronizar: async () => true,
-      status_sync: async () => ({ rodando: false }),
+      status_sync: async () => (window.__syncRodando
+        ? { rodando: true, msg: "Contratações — 1 de 3…" } : { rodando: false }),
+      parar_sync: async () => {
+        window.__chamadas.push({ metodo: "parar_sync" });
+        if (!window.__syncRodando) return { ok: false, rodando: false };
+        window.__syncRodando = false;
+        return { ok: true, rodando: true };
+      },
       checar_atualizacao: async () => null,
       set_config: async (k, v) => {
         window.__chamadas.push({ metodo: "set_config", k, v }); return true; },

@@ -286,9 +286,10 @@ async function iniciarApp(e) {
     temReferencia = (await api.listar_municipios_referencia()).length > 0;
   $("wizard").classList.add("oculto");
   $("app").classList.remove("oculto");
+  $("sub-edicao").textContent = `Versão gratuita (${e.versao})`;
   $("sub-municipio").textContent =
     `Contratações públicas de ${e.municipio} · ${e.uf}`;
-  api.set_titulo(`Licitarium — ${e.municipio}/${e.uf}`);
+  api.set_titulo(`Licitarium Free ${e.versao} — ${e.municipio}/${e.uf}`);
   progressoSplash(0.6, `${e.municipio} · ${e.uf}`);
   mostrarUltimaSync(e.sincronizado_em);
   renderKpis(e.kpis);
@@ -2085,9 +2086,13 @@ ligarBuscaReferencia();
 // em vez de em fila — o tempo total vira o da mais lenta, não a soma.
 $("btn-config").addEventListener("click", async () => {
   abrirModal("veu-config");
-  const [e, brasao, orgaos, log] = await Promise.all([
+  const [e, brasao, orgaos, log, sync] = await Promise.all([
     api.get_estado(), api.brasao(), api.listar_orgaos(), api.ultimo_log(),
-    renderReferencia()]);
+    api.status_sync?.() ?? {rodando: false}, renderReferencia()]);
+  // abrir as Configurações no meio de uma coleta não recebe evento de
+  // progresso retroativo: sem esta leitura, o botão de parar nasceria
+  // desabilitado justo quando ele é necessário
+  estadoDoParar(!!sync.rodando);
   $("cfg-municipio").innerHTML = `${esc(e.municipio)} — ${esc(e.uf)}
     <small class="dim">(IBGE ${esc(e.ibge)})</small>`;
   mostrarBrasao(brasao.dataurl);
@@ -2206,15 +2211,38 @@ document.addEventListener("keydown", e => {
 
 // ── sincronização ─────────────────────────────────────────────────────────
 $("btn-sync").addEventListener("click", () => api.sincronizar());
+
+// O botão de parar só existe enquanto há o que parar — habilitado por
+// evento de progresso, não por palpite de quem abre as Configurações.
+$("btn-parar-sync").addEventListener("click", async () => {
+  $("btn-parar-sync").disabled = true;
+  const r = await api.parar_sync();
+  $("parar-sync-status").textContent = r.rodando
+    ? "Parando após o passo atual…"
+    : "Não há sincronização em andamento.";
+});
+function estadoDoParar(rodando) {
+  $("btn-parar-sync").disabled = !rodando;
+  if (!rodando) $("parar-sync-status").textContent = "";
+}
+
 window.onSyncProgresso = st => {
   $("sync-dot").classList.toggle("rodando", st.rodando);
   if (st.rodando && st.msg) $("sync-msg").textContent = st.msg;
   $("btn-sync").disabled = st.rodando;
+  estadoDoParar(st.rodando);
 };
 window.onSyncFim = async st => {
   $("sync-dot").classList.remove("rodando");
   $("btn-sync").disabled = false;
-  if (st.erro) { $("sync-msg").textContent = `Falha na sincronização: ${st.erro}`; }
+  estadoDoParar(false);
+  if (st.cancelado) {
+    // parada a pedido não é falha: o texto não pode sugerir erro, senão o
+    // usuário acha que quebrou algo ao clicar em Parar
+    $("sync-msg").textContent = "Sincronização interrompida. O que já foi "
+      + "baixado está no acervo; a próxima retoma de onde faltou.";
+  }
+  else if (st.erro) { $("sync-msg").textContent = `Falha na sincronização: ${st.erro}`; }
   else {
     const r = st.resumo || {};
     const partes = Object.entries(r).map(([t, n]) =>
@@ -2226,7 +2254,12 @@ window.onSyncFim = async st => {
   const e = await api.get_estado();
   renderKpis(e.kpis);
   await carregarFiltros();
-  await carregarLista();
+  // Atualiza a vista que está aberta. Chamava `carregarLista()` direto, e
+  // `COLUNAS` não tem entrada para "painel": quando a coleta terminava com
+  // o usuário no Painel — que é a aba inicial, ou seja, o caso mais comum
+  // logo depois da sincronização de abertura — isso estourava dentro de um
+  // handler assíncrono. Sem tela de erro: o Painel só não se atualizava.
+  await (estado.tipo === "painel" ? carregarPainel() : carregarLista());
 };
 
 // ── exportação ────────────────────────────────────────────────────────────

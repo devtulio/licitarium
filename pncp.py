@@ -52,6 +52,28 @@ class PncpErro(Exception):
     """Falha de comunicação com o PNCP após esgotar as tentativas."""
 
 
+class SyncCancelado(Exception):
+    """O usuário pediu para parar a sincronização.
+
+    **Não herda de PncpErro de propósito.** Os blocos `except PncpErro`
+    espalhados por `sincronizar_tudo` existem para que a falha de um tipo
+    não derrube os demais — se o cancelamento herdasse dele, seria
+    engolido e a coleta seguiria para a fase seguinte, exatamente o
+    contrário do pedido.
+
+    Quem levanta é a própria função de progresso (ver `Api._progresso`):
+    ela já é chamada em todos os pontos naturais da coleta e desce por
+    toda a pilha, então o cancelamento não precisou de nenhuma bandeira
+    nova aqui dentro. O preço é que a parada acontece no próximo ponto de
+    progresso, não no meio de uma requisição em voo.
+
+    Interromper é seguro porque nada aqui é gravado à meia-boca: o
+    `last_sync_<tipo>` só avança quando o tipo termina inteiro, e as
+    gravações são upsert — o que já entrou fica, e a próxima coleta
+    refaz a janela pendente.
+    """
+
+
 class ItensIndisponiveis(PncpErro):
     """O portal respondeu 404 na listagem de itens de uma contratação.
 

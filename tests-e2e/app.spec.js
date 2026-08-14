@@ -553,7 +553,8 @@ test("selo, título da janela e última sincronização no rodapé",
   await expect(page.locator("#svg-selo polygon").first()).toBeVisible();
   const titulo = await page.evaluate(() =>
     window.__chamadas.find(c => c.metodo === "set_titulo"));
-  expect(titulo.t).toBe("Licitarium — Orindiúva/SP");
+  // desde a 1.34.0 a barra de título traz produto + versão + município
+  expect(titulo.t).toBe("Licitarium Free 9.9.9 — Orindiúva/SP");
   await expect(page.locator("#sync-msg")).toContainText("Sincronizado");
 });
 
@@ -1005,4 +1006,62 @@ test("filtros que mudam o cálculo se destacam dos que só filtram a lista",
   expect(cores.corrigir).not.toBe(cores.soMeu);
   expect(cores.conteudo).not.toBe(cores.soMeu);
   expect(cores.corrigir).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+});
+
+test("parar sincronização: botão só vale enquanto há coleta em curso",
+    async ({ page }) => {
+  await page.locator("#btn-config").click();
+  // sem coleta, o botão nasce desabilitado — clicar nele não faria nada
+  await expect(page.locator("#btn-parar-sync")).toBeDisabled();
+});
+
+test("parar sincronização: Configurações aberta no meio da coleta já vem armada",
+    async ({ page }) => {
+  // sem ler o status ao abrir, o botão nasceria desabilitado justamente
+  // quando é necessário — o evento de progresso não é retroativo
+  await page.evaluate(() => { window.__syncRodando = true; });
+  await page.locator("#btn-config").click();
+  const parar = page.locator("#btn-parar-sync");
+  await expect(parar).toBeEnabled();
+
+  await parar.click();
+  await expect(parar).toBeDisabled();
+  await expect(page.locator("#parar-sync-status"))
+    .toContainText("Parando após o passo atual");
+  expect(await page.evaluate(() => window.__chamadas
+    .some(c => c.metodo === "parar_sync"))).toBe(true);
+});
+
+test("interrupção a pedido não é anunciada como falha", async ({ page }) => {
+  // o usuário clicou em Parar: dizer "Falha na sincronização" faria ele
+  // achar que quebrou alguma coisa
+  await page.evaluate(() => window.onSyncFim({ cancelado: true, erro: null,
+                                               resumo: null }));
+  const msg = page.locator("#sync-msg");
+  await expect(msg).toContainText("interrompida");
+  await expect(msg).not.toContainText("Falha");
+});
+
+test("fim da coleta atualiza a vista aberta, inclusive o Painel",
+    async ({ page }) => {
+  // achado 2026-08-13: onSyncFim chamava carregarLista() sempre, e COLUNAS
+  // não tem entrada para "painel" — a coleta de abertura terminando na aba
+  // inicial estourava dentro de um handler assíncrono, sem tela de erro; o
+  // Painel simplesmente não se atualizava.
+  const erros = [];
+  page.on("pageerror", e => erros.push(String(e)));
+  expect(await page.evaluate(() => estado.tipo)).toBe("painel");
+  await page.evaluate(() => window.onSyncFim({ resumo: { contratacoes: 5 },
+                                               erro: null }));
+  await expect(page.locator("#p-execucao .card")).not.toHaveCount(0);
+  expect(erros).toEqual([]);
+});
+
+test("cabeçalho traz marca, edição gratuita e município", async ({ page }) => {
+  await expect(page.locator("#sub-edicao")).toHaveText("Versão gratuita (9.9.9)");
+  await expect(page.locator("#sub-municipio"))
+    .toHaveText("Contratações públicas de Orindiúva · SP");
+  const titulo = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "set_titulo").pop());
+  expect(titulo.t).toBe("Licitarium Free 9.9.9 — Orindiúva/SP");
 });

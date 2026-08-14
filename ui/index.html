@@ -41,7 +41,8 @@
   <header>
     <div class="marca">
       <svg viewBox="0 0 64 64" aria-hidden="true" id="svg-selo"></svg>
-      <div class="mark">LICITARI<b>V</b>M<small id="sub-municipio"></small></div>
+      <div class="mark">LICITARI<b>V</b>M<small
+        id="sub-edicao"></small><small id="sub-municipio"></small></div>
     </div>
     <div class="info-topo">
       <div id="sync-status"><span class="dot" id="sync-dot"></span>
@@ -320,6 +321,17 @@
       <div class="dim" style="font-size:11.5px; margin-top:6px">
         Nas listas, arraste a borda direita de um cabeçalho para ajustar a
         coluna; dê duplo clique nela para caber no conteúdo.
+      </div>
+    </div>
+    <div class="card cfg">
+      <h2>Sincronização</h2>
+      <div class="aviso">A coleta roda em segundo plano e pode demorar na
+        primeira vez. Parar não corrompe nada: o que já entrou fica, e a
+        próxima coleta refaz de onde faltou.</div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:8px">
+        <button class="btn ghost" id="btn-parar-sync" disabled>Parar
+          sincronização</button>
+        <span class="dim" id="parar-sync-status" role="status"></span>
       </div>
     </div>
     <div class="card cfg">

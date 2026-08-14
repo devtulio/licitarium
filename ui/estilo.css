@@ -170,6 +170,9 @@ header { background:var(--surface); border-bottom:1px solid var(--border);
 header .mark { font-size:22px; }
 header .mark small { display:block; font-family:var(--font-ui); font-size:10.5px;
   letter-spacing:.05em; color:var(--muted); margin-top:2px; }
+/* a linha da edição fica um degrau abaixo do município na hierarquia: é
+   informação de produto, não do acervo que o usuário veio consultar */
+header .mark #sub-edicao { font-size:10px; opacity:.8; margin-top:3px; }
 /* pedido do usuário (2026-08-08): Compacta = metade da largura da janela,
    Expandida = a janela inteira — não um número fixo de pixels escolhido a
    dedo (era 1000px, virou motivo de o Painel usar a tela toda e as listas
