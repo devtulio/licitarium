@@ -148,7 +148,10 @@ function scriptPonte(temaBanco = "portal") {
       },
       imprimir_painel: async (vistas, ano) => {
         window.__chamadas.push({ metodo: "imprimir_painel", ano,
-          tamanhos: (vistas || []).map(([nome, html]) => [nome, html.length]) });
+          tamanhos: (vistas || []).map(([nome, html]) => [nome, html.length]),
+          // guardado inteiro: é aqui que dá para conferir o que de fato
+          // viaja para o papel, e não só o tamanho
+          html: (vistas || []).map(([, html]) => html).join("") });
         return { ok: true, arquivo: "C:/tmp/painel.html" };
       },
       filtros_disponiveis: async () => ({ anos: [2026, 2025, 2024],

@@ -306,7 +306,7 @@ function grafSeries(el, series, anoAtual) {
     return;
   }
   const ultimoMesAtual = Math.min(new Date().getMonth(), 11);
-  el.innerHTML = `<div style="position:relative">
+  el.innerHTML = `<div class="graf-par" style="position:relative">
     <div class="graf-echart" style="height:220px"></div>
     <svg data-overlay aria-hidden="true"
       style="position:absolute;inset:0"></svg></div>`;
@@ -485,7 +485,7 @@ function grafConcentracao(el, curva, total) {
   // destacar o último ponto seria dizer "todos os fornecedores = 100%", que
   // não informa nada — e o rótulo cairia em cima do fim da curva
   const dez = Math.min(9, Math.max(0, curva.length - 2));
-  el.innerHTML = `<div style="position:relative">
+  el.innerHTML = `<div class="graf-par" style="position:relative">
     <div class="graf-echart" style="height:190px"></div>
     <svg data-overlay aria-hidden="true"
       style="position:absolute;inset:0"></svg></div>`;
@@ -1167,6 +1167,46 @@ async function prepararPainel(estadoInicial) {
     orgao.add(new Option(o.nome ?? o.cnpj, o.cnpj)));
 }
 
+// O SVG que o ECharts produz sai com largura e altura FIXAS em pixels e
+// **sem viewBox** — ele desenha para a medida da tela e não sabe encolher.
+// Colado num cartão de papel mais estreito, o desenho não se ajusta: ele é
+// cortado. Em A3 a página era larga o bastante para o corte não aparecer;
+// em A4 apareceu em quase todos os gráficos (achado no PDF real, 2026-08-14).
+//
+// Aqui cada SVG capturado ganha o viewBox que faltava, calculado da própria
+// medida com que foi desenhado, e passa a pedir 100% da largura disponível.
+// A partir daí o papel escolhe o tamanho e o vetor acompanha — que é o que
+// já valia para os SVG desenhados à mão (`_svg` em relatorios.py), sempre
+// nascidos com viewBox.
+// Vista escondida tem largura 0, e `desenharGraficos` pula o que mede 0 —
+// ela só ganha os gráficos quando o usuário a abre. Quem imprimisse logo
+// depois de abrir o programa mandava três das quatro vistas SEM desenho
+// nenhum: cartão com título e nota, e nada dentro. Passava despercebido
+// porque quem imprime costuma ter navegado antes (achado 2026-08-14, ao
+// escrever a guarda do que viaja para o papel).
+//
+// Aqui cada vista é revelada por um instante, desenhada e escondida de
+// novo. É síncrono: ninguém vê o piscar, e nada fica pendurado.
+function paraPapel(id) {
+  const vista = $(id);
+  const estavaOculta = vista.classList.contains("oculto");
+  if (estavaOculta) vista.classList.remove("oculto");
+  desenharGraficos(vista);
+  if (estavaOculta) vista.classList.add("oculto");
+  const copia = vista.cloneNode(true);
+  copia.querySelectorAll("svg[width]").forEach(svg => {
+    if (svg.getAttribute("viewBox")) return;      // os à mão já têm
+    const l = parseFloat(svg.getAttribute("width"));
+    const a = parseFloat(svg.getAttribute("height"));
+    if (!l || !a) return;
+    svg.setAttribute("viewBox", `0 0 ${l} ${a}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.setAttribute("width", "100%");
+    svg.removeAttribute("height");                // a altura sai do viewBox
+  });
+  return copia.innerHTML;
+}
+
 // A impressão leva as quatro vistas, cada uma numa página A4 deitada: o SVG é
 // vetorial, então sai na resolução da impressora, não na da tela.
 $("btn-imprimir-painel").addEventListener("click", async () => {
@@ -1176,10 +1216,10 @@ $("btn-imprimir-painel").addEventListener("click", async () => {
   botao.disabled = true;
   botao.textContent = "Gerando…";
   try {
-    const vistas = [["execucao", $("p-execucao").innerHTML],
-                    ["analise", $("p-analise").innerHTML],
-                    ["vigilancia", $("p-vigilancia").innerHTML],
-                    ["economia", $("p-economia").innerHTML]];
+    const vistas = [["execucao", paraPapel("p-execucao")],
+                    ["analise", paraPapel("p-analise")],
+                    ["vigilancia", paraPapel("p-vigilancia")],
+                    ["economia", paraPapel("p-economia")]];
     await api.imprimir_painel(vistas, P.dados.ano);
   } finally {
     botao.disabled = false;

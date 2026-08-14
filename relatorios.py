@@ -2336,6 +2336,26 @@ TINTA_SEQUENCIAL = {"seq1-ink": "#141414", "seq2-ink": "#141414",
 # que impede o navegador de "economizar tinta" e devolver barras cinzentas.
 _CSS_PAINEL_RESTO = """
   * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* O SVG capturado chega com viewBox (posto na captura, ver paraPapel em
+     ui/painel.js) e largura de 100%: estas duas linhas são o que faz a
+     altura acompanhar, em vez de o desenho ser cortado no cartão estreito. */
+  .card svg { max-width:100%; height:auto; display:block; }
+  /* o par gráfico + overlay do corte vertical dividem a mesma caixa; sem
+     isto o overlay fica na altura antiga e as marcas descolam do gráfico */
+  .card svg[data-overlay] { position:absolute; inset:0; }
+  /* A tela grava a altura do gráfico em pixels no `style=` do contêiner,
+     medida para a largura da tela. No papel o SVG passa a ocupar 100% da
+     largura e fica MAIS ALTO que aquele número — vazava a caixa e caía por
+     cima da nota do cartão. `auto` deixa a caixa acompanhar o desenho; o
+     `!important` é para vencer o style inline, que não dá para remover sem
+     mexer no que a tela usa. */
+  .card .graf, .card .graf-echart { height:auto !important; }
+  /* Gráfico com overlay (o corte vertical desenhado à mão) põe os rótulos
+     de eixo ABAIXO da caixa do gráfico. Na tela a altura fixa do contêiner
+     já reservava esse espaço; com `height:auto` a caixa encolheu até o
+     desenho e os rótulos passaram a encostar na nota do cartão — medido em
+     -5 px de folga. O respiro devolve o que a altura fixa dava. */
+  .card .graf-par { padding-bottom:14px; }
   .vista { display:grid; gap:12px; }
   .faixa { display:grid; gap:12px; }
   .f-4 { grid-template-columns:1.15fr 1fr 1fr 1fr; }

@@ -652,3 +652,34 @@ test("a barra fica com o grosso do cartão, não o texto em volta",
   await page.waitForTimeout(400);
   await conferir("economia");
 });
+
+test("o que vai ao papel tem SVG que sabe encolher", async ({ page }) => {
+  // O ECharts entrega SVG com largura FIXA em pixels e sem viewBox: ele
+  // desenha para a medida da tela e não se ajusta. Colado num cartão de
+  // papel mais estreito, era cortado — em A3 a página escondia o defeito,
+  // em A4 ele apareceu em quase todos os gráficos (PDF real, 2026-08-14).
+  await page.locator("#btn-imprimir-painel").click();
+  const html = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "imprimir_painel").pop().html);
+  const abrindo = html.match(/<svg[^>]*>/g) || [];
+  expect(abrindo.length).toBeGreaterThan(5);
+  const semViewBox = abrindo.filter(t => !/viewBox=/.test(t));
+  expect(semViewBox, "SVG sem viewBox não encolhe no papel").toEqual([]);
+  // `width="100%"` também começa com dígito: o que não pode é largura em
+  // número puro, que é a que trava o desenho no tamanho da tela
+  const comLarguraFixa = abrindo.filter(t => /width="\d+(\.\d+)?"/.test(t));
+  expect(comLarguraFixa, "largura em pixels trava o desenho").toEqual([]);
+});
+
+test("imprimir sem abrir as vistas leva os gráficos mesmo assim",
+    async ({ page }) => {
+  // Vista escondida tem largura 0 e `desenharGraficos` pula quem mede 0:
+  // quem imprimisse logo depois de abrir mandava três das quatro vistas com
+  // cartão vazio — título e nota, e nada dentro. Não aparecia porque quem
+  // imprime costuma ter navegado antes (achado 2026-08-14).
+  await page.locator("#btn-imprimir-painel").click();
+  const html = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "imprimir_painel").pop().html);
+  expect((html.match(/<svg/g) || []).length,
+         "vista escondida foi ao papel sem desenho").toBeGreaterThan(12);
+});

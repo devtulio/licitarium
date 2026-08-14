@@ -201,6 +201,17 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   fechando a fronteira. Antes disso este documento afirmava que a captura
   "sai no papel sem conversão": era falso, e escrito sem imprimir para
   conferir.
+- **O SVG do ECharts não sabe encolher (1.41.1).** Ele sai com `width`/
+  `height` em pixels e **sem `viewBox`** — desenhado para a medida da tela.
+  Colado num cartão de papel mais estreito, é cortado. `paraPapel()` em
+  ui/painel.js dá o viewBox que falta e troca a largura por 100%; o CSS do
+  documento completa com `max-width:100%; height:auto`. Os SVG desenhados à
+  mão (`_svg` em relatorios.py) já nasciam com viewBox e nunca tiveram isso.
+- **Vista escondida não desenha (1.41.1).** Largura 0 faz `desenharGraficos`
+  pular o gráfico; a vista só ganha desenho ao ser aberta. Por isso
+  `paraPapel()` revela a vista, desenha e esconde de novo antes de capturar
+  — sem isso, imprimir logo depois de abrir mandava três das quatro vistas
+  com cartão vazio.
 - **Papel do painel: A4 paisagem (1.41.0).** Era A3, que quase nenhuma
   impressora de secretaria tem. Quem quiser A3 escolhe na caixa de impressão
   do navegador — a grade é fluida e acompanha.

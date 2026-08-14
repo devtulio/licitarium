@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.41.1 — 2026-08-14
+
+**Gráficos cortados na impressão**
+
+Os gráficos saíam do painel impresso com o pedaço da direita faltando — o
+mês de agosto sumia das colunas, o mapa de calor perdia metade dos meses, e
+o cartão de concentração de fornecedores era partido ao meio pela borda da
+página.
+
+O desenho vinha da tela com a largura travada em pixels, medida para o
+monitor. No papel, mais estreito, ele não sabia encolher: era cortado. Agora
+cada gráfico sai da tela sabendo se ajustar ao espaço que encontrar — no A4,
+no A3, em qualquer largura. Em A3 o problema não aparecia porque a página
+era larga o bastante para esconder o corte.
+
+**Três das quatro visões saíam sem gráfico nenhum**
+
+Achado ao escrever a verificação do defeito acima. Quem abrisse o programa e
+mandasse imprimir direto recebia as visões *Análise*, *Vigilância* e
+*Economia* com os cartões vazios: título, nota de rodapé e nenhum desenho.
+
+A causa: uma visão que ainda não foi aberta tem largura zero, e o gráfico não
+é desenhado nela. Só passava despercebido porque quem imprime costuma ter
+navegado pelas visões antes. Agora cada visão é preparada no momento da
+impressão, tenha sido aberta ou não.
+
+**Rótulo de eixo encostando na nota do cartão**
+
+No gráfico de concentração, os rótulos de baixo ficavam a 5 pixels da nota
+explicativa — grudados. Ganharam respiro.
+
 ## 1.41.0 — 2026-08-14
 
 **O calendário voltava quebrado na impressão**
