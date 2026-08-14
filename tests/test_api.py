@@ -134,12 +134,17 @@ def test_manual_segue_o_padrao_de_nome_da_familia():
     O padrão da família é "Manual Operacional — SIGLA vX.Y.Z", para os
     manuais dos cinco sistemas ficarem juntos e ordenados na pasta. Este
     teste também pega bump de versão esquecido no manual.
+
+    Aqui a sigla é "Licitarium Free" desde a 1.35.0 (decisão do usuário
+    em 2026-08-14): o nome do produto ganhou o "Free", e o manual segue o
+    produto. A ordenação alfabética na pasta continua valendo, já que o
+    prefixo "Licitarium" não mudou.
     """
     man = (licitarium.DIR_APP / "MANUAL.html").read_text(encoding="utf-8")
-    esperado = f"Manual Operacional — Licitarium v{licitarium.VERSAO}"
+    esperado = f"Manual Operacional — Licitarium Free v{licitarium.VERSAO}"
     assert f"<title>{esperado}</title>" in man
     # cabeçalho de cada página impressa: mesma ordem dos irmãos
-    cabecalho = f'"Licitarium v{licitarium.VERSAO} — Manual Operacional"'
+    cabecalho = f'"Licitarium Free v{licitarium.VERSAO} — Manual Operacional"'
     assert f"content: {cabecalho}" in man
     assert f"VERSÃO {licitarium.VERSAO}" in man        # capa
 

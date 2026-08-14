@@ -20,6 +20,10 @@ continuam avisando que há atualização, mas abrem a página do release
 para download manual em vez de instalar sozinhas. Da 1.35.0 em diante a
 instalação automática volta ao normal.
 
+O **manual** acompanha o produto: o título passa a ser *Manual
+Operacional — Licitarium Free vX.Y.Z*, que é o nome do PDF quando se
+imprime pelo botão do próprio manual.
+
 ## 1.34.0 — 2026-08-13
 
 **Parar a sincronização, e identificação da edição**
