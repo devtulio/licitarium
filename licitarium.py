@@ -28,7 +28,7 @@ import pca_builder
 import pncp
 import relatorios
 
-VERSAO = "1.34.0"
+VERSAO = "1.35.0"
 # dentro do exe onefile os arquivos ficam na pasta temporária do bundle;
 # _MEIPASS é o caminho oficial para chegar até eles
 DIR_APP = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1857,9 +1857,12 @@ class Api:
                 # arquivo por ponto ao publicar o anexo ("Licitarium.v1.2.4
                 # .exe"), por isso os dois separadores. Segue achando as
                 # releases antigas, que se chamavam só "Licitarium.exe".
+                # O "Free" é opcional porque entrou só na 1.35.0: as
+                # releases já publicadas não o têm, e esta checagem também
+                # roda contra elas.
                 self._asset_url = next(
                     (a.get("browser_download_url") for a in d.get("assets", [])
-                     if re.fullmatch(r"Licitarium([ .]v[\d.]+)?\.exe",
+                     if re.fullmatch(r"Licitarium([ .]Free)?([ .]v[\d.]+)?\.exe",
                                      a.get("name") or "")), None)
                 # instalação automática só faz sentido rodando como exe e
                 # sem Smart App Control barrando o binário novo

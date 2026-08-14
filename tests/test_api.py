@@ -320,20 +320,24 @@ def test_filtro_ano_pca(api):
     assert api.listar("pca", {"ano": 2024})["total"] == 0
 
 
-def test_asset_do_auto_update_aceita_nome_com_versao():
-    """O exe passou a se chamar "Licitarium vX.Y.Z.exe" (1.2.4).
-
-    O casamento por nome fixo pararia de achar o download da release nova;
-    o padrão continua aceitando as releases antigas, sem versão no nome.
+def test_asset_do_auto_update_aceita_todos_os_nomes_ja_publicados():
+    """O nome do exe mudou duas vezes: ganhou a versão (1.2.4) e o "Free"
+    (1.35.0). O casamento é por padrão porque a checagem roda contra
+    releases de qualquer época — inclusive as antigas, que continuam no
+    GitHub com o nome de então.
     """
-    padrao = re.compile(r"Licitarium([ .]v[\d.]+)?\.exe")
+    padrao = re.compile(r"Licitarium([ .]Free)?([ .]v[\d.]+)?\.exe")
     # o GitHub troca espaço por ponto no nome do anexo: o arquivo sobe como
-    # "Licitarium v1.2.4.exe" e a release publica "Licitarium.v1.2.4.exe"
-    assert padrao.fullmatch("Licitarium.v1.2.4.exe")
+    # "Licitarium Free v1.35.0.exe" e a release publica
+    # "Licitarium.Free.v1.35.0.exe"
+    assert padrao.fullmatch("Licitarium.Free.v1.35.0.exe")
+    assert padrao.fullmatch("Licitarium Free v1.35.0.exe")
+    assert padrao.fullmatch("Licitarium.v1.2.4.exe")   # 1.2.4 até 1.34.0
     assert padrao.fullmatch("Licitarium v1.2.4.exe")
     assert padrao.fullmatch("Licitarium.exe")          # releases até a 1.2.3
     for fora in ("licitarium.exe", "OutroLicitarium.exe",
-                 "Licitarium.v1.2.4.zip", "Licitarium.exe.txt"):
+                 "Licitarium.v1.2.4.zip", "Licitarium.exe.txt",
+                 "LicitariumFree.exe"):   # sem separador não é o nosso
         assert not padrao.fullmatch(fora), fora
     # e é o mesmo padrão que o código usa
     fonte = (licitarium.DIR_APP / "licitarium.py").read_text(encoding="utf-8")
@@ -342,9 +346,26 @@ def test_asset_do_auto_update_aceita_nome_com_versao():
 
 def test_spec_nomeia_o_exe_com_a_versao_do_codigo():
     spec = (licitarium.DIR_APP / "Licitarium.spec").read_text(encoding="utf-8")
-    assert "name=f'Licitarium v{VERSAO}'" in spec
+    assert "name=f'Licitarium Free v{VERSAO}'" in spec
     # a versão é lida de licitarium.py; cópia fixa aqui sairia de sincronia
     assert "licitarium.py" in spec and "re.search" in spec
+
+
+def test_verificador_antigo_nao_reconhece_o_nome_novo():
+    """Registra o custo, de uma vez só, da renomeação do exe (1.35.0).
+
+    Quem está na 1.34.0 ou antes tem embutido o padrão SEM o "Free": vai
+    continuar avisando que há versão nova, mas cai no download manual em
+    vez de instalar sozinho. É consequência inevitável de renomear — o
+    verificador viaja dentro do exe já instalado. Este teste existe para
+    que isso seja um fato conhecido e datado, não uma surpresa.
+    """
+    antigo = re.compile(r"Licitarium([ .]v[\d.]+)?\.exe")
+    assert not antigo.fullmatch("Licitarium.Free.v1.35.0.exe")
+    # e o inverso vale: o verificador novo acha o que as releases antigas
+    # publicaram, então quem atualizar a partir da 1.35.0 fica coberto
+    novo = re.compile(r"Licitarium([ .]Free)?([ .]v[\d.]+)?\.exe")
+    assert novo.fullmatch("Licitarium.v1.34.0.exe")
 
 
 def test_troca_do_exe_assume_o_nome_da_versao_nova():

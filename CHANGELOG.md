@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.35.0 — 2026-08-14
+
+**O executável passa a se chamar `Licitarium Free vX.Y.Z.exe`**
+
+Acompanha o nome do produto. Na página de releases o GitHub troca os
+espaços por pontos, então o arquivo aparece como
+`Licitarium.Free.v1.35.0.exe`.
+
+O verificador de atualização casa o anexo do release por padrão de nome,
+e passou a aceitar as três formas já publicadas (`Licitarium.exe` das
+versões até a 1.2.3, `Licitarium.vX.Y.Z.exe` da 1.2.4 à 1.34.0, e a nova
+com `Free`) — a checagem também roda contra releases antigas, que
+continuam no GitHub com o nome de então.
+
+**Efeito de uma vez só:** quem está na 1.34.0 ou anterior tem embutido o
+verificador antigo, que não reconhece o novo nome. Essas instalações
+continuam avisando que há atualização, mas abrem a página do release
+para download manual em vez de instalar sozinhas. Da 1.35.0 em diante a
+instalação automática volta ao normal.
+
 ## 1.34.0 — 2026-08-13
 
 **Parar a sincronização, e identificação da edição**
