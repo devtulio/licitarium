@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.38.0 — 2026-08-14
+
+**Sete correções de interface, saídas de uma auditoria medida**
+
+A auditoria dirigiu a interface de verdade — 15 telas, os 4 temas, 40
+paradas de tabulação — e mediu o que não se confere lendo o código. O que
+ela achou:
+
+**Gasto que subiu não é mais pintado de verde.** O card "Homologado em
+2026" mostrava "▲ 73% sobre 2025" na mesma tinta verde usada em
+"Homologada": o programa afirmava que gastar mais é bom. Verde e vermelho
+passam a valer só onde a direção do número tem esse sentido — no card
+"Economizado", onde mais realmente é melhor. No card de gasto a seta
+continua, sem juízo de valor.
+
+**Texto claro demais em quatro pontos.** Os chips de aviso ficavam em
+4,03:1 de contraste (a norma exige 4,5:1), e a mesma tinta de aviso
+deixava o marcador de "município de fora" em 4,31:1 — justamente o texto
+que distingue preço do próprio município de preço alheio. As abas não
+selecionadas do tema Rótulo Civil ficavam em 4,46:1. Os tons de aviso dos
+temas Portal, Pergaminho e Rótulo Civil foram escurecidos, e o cinza do
+Rótulo Civil também.
+
+**Nada abaixo de 11 px.** Havia 198 trechos menores que isso, alguns em
+9,5 px. Densidade continua sendo a escolha do painel, mas o piso subiu. A
+única exceção deliberada é o rótulo dos eixos dentro dos gráficos, onde o
+espaço é disputado e 10,5 px ainda lê.
+
+**Campos com rótulo de verdade.** "CNPJ", "Nome do órgão", "UF" e
+"Município de referência" tinham o nome apenas no texto cinza de dentro
+do campo — que some no primeiro caractere digitado, e que leitor de tela
+não anuncia. Agora o rótulo fica acima, e o texto de dentro virou exemplo.
+
+**Cards da mesma fileira com a mesma altura.** Na vista Economia, o card
+"homologado no ano" tinha duas linhas contra três dos irmãos. Ganhou a
+comparação com o ano anterior — informação, não espaço em branco.
+
+Cada uma dessas correções tem um teste que varre a tela renderizada e
+falha se o defeito voltar: contraste nos quatro temas, piso de tamanho de
+letra, rótulo de campo, cor do indicador de variação e anatomia dos cards.
+
 ## 1.37.1 — 2026-08-14
 
 **A barra volta a ser o maior elemento do gráfico**

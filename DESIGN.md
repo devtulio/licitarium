@@ -177,6 +177,22 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
 - **Config**: município (trocar = confirmação + re-bootstrap), órgãos (CNPJs), tema.
 - Acessibilidade WCAG 2.1 AA (padrão da casa). Sem login — desktop single-user,
   dado 100% público.
+- **Regras de interface travadas por teste** (`tests-e2e/interface.spec.js`,
+  desde a 1.38.0). São medições sobre a tela renderizada, porque token, tema
+  e composição de transparência só se encontram no navegador:
+  contraste ≥ 4,5:1 nos **quatro** temas · piso de 11 px (exceção: rótulo de
+  eixo dentro do SVG, 10,5 px) · todo campo com nome acessível, nunca só
+  `placeholder` · cards de uma fileira com o mesmo número de linhas visíveis.
+- **Verde e vermelho são afirmação, não direção.** `.up`/`.down` só valem
+  onde subir *significa* melhor (economia). Para valor gasto vale `.dir`:
+  a seta carrega a direção em tinta neutra. Pintar "gastamos 73% a mais" de
+  verde era o programa dizendo o que o dado não diz.
+- **Ao medir a tela, esperar a transição fechar.** `body` anima `background`
+  e `color` por 250 ms; `getComputedStyle` no meio disso devolve o valor
+  interpolado e produz razão de contraste que na tela parada não existe.
+  Mesma família de armadilha: o Chrome devolve cor em `rgb()` (0–255) **e**
+  em `color(srgb …)` (0–1) — ler as duas com a mesma régua acusou 71 falhas
+  onde havia 18.
 - Nasceu single-file; na 1.1.0 virou `index.html` + `estilo.css` + `app.js`,
   quando o arquivo passou de 1.700 linhas. Para **por aí**: `app.js` continua
   um script clássico. Fatiar em ES modules exigiria `type="module"`, e o

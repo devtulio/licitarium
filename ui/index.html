@@ -360,9 +360,13 @@
     <div class="card cfg">
       <h2>Órgãos monitorados</h2>
       <div id="cfg-orgaos"></div>
-      <div style="display:flex; gap:8px; margin-top:12px">
-        <input type="text" id="novo-cnpj" placeholder="CNPJ (14 dígitos)">
-        <input type="text" id="novo-nome" placeholder="Nome do órgão">
+      <!-- rótulo de verdade, não só placeholder: o placeholder some no
+           primeiro caractere digitado e não é nome acessível -->
+      <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-end">
+        <label class="campo" style="flex:1"><span>CNPJ</span>
+          <input type="text" id="novo-cnpj" placeholder="14 dígitos"></label>
+        <label class="campo" style="flex:2"><span>Nome do órgão</span>
+          <input type="text" id="novo-nome" placeholder="ex.: Câmara Municipal"></label>
         <button class="btn ghost" id="btn-add-orgao">+ Adicionar</button>
       </div>
     </div>
@@ -379,10 +383,12 @@
         <option value="itens">Preços no banco (mais primeiro)</option>
       </select>
       <div id="cfg-referencia"></div>
-      <div style="display:flex; gap:8px; margin-top:12px">
-        <select id="ref-uf" style="width:90px"></select>
-        <input type="text" id="ref-busca" placeholder="Digite o município"
-               autocomplete="off" style="flex:1">
+      <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-end">
+        <label class="campo" style="width:90px"><span>UF</span>
+          <select id="ref-uf"></select></label>
+        <label class="campo" style="flex:1"><span>Município de referência</span>
+          <input type="text" id="ref-busca" placeholder="ex.: Olímpia"
+                 autocomplete="off"></label>
       </div>
       <div id="ref-sugestoes" class="sugestoes oculto"></div>
     </div>

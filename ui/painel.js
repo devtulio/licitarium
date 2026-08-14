@@ -867,7 +867,7 @@ function vistaExecucao(d) {
       <h3>Homologado em ${ano}</h3>
       <div class="n">${compacto(c.homologado)}</div>
       <div class="r">${varValor == null ? `sem ${ano - 1} para comparar`
-        : `<span class="${varValor >= 0 ? "up" : "down"}">${
+        : `<span class="dir">${
             varValor >= 0 ? "▲" : "▼"} ${pct(Math.abs(varValor), 0)}</span>
            sobre ${ano - 1}${d.comparacao_parcial ? " no mesmo período" : ""}`}</div>
       ${spark.length > 1 ? svg(240, 44, `<polyline fill="none" stroke="var(--s1)"
@@ -968,6 +968,11 @@ function vistaEconomia(d) {
   const e = d.economia, ano = d.ano;
   const varEcon = e.economizado_anterior
     ? (e.economizado / e.economizado_anterior - 1) * 100 : null;
+  // o card de homologado ficava com duas linhas contra as três dos irmãos, e
+  // a fileira perdia a linha de base comum — a comparação com o ano anterior
+  // preenche a lacuna com informação, não com espaço em branco
+  const varHom = e.homologado_anterior
+    ? (e.homologado / e.homologado_anterior - 1) * 100 : null;
   return `
   <div class="faixa f-3">
     <div class="card hero">
@@ -983,7 +988,11 @@ function vistaEconomia(d) {
       <div class="r" style="margin-top:8px">${compacto(e.estimado)} estimados</div>
     </div>
     <div class="card kpiv"><div class="v">${compacto(e.homologado)}</div>
-      <div class="r">homologado no ano</div></div>
+      <div class="r">homologado no ano</div>
+      <div class="r" style="margin-top:8px">${
+        varHom == null ? `sem ${ano - 1} para comparar`
+          : `<span class="dir">${varHom >= 0 ? "▲" : "▼"} ${
+              pct(Math.abs(varHom), 0)}</span> sobre ${ano - 1}`}</div></div>
   </div>
   ${cartaoGraf(`Economia acumulada — ${ano - 2} a ${ano}`, "economia_series",
            `O ano corrente em destaque; os anteriores ficam como contexto —

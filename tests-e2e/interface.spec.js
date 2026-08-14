@@ -1,0 +1,157 @@
+// Guardas de interface que saíram da auditoria de 2026-08-14. São medições
+// sobre a tela renderizada — o que não dá para conferir lendo o CSS, porque
+// token, tema e composição de transparência só se encontram no navegador.
+const { test, expect } = require("@playwright/test");
+const { abrirApp } = require("./harness");
+
+test.beforeEach(async ({ page }) => abrirApp(page));
+
+const TEMAS = ["portal", "pergaminho", "observatorio", "civil"];
+
+// O Chrome devolve duas notações de cor — rgb() em 0-255 e
+// color(srgb r g b / a) em 0-1. Ler as duas com a mesma régua produz número
+// sem sentido: na auditoria isso "achou" 22 contrastes de razão 1,0 que na
+// tela eram 15:1. Fundo translúcido (o chip tem fill a 10%) tem de ser
+// COMPOSTO sobre o que está atrás, senão a razão sai contra cor que ninguém vê.
+const MEDIR_CONTRASTE = () => {
+  const ler = (c) => {
+    if (!c || /transparent/.test(c)) return [0, 0, 0, 0];
+    const n = (c.match(/-?\d*\.?\d+(e-?\d+)?/gi) || []).map(Number);
+    return /^color\(/.test(c)
+      ? [n[0] * 255, n[1] * 255, n[2] * 255, n.length > 3 ? n[3] : 1]
+      : [n[0], n[1], n[2], n.length > 3 ? n[3] : 1];
+  };
+  const sobre = (f, b) =>
+    [0, 1, 2].map(i => f[i] * f[3] + b[i] * (1 - f[3])).concat(1);
+  const lum = (rgb) => {
+    const [r, g, b] = rgb.slice(0, 3).map(v => {
+      v /= 255;
+      return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
+    });
+    return .2126 * r + .7152 * g + .0722 * b;
+  };
+  const fundoDe = (el) => {
+    const pilha = [];
+    for (let n = el; n; n = n.parentElement) {
+      const c = ler(getComputedStyle(n).backgroundColor);
+      if (c[3] > 0) pilha.push(c);
+      if (c[3] >= 1) break;
+    }
+    let base = [255, 255, 255, 1];
+    for (let i = pilha.length - 1; i >= 0; i--) base = sobre(pilha[i], base);
+    return base;
+  };
+
+  const fora = [];
+  document.querySelectorAll("body *").forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || el.closest("#splash")) return;
+    if (getComputedStyle(el).visibility === "hidden") return;
+    const txt = [...el.childNodes]
+      .filter(n => n.nodeType === 3 && n.textContent.trim())
+      .map(n => n.textContent.trim()).join(" ");
+    if (!txt) return;
+    const cs = getComputedStyle(el);
+    const px = parseFloat(cs.fontSize);
+    const grande = px >= 24 || (px >= 18.66 && parseInt(cs.fontWeight) >= 700);
+    const exigido = grande ? 3 : 4.5;
+    const [x, y] = [lum(ler(cs.color)), lum(fundoDe(el))]
+      .sort((a, b) => b - a);
+    const razao = (x + .05) / (y + .05);
+    if (razao < exigido)
+      fora.push(`${txt.slice(0, 28)} — ${razao.toFixed(2)}:1 ` +
+                `(exige ${exigido}, ${px}px)`);
+  });
+  return fora;
+};
+
+test("nenhum texto da tela fica abaixo do contraste da WCAG AA",
+    async ({ page }) => {
+  // achados de 2026-08-14: chip de aviso a 4,03:1 (--warn #a26a00) e abas
+  // não selecionadas a 4,46:1 no tema Rótulo Civil (--muted #5b7a6e)
+  for (const tema of TEMAS) {
+    await page.evaluate(t => { document.documentElement.dataset.theme = t; }, tema);
+    await expect(page.locator("#p-execucao .card")).not.toHaveCount(0);
+    // ESPERAR A TRANSIÇÃO FECHAR. `body` anima background e color por 250 ms
+    // (estilo.css) e `getComputedStyle` devolve o valor interpolado: medindo
+    // na hora, o texto já está na cor nova enquanto o fundo ainda está na
+    // antiga, e sai razão de 2,39:1 que na tela parada não existe.
+    await page.waitForTimeout(350);
+    expect(await page.evaluate(MEDIR_CONTRASTE), `tema ${tema}`).toEqual([]);
+  }
+});
+
+test("nenhum texto da interface fica abaixo de 11px", async ({ page }) => {
+  // densidade é escolha legítima num painel, mas o piso estava em 9,5px.
+  // O rótulo de eixo do SVG (.painel .rot) é a exceção deliberada: vive
+  // dentro do gráfico, onde 10,5px ainda lê e o espaço é disputado.
+  const miudos = await page.evaluate(() => {
+    const fora = [];
+    document.querySelectorAll("body *").forEach(el => {
+      if (el.closest("#splash") || el.closest("svg")) return;
+      const txt = [...el.childNodes]
+        .filter(n => n.nodeType === 3 && n.textContent.trim().length > 3);
+      if (!txt.length) return;
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (px < 11)
+        fora.push(`${txt[0].textContent.trim().slice(0, 30)} — ${px}px`);
+    });
+    return [...new Set(fora)];
+  });
+  expect(miudos).toEqual([]);
+});
+
+test("todo campo de texto tem nome acessível, não só placeholder",
+    async ({ page }) => {
+  // o placeholder some no primeiro caractere digitado: quem chegou ali por
+  // teclado ou leitor de tela fica sem saber o que o campo espera
+  await page.locator("#btn-config").click();
+  const sem = await page.evaluate(() => {
+    const fora = [];
+    document.querySelectorAll("input[type=text], input:not([type]), select")
+      .forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const nome = (el.labels && el.labels.length &&
+                      el.labels[0].textContent.trim()) ||
+                     el.getAttribute("aria-label") ||
+                     el.getAttribute("title") || "";
+        if (!nome) fora.push(el.id || el.outerHTML.slice(0, 60));
+      });
+    return fora;
+  });
+  expect(sem).toEqual([]);
+});
+
+test("valor gasto não é pintado de verde por ter subido", async ({ page }) => {
+  // .up/.down afirmam "bom"/"ruim". Só cabem onde a direção TEM esse
+  // sentido — economizar mais é melhor. Gastar mais não é nem um nem outro,
+  // e o verde de "Homologada" dizia o que o dado não diz.
+  const hero = page.locator("#p-execucao .card.hero .r");
+  await expect(hero.locator(".dir")).toHaveCount(1);
+  await expect(hero.locator(".up, .down")).toHaveCount(0);
+  await expect(hero).toContainText(/[▲▼]/);          // a direção continua lá
+
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  // no card de economia mais É melhor: ali verde/vermelho seguem valendo
+  await expect(page.locator("#p-economia .card.hero .r .up, " +
+                            "#p-economia .card.hero .r .down")).toHaveCount(1);
+});
+
+test("os cards de uma fileira têm a mesma anatomia", async ({ page }) => {
+  // um card com duas linhas ao lado de irmãos com três quebrava a linha de
+  // base da fileira, e a diferença não queria dizer nada
+  for (const [vista, sel] of [["execucao", "#p-execucao"],
+                              ["economia", "#p-economia"]]) {
+    if (vista !== "execucao")
+      await page.locator(`.subabas button[data-vista="${vista}"]`).click();
+    // conta linha VISÍVEL, não nó no DOM: o que quebra a fileira é o que a
+    // pessoa vê, e um `.r` escondido continuaria contando
+    const linhas = await page.locator(`${sel} .faixa .card.kpiv`)
+      .evaluateAll(cs => cs.map(c => [...c.querySelectorAll(".r")]
+        .filter(r => r.getBoundingClientRect().height > 0).length));
+    expect(linhas.length, `${vista} sem cards kpiv`).toBeGreaterThan(1);
+    expect(new Set(linhas).size, `${vista}: ${linhas.join("/")} linhas`)
+      .toBe(1);
+  }
+});

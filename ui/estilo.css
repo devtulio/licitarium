@@ -14,7 +14,7 @@
 :root, [data-theme="portal"] {
   --bg:#f8f9fa; --surface:#ffffff; --surface2:#f1f3f5;
   --text:#1b1b1b; --muted:#5c6670; --border:#e3e6e8;
-  --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#a26a00;
+  --accent:#1351b4; --accent-fg:#ffffff; --ok:#168821; --warn:#966100;
   --erro:#b00020; --badge-tom:85%;
   --radius:8px; --pill:99px; --font-ui:system-ui,'Segoe UI',sans-serif;
   /* --font-display: só pergaminho/civil sobrescrevem — o resto herda o
@@ -27,7 +27,7 @@
 [data-theme="pergaminho"] {
   --bg:#f5efe2; --surface:#fbf7ee; --surface2:#efe6d2;
   --text:#2b2115; --muted:#6f5b3e; --border:#d9cbaa;
-  --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#8a6d1f;
+  --accent:#8b2e2e; --accent-fg:#f5efe2; --ok:#4a6b3a; --warn:#7d6219;
   --erro:#8b2e2e; --badge-tom:85%;
   --radius:3px; --pill:3px; --shadow:0 1px 2px rgba(43,33,21,.12); --mark-v:#8b2e2e;
   --font-ui:'Public Sans',system-ui,'Segoe UI',sans-serif;
@@ -46,8 +46,8 @@
    originou a direção (2026-08-13). */
 [data-theme="civil"] {
   --bg:#f6f9fa; --surface:#ffffff; --surface2:#eaf0ee;
-  --text:#122a22; --muted:#5b7a6e; --border:#d9e6e1;
-  --accent:#1b7a4d; --accent-fg:#ffffff; --ok:#1b7a4d; --warn:#9c6b15;
+  --text:#122a22; --muted:#567569; --border:#d9e6e1;
+  --accent:#1b7a4d; --accent-fg:#ffffff; --ok:#1b7a4d; --warn:#8f6212;
   --erro:#b23a2e; --badge-tom:85%;
   --radius:12px; --pill:99px; --shadow:0 1px 3px rgba(18,42,34,.1); --mark-v:#1b7a4d;
   --font-ui:'Lato',system-ui,'Segoe UI',sans-serif;
@@ -124,7 +124,7 @@ input, select { background:var(--surface); color:var(--text);
 :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .card { background:var(--surface); border:1px solid var(--border);
         border-radius:var(--radius); box-shadow:var(--shadow); }
-.badge { font-size:10.5px; padding:3px 10px; border-radius:var(--pill);
+.badge { font-size:11px; padding:3px 10px; border-radius:var(--pill);
          letter-spacing:.04em; white-space:nowrap; }
 /* Nos temas claros a cor cheia sobre o fundo translúcido não alcança 4.5:1
    no corpo de 10,5px do selo (WCAG 1.4.3) — daí a tinta escurecida. No
@@ -168,11 +168,11 @@ header { background:var(--surface); border-bottom:1px solid var(--border);
          justify-content:space-between; gap:12px; }
 [data-theme="pergaminho"] header { border-bottom:3px double #b08d3e; }
 header .mark { font-size:22px; }
-header .mark small { display:block; font-family:var(--font-ui); font-size:10.5px;
+header .mark small { display:block; font-family:var(--font-ui); font-size:11px;
   letter-spacing:.05em; color:var(--muted); margin-top:2px; }
 /* a linha da edição fica um degrau abaixo do município na hierarquia: é
    informação de produto, não do acervo que o usuário veio consultar */
-header .mark #sub-edicao { font-size:10px; opacity:.8; margin-top:3px; }
+header .mark #sub-edicao { font-size:11px; opacity:.8; margin-top:3px; }
 /* pedido do usuário (2026-08-08): Compacta = metade da largura da janela,
    Expandida = a janela inteira — não um número fixo de pixels escolhido a
    dedo (era 1000px, virou motivo de o Painel usar a tela toda e as listas
@@ -227,7 +227,7 @@ main { max-width:max(50vw, 1000px); margin:0 auto; padding:18px 22px 30px; }
 .kpi .n { font-size:22px; font-weight:700; color:var(--accent);
           font-family:var(--font-display); }
 [data-theme="pergaminho"] .kpi .n, [data-theme="civil"] .kpi .n { font-weight:400; }
-.kpi .l { font-size:10.5px; color:var(--muted); letter-spacing:.07em;
+.kpi .l { font-size:11px; color:var(--muted); letter-spacing:.07em;
           text-transform:uppercase; margin-top:3px; }
 
 nav.abas { display:flex; gap:2px; border-bottom:2px solid var(--border); margin-bottom:12px; }
@@ -302,7 +302,7 @@ nav.abas button.on { color:var(--accent); font-weight:600;
                   font-variant-numeric:tabular-nums; font-family:var(--font-display); }
 [data-theme="pergaminho"] .precos .cel .v, [data-theme="civil"] .precos .cel .v
   { font-weight:400; }
-.precos .cel .r { font-size:10px; color:var(--muted); letter-spacing:.05em;
+.precos .cel .r { font-size:11px; color:var(--muted); letter-spacing:.05em;
                   text-transform:uppercase; margin-top:2px; }
 .precos .cel.destaque .v { color:var(--accent); }
 /* dispersão: a leitura fina fica em texto corrido, para não competir com os
@@ -347,7 +347,7 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .dim { color:var(--muted); font-size:12px; }
 /* valor sem homologação: é estimativa, não pode passar por valor final */
 .est { font-style:italic; color:var(--muted); }
-.est small { font-size:9.5px; letter-spacing:.04em; }
+.est small { font-size:11px; letter-spacing:.04em; }
 /* colunas curtas centralizadas (mesmo tratamento dos relatórios) */
 .g-contratacoes > :nth-child(1), .g-contratacoes > :nth-child(2),
 .g-contratacoes > :nth-child(5),
@@ -362,7 +362,7 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .g-itens.corrigido > :nth-child(9),
 .g-itens.conteudo.corrigido > :nth-child(10) { text-align:center; }
 /* preço na unidade-base: número menor, com a base ao lado */
-.linha .base { font-size:10.5px; color:var(--muted); }
+.linha .base { font-size:11px; color:var(--muted); }
 /* caixa de seleção da pesquisa de preços: clique nela não abre o detalhe */
 .linha .sel { display:flex; align-items:center; justify-content:center; }
 .linha .sel input { cursor:pointer; margin:0; }
@@ -382,7 +382,7 @@ body.redimensionando { cursor:col-resize; user-select:none; }
 .linha .obj { display:block; text-align:justify; hyphens:auto; }
 /* preço vindo de município de referência: discreto, mas sempre visível —
    o usuário não pode confundir a própria série com a de fora */
-.de-fora { color:var(--warn); font-size:10.5px; }
+.de-fora { color:var(--warn); font-size:11px; }
 .vazio { padding:30px 34px 34px; text-align:center; color:var(--muted);
          font-size:13px; }
 .vazio svg { width:74px; height:74px; opacity:.28; margin-bottom:6px; }
@@ -419,7 +419,7 @@ body.travado { overflow:hidden; }
 .meta { display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
         background:var(--border); border-top:1px solid var(--border); }
 .meta > div { background:var(--surface); padding:11px 18px; }
-.meta .k { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase;
+.meta .k { font-size:11px; letter-spacing:.07em; text-transform:uppercase;
            color:var(--muted); }
 .meta .v { font-size:13.5px; margin-top:3px; font-variant-numeric:tabular-nums;
            overflow-wrap:break-word; }
@@ -440,7 +440,7 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .pca-totais b { color:var(--text); font-size:14px; }
 .g-pca-minuta { grid-template-columns:26px 30px 30px minmax(0,1fr) 62px 96px 108px 58px 116px; }
 .abc { display:inline-block; width:19px; height:19px; line-height:19px;
-       border-radius:50%; text-align:center; font-size:10.5px;
+       border-radius:50%; text-align:center; font-size:11px;
        font-weight:700; }
 .abc-A { background:color-mix(in srgb, var(--accent) 22%, transparent);
          color:var(--accent); }
@@ -454,11 +454,11 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
   font-size:11.5px; cursor:pointer; white-space:nowrap; }
 .familias button.on { border-color:var(--accent); color:var(--accent); }
 .familias button small { color:var(--muted); margin-left:5px; }
-.tag-mesclado { font-size:9.5px; color:var(--accent); letter-spacing:.04em; }
+.tag-mesclado { font-size:11px; color:var(--accent); letter-spacing:.04em; }
 .g-pca-minuta input[type=text], .g-pca-minuta input[type=number] {
   width:100%; padding:3px 6px; font-size:12.5px; }
 .linha .aviso-un { color:var(--warn); cursor:help; }
-.linha .tag-unico { font-size:9.5px; color:var(--warn); letter-spacing:.04em; }
+.linha .tag-unico { font-size:11px; color:var(--warn); letter-spacing:.04em; }
 #pca-lista { max-height:58vh; overflow-y:auto; }
 .veu { padding-top:24px; }
 .cfg { padding:18px 20px; margin-bottom:14px; }
@@ -475,6 +475,13 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
           border-bottom:1px solid var(--border); }
 .orgrow small { color:var(--muted); display:block; font-size:11px; }
 .aviso { font-size:12px; color:var(--warn); margin-top:8px; }
+/* Campo com rótulo próprio, empilhado. O placeholder não serve de rótulo:
+   some no primeiro caractere digitado e leitor de tela não o anuncia
+   (auditoria de interface, 2026-08-14). */
+.campo { display:flex; flex-direction:column; gap:4px; }
+.campo > span { font-size:11px; color:var(--muted); letter-spacing:.05em;
+                text-transform:uppercase; }
+.campo > input, .campo > select { width:100%; }
 .sobre { display:flex; gap:16px; align-items:center; }
 .sobre svg { width:80px; height:80px; flex:none; }
 .sobre p { font-size:12.5px; color:var(--muted); line-height:1.5; }
@@ -539,9 +546,16 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
            line-height:1.05; white-space:nowrap; }
 .hero .r, .kpiv .r { font-size:12px; color:var(--muted); margin-top:2px; }
 .kpiv .v { font-size:22px; font-weight:700; }
-.kpiv .r { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+.kpiv .r { font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+/* Verde e vermelho afirmam "bom" e "ruim": só valem onde a direção do
+   número TEM esse sentido — economizar mais é melhor, e aí .up/.down
+   cabem. Para valor gasto, subir não é bom nem ruim, e pintar de verde um
+   "gastamos 73% a mais" era o programa dizendo o que o dado não diz, com o
+   mesmo token de "Homologada" (auditoria de interface, 2026-08-14). Nesse
+   caso vale `.dir`: a seta continua carregando a direção, sem juízo. */
 .up { color:var(--ok); font-weight:600; }
 .down { color:var(--erro); font-weight:600; }
+.dir { color:var(--text); font-weight:600; }
 .leg { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px;
        color:var(--muted); margin-top:8px; }
 .leg i { width:9px; height:9px; border-radius:2px; display:inline-block;
@@ -557,7 +571,7 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
 .painel td.num, .painel th.num { width:84px; }
 .painel td, .painel th { padding:5px 6px; text-align:left;
                          border-bottom:1px solid var(--border); }
-.painel th { font-size:10.5px; color:var(--muted); text-transform:uppercase;
+.painel th { font-size:11px; color:var(--muted); text-transform:uppercase;
              letter-spacing:.04em; font-weight:600; }
 .painel td.num, .painel th.num { text-align:right;
                                  font-variant-numeric:tabular-nums; }
