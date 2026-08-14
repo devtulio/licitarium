@@ -418,20 +418,36 @@ function grafDesagio(el, desagios, larg = 500) {
             homologado no exercício.</div>`;
     return;
   }
+  // O eixo era fixo em [-max, +max]: com todas as modalidades economizando
+  // — o caso comum — metade do cartão ficava vazia e as barras nasciam no
+  // meio, longe dos nomes. Este gráfico passou a destoar dos irmãos, que
+  // alinham a barra ao rótulo. Agora o zero fica onde o dado põe: sem
+  // nenhum estouro ele encosta à esquerda e o desenho vira uma barra comum;
+  // havendo estouro, o eixo abre para o lado negativo e a divergência
+  // aparece — que é quando ela informa alguma coisa.
+  const pcts = desagios.map(d => d.pct);
+  const menor = Math.min(0, ...pcts), maior = Math.max(0, ...pcts);
+  const diverge = menor < 0;
   el.innerHTML = `<div class="graf-echart" style="height:${
-    Math.max(120, desagios.length * 34 + 10)}px"></div>
-    <div class="leg" style="justify-content:space-between">
-      <span>acima do estimado</span><span>economia</span></div>`;
+    Math.max(120, desagios.length * 34 + 10)}px"></div>` + (diverge
+    ? `<div class="leg" style="justify-content:space-between">
+         <span>acima do estimado</span><span>economia</span></div>` : "");
   const chart = _iniciarEchart(el.querySelector(".graf-echart"));
-  const max = Math.max(20, ...desagios.map(d => Math.abs(d.pct)));
+  const rotulos = pcts.map(v => pct(v));
+  const folgaDireita = Math.ceil(Math.max(
+    ...rotulos.map(t => _larguraTexto(t, VAL_TXT.fontSize)))) + 8;
+  const larguraRotulo = Math.max(56, Math.floor(Math.min(
+    el.clientWidth * 0.42, el.clientWidth - folgaDireita - el.clientWidth * 0.38)));
   chart.setOption({
     animation: false,
-    grid: { left: 4, right: 8, top: 8, bottom: 4, containLabel: true },
-    xAxis: { type: "value", min: -max, max, axisLabel: { show: false },
+    grid: { left: 4, right: folgaDireita, top: 8, bottom: 4,
+            containLabel: true },
+    xAxis: { type: "value", min: menor, max: maior, axisLabel: { show: false },
       axisLine: { show: false }, splitLine: { show: false } },
     yAxis: { type: "category", inverse: true,
       data: desagios.map(d => d.modalidade ?? "–"),
-      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { ...ROT_TXT, width: larguraRotulo, overflow: "truncate" } },
     series: [
       { name: "economia", type: "bar", barWidth: 17,
         data: desagios.map(d => d.pct >= 0 ? d.pct : null),
@@ -570,8 +586,18 @@ function grafCalor(el, calor, meses) {
       ).join("")}<span>mais processos</span></div>`;
   const chart = _iniciarEchart(el.querySelector(".graf-echart"));
   const data = [];
-  linhas.forEach(([, valores], i) => valores.forEach((v, m) =>
-    data.push({ value: [m, i, v || 0], itemStyle: { color: `var(--seq${nivel(v)})` } })));
+  linhas.forEach(([, valores], i) => valores.forEach((v, m) => {
+    const n = nivel(v);
+    data.push({ value: [m, i, v || 0],
+      itemStyle: { color: `var(--seq${n})` },
+      // O número dentro da célula poupa o hover para ler a contagem. A tinta
+      // sai de `--seq{n}-ink`, definida junto de cada rampa: escolher pelo
+      // nível ("alto = claro") seria falso no Observatório, cuja rampa é
+      // invertida. Célula zerada fica só com o tom de fundo — imprimir "0"
+      // doze vezes por linha vira ruído.
+      label: { show: !!v, formatter: String(v), fontSize: 11, fontWeight: 600,
+               color: `var(--seq${n}-ink)` } });
+  }));
   chart.setOption({
     animation: false,
     grid: { left: 4, right: 8, top: 8, bottom: 8, containLabel: true },

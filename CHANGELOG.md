@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.39.0 — 2026-08-14
+
+**O deságio por modalidade volta a começar junto dos nomes**
+
+O gráfico reservava metade da largura para o lado negativo — o das
+modalidades que fecharam *acima* do estimado. Como isso quase nunca
+acontece, na prática metade do cartão ficava vazia e as barras nasciam no
+meio, longe dos rótulos: o único gráfico do painel que não alinhava a barra
+ao nome.
+
+Agora o zero fica onde o dado o coloca. Não havendo nenhum estouro, ele
+encosta à esquerda e o desenho é uma barra comum como as vizinhas; havendo,
+o eixo abre para o lado negativo e a divergência aparece — que é justamente
+quando ela diz alguma coisa. A legenda "acima do estimado / economia" só
+aparece nesse caso.
+
+**O mapa de calor mostra o número de processos dentro de cada quadrado**
+
+Antes era preciso passar o mouse para saber se um mês tinha 2 ou 20
+processos. A cor continua dando a leitura rápida; o número dá a exata.
+Quadrado sem processo fica só com o tom de fundo — imprimir "0" doze vezes
+por linha seria ruído.
+
+A tinta do número acompanha o degrau da rampa, não o tema: no Observatório a
+rampa é invertida (o tom mais claro é o de maior volume), então "muito
+processo = texto claro" seria falso lá. Os vinte pares — cinco degraus × quatro
+temas — foram medidos, e o quarto degrau do tema Portal precisou escurecer um
+tom porque, no anterior, nem branco puro alcançava o contraste mínimo. Esse
+degrau é usado também no painel impresso, que acompanhou a mudança.
+
 ## 1.38.1 — 2026-08-14
 
 **Só avisa o que é aviso**

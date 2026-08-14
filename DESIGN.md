@@ -187,6 +187,18 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   onde subir *significa* melhor (economia). Para valor gasto vale `.dir`:
   a seta carrega a direção em tinta neutra. Pintar "gastamos 73% a mais" de
   verde era o programa dizendo o que o dado não diz.
+- **Eixo divergente só quando há divergência.** No deságio o eixo vai de
+  `min(0, …)` a `max(…)`: sem nenhuma modalidade acima do estimado ele
+  encosta à esquerda e o gráfico vira barra comum, alinhada ao rótulo como
+  os irmãos. Eixo simétrico fixo desperdiçava metade do cartão no caso
+  comum. A legenda "acima do estimado / economia" acompanha: só aparece
+  quando o lado negativo existe.
+- **Tinta sobre cor de rampa vai por degrau, nunca por tema.** A rampa do
+  Observatório é invertida (`--seq1` escuro, `--seq5` claro), então "nível
+  alto = texto claro" é falso lá. Daí `--seq{n}-ink`, definido junto de cada
+  rampa e replicado em `TINTA_SEQUENCIAL` (relatorios.py) para o painel
+  impresso. Os 20 pares foram medidos; `--seq4` do Portal mudou de `#2a78d6`
+  para `#2571c9` porque no anterior nem o branco puro chegava a 4,5:1.
 - **Âmbar custa: só marca o que tem consequência.** `.aviso` (cor de alerta)
   é para o que a pessoa precisa observar — trocar de município apaga o
   acervo; o limite legal desatualizado produz alerta de fracionamento errado.

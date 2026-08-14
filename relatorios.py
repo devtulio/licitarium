@@ -2318,7 +2318,17 @@ soma.</div>
 # branco, caem a 1,28-2,99 de contraste. Detalhe em design/DASHBOARD.md.
 SERIE_DOCUMENTO = dict(s1="#2a78d6", s2="#eb6834", s3="#1baf7a", s4="#eda100",
                        seq1="#cde2fb", seq2="#9ec5f4", seq3="#5598e7",
-                       seq4="#2a78d6", seq5="#1c5cab")
+                       seq4="#2571c9", seq5="#1c5cab")
+
+# Tinta do número dentro da célula do mapa de calor. Precisa vir para o papel
+# junto da rampa: sem ela o número herda a cor de texto do documento e some
+# nos dois degraus escuros. Chave com hífen não cabe em `dict(...)`, daí o
+# literal. Os cinco pares foram medidos contra a rampa acima (≥ 4,5:1) — o
+# `seq4` mudou de #2a78d6 para #2571c9 justamente porque, no anterior, nem o
+# branco puro alcançava 4,5:1.
+TINTA_SEQUENCIAL = {"seq1-ink": "#141414", "seq2-ink": "#141414",
+                    "seq3-ink": "#141414", "seq4-ink": "#ffffff",
+                    "seq5-ink": "#ffffff"}
 
 
 # Estilo do painel impresso. As cores de série são as mesmas da tela — foram
@@ -2370,7 +2380,8 @@ _CSS_PAINEL_RESTO = """
 # As chaves de SERIE_DOCUMENTO já são os nomes das variáveis CSS (s1…seq5).
 CSS_PAINEL = (
     ":root { "
-    + " ".join(f"--{chave}:{cor};" for chave, cor in SERIE_DOCUMENTO.items())
+    + " ".join(f"--{chave}:{cor};" for chave, cor
+               in {**SERIE_DOCUMENTO, **TINTA_SEQUENCIAL}.items())
     + " --surface:var(--superficie); --surface2:var(--cabecalho);"
     " --muted:var(--suave); --text:var(--texto); --border:var(--borda);"
     " --accent:var(--acento); --accent-fg:#ffffff; --erro:var(--alerta);"

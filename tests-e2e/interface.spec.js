@@ -163,6 +163,40 @@ test("cor de alerta só marca o que tem consequência", async ({ page }) => {
   expect(cores.aviso).not.toBe(cores.ajuda);
 });
 
+test("deságio começa junto do rótulo quando ninguém estourou o estimado",
+    async ({ page }) => {
+  // O eixo era fixo em [-max, +max]: com todas as modalidades economizando,
+  // metade do cartão ficava vazia e a barra nascia no meio, destoando dos
+  // gráficos irmãos. Com estouro, a divergência volta — aí ela informa.
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const medir = () => page.evaluate(() => {
+    const el = document.querySelector('[data-graf="desagio"]');
+    const svg = el.querySelector("svg");
+    const cx = el.getBoundingClientRect();
+    const barras = [...svg.querySelectorAll("path")]
+      .filter(p => (p.getAttribute("fill") || "none") !== "none")
+      .map(p => p.getBoundingClientRect())
+      .filter(r => r.width > 2 && r.height > 2);
+    return { inicio: Math.round(Math.min(...barras.map(b => b.left - cx.left))),
+             cartao: Math.round(cx.width),
+             temLegenda: !!el.querySelector(".leg") };
+  });
+  const m = await medir();
+  // o acervo de exemplo não tem estouro: a barra encosta no rótulo
+  expect(m.inicio, `barra começa a ${m.inicio}px de um cartão de ${m.cartao}`)
+    .toBeLessThan(m.cartao * 0.45);
+  expect(m.temLegenda, "legenda de divergência sem divergência").toBe(false);
+});
+
+test("o mapa de calor traz a contagem dentro da célula", async ({ page }) => {
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const nums = await page.locator('[data-graf="calor"] svg text')
+    .evaluateAll(ts => ts.map(t => t.textContent.trim())
+      .filter(s => /^\d+$/.test(s)));
+  expect(nums.length).toBeGreaterThan(5);
+  expect(nums).not.toContain("0");   // célula zerada fica só com o tom
+});
+
 test("os cards de uma fileira têm a mesma anatomia", async ({ page }) => {
   // um card com duas linhas ao lado de irmãos com três quebrava a linha de
   // base da fileira, e a diferença não queria dizer nada
