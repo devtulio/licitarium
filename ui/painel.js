@@ -763,9 +763,13 @@ function grafAgenda(el, itens) {
       const faixa = prazo <= 15 ? "u" : prazo <= 60 ? "a" : "t";
       const quem = grupo.map(i => `${i.tipo}: ${i.nome ?? "–"}`).join(" · ");
       const quantos = `${grupo.length} vencimento${grupo.length > 1 ? "s" : ""}`;
-      celulas.push(`<div class="cal-dia venc ${faixa}${marca}"
+      // `aria-label` e não `title`: o title desenha o balão preto nativo do
+      // navegador em cima do tooltip próprio, com atraso — dois balões
+      // dizendo a mesma coisa. O aria-label só fala, não desenha.
+      celulas.push(`<div class="cal-dia venc ${faixa}${marca}" role="img"
+        aria-label="${esc(quantos)} em ${esc(dataBr(k))}: ${esc(quem)}"
         data-tip-v="${esc(quantos)} em ${esc(dataBr(k))}"
-        data-tip-l="${esc(quem)}" title="${esc(quantos)} — ${esc(quem)}"
+        data-tip-l="${esc(quem)}"
         >${d}<b>${grupo.length}</b></div>`);
     }
     // o ano só aparece quando a janela de 90 dias vira o calendário

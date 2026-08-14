@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.40.1 — 2026-08-14
+
+**Um balão só ao passar o mouse no calendário**
+
+Apontar um dia com vencimento mostrava o balão do próprio programa e,
+segundos depois, um segundo balão — preto, quadrado — repetindo a mesma
+informação. O segundo era do navegador: cada dia carregava o atributo
+`title`, posto ali para leitor de tela, e o navegador desenha um balão
+nativo sempre que ele existe.
+
+A descrição para leitor de tela passa a ir em `aria-label`, que é lido em
+voz alta sem desenhar nada na tela.
+
 ## 1.40.0 — 2026-08-14
 
 **A agenda dos próximos 90 dias vira um calendário**

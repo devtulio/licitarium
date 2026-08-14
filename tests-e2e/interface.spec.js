@@ -197,6 +197,25 @@ test("o mapa de calor traz a contagem dentro da célula", async ({ page }) => {
   expect(nums).not.toContain("0");   // célula zerada fica só com o tom
 });
 
+test("nenhuma marca de gráfico soma o balão nativo ao tooltip próprio",
+    async ({ page }) => {
+  // `title` faz o navegador desenhar o balão preto dele por cima do tooltip
+  // do painel, com atraso: dois balões dizendo a mesma coisa. Quem precisa
+  // do nome acessível usa `aria-label`, que fala sem desenhar.
+  for (const vista of ["execucao", "analise", "vigilancia", "economia"]) {
+    if (vista !== "execucao")
+      await page.locator(`.subabas button[data-vista="${vista}"]`).click();
+    const dobrados = await page.evaluate(() =>
+      [...document.querySelectorAll(".vista:not(.oculto) [data-tip-v][title]")]
+        .map(e => e.getAttribute("title").slice(0, 40)));
+    expect(dobrados, `vista ${vista}`).toEqual([]);
+  }
+  // e o dia com vencimento continua tendo nome acessível
+  const comNome = await page.locator('[data-graf="agenda"] .cal-dia.venc')
+    .evaluateAll(cs => cs.filter(c => !c.getAttribute("aria-label")).length);
+  expect(comNome, "célula de vencimento sem aria-label").toBe(0);
+});
+
 test("os cards de uma fileira têm a mesma anatomia", async ({ page }) => {
   // um card com duas linhas ao lado de irmãos com três quebrava a linha de
   // base da fileira, e a diferença não queria dizer nada
