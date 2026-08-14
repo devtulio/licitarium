@@ -49,11 +49,8 @@ test("todo gráfico tem nome acessível e não esconde os rótulos",
 
 test("as mensagens dinâmicas são regiões vivas", async ({ page }) => {
   // são o único canal de retorno, inclusive dos erros
-  for (const id of ["sync-msg", "brasao-status"])
+  for (const id of ["sync-msg", "brasao-status", "pca-status"])
     await expect(page.locator(`#${id}`)).toHaveAttribute("role", "status");
-  await page.locator('.subabas button[data-vista="economia"]').click();
-  await expect(page.locator("#economia-status"))
-    .toHaveAttribute("role", "status");
 });
 
 test("o checkbox da linha não é filho de um botão", async ({ page }) => {

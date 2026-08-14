@@ -756,23 +756,49 @@ function _corTemaEchart(nome, fallback, paraImpressao) {
 // Usado nos 4 gráficos de Economia e no "por modalidade" do Executivo —
 // achado 2026-08-11: Economia/Executivo nunca tiveram vista na tela, iam
 // direto do banco pro papel; ganham motor aqui como Preços já ganhou.
+// Fonte declarada de propósito, e não herdada: o ECharts reserva espaço
+// medindo o texto, e sem `fontFamily` ele mede com a sans-serif padrão e
+// desenha com outra — a reserva saía curta e o rótulo era cortado pela
+// borda. No caminho impresso ela ainda pina a fonte dentro do SVG
+// capturado, que vai parar num documento com CSS próprio.
+const FONTE_GRAFICO = "'Public Sans', system-ui, -apple-system, sans-serif";
+
+function _larguraTextoGrafico(txt, px) {
+  const ctx = (_larguraTextoGrafico._ctx ??=
+    document.createElement("canvas").getContext("2d"));
+  ctx.font = `${px}px ${FONTE_GRAFICO}`;
+  return ctx.measureText(txt).width;
+}
+
 function desenharBarrasEcharts(el, itens, { valor, rotulo, sub }) {
   if (!window.echarts || !itens || !itens.length) { el.innerHTML = ""; return; }
   const s1 = _corTemaEchart("--s1", "#2a78d6", true), muted = _corTemaEchart("--muted", "#5b6066", true);
   if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
-  const chart = echarts.init(el, null, { renderer: "svg" });
+  const chart = echarts.init(el, { textStyle: { fontFamily: FONTE_GRAFICO } },
+                             { renderer: "svg" });
   el.__echart = chart;
   el.style.height = Math.max(120, itens.length * 36 + 30) + "px";
+  const rotulosValor = itens.map(
+    it => compacto(valor(it)) + (sub ? " · " + sub(it) : ""));
+  // `containLabel` não conta o rótulo de série: a margem direita precisa
+  // caber o mais largo deles, senão "· 4 processos" sai pela borda
+  const folgaDireita = Math.ceil(Math.max(
+    ...rotulosValor.map(t => _larguraTextoGrafico(t, 11)))) + 8;
+  const larguraRotulo = Math.max(
+    64, Math.floor((el.clientWidth - folgaDireita) * 0.62));
   chart.setOption({
     animation: false,
-    grid: { left: 4, right: 70, top: 8, bottom: 8, containLabel: true },
+    grid: { left: 4, right: folgaDireita, top: 8, bottom: 8,
+            containLabel: true },
     xAxis: { type: "value", show: false },
     yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
       axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { color: muted, fontSize: 11 } },
+      // sem teto, rótulo comprido engole a área de plotagem inteira
+      axisLabel: { color: muted, fontSize: 11, width: larguraRotulo,
+                   overflow: "truncate" } },
     series: [{ type: "bar", barWidth: 17,
-      data: itens.map(it => ({ value: valor(it) || 0,
-        _rotuloValor: compacto(valor(it)) + (sub ? " · " + sub(it) : ""),
+      data: itens.map((it, i) => ({ value: valor(it) || 0,
+        _rotuloValor: rotulosValor[i],
         itemStyle: { color: s1, borderRadius: [0, 4, 4, 0] } })),
       label: { show: true, position: "right", color: muted, fontSize: 11,
         formatter: p => p.data._rotuloValor } }]

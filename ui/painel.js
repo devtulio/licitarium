@@ -139,9 +139,28 @@ function ligarTooltips() {
 // ── ECharts: estilos de texto compartilhados, mesmos valores das classes
 // .rot/.val/.eixo de estilo.css — o SVG do ECharts não carrega classe CSS
 // (sai com style="" inline), então o valor precisa ir explícito aqui.
+// A família **precisa** ir junto: o ECharts mede o texto para reservar
+// espaço (é o que `containLabel` usa) com a fonte que ele acha que vale, e
+// sem `fontFamily` explícito ele calcula sobre a sans-serif padrão enquanto
+// o SVG desenha com a `--font-ui` do tema, mais larga. A reserva saía menor
+// que o rótulo e o "C" de "Concorrência - Eletrônica" era comido pela borda
+// do cartão — na tela e no PDF do painel, que captura o mesmo SVG.
+// Lida na hora de desenhar, não no carregamento: trocar de tema troca a
+// fonte, e o painel se redesenha inteiro nessa troca.
+const _fonteUI = () => getComputedStyle(document.body).fontFamily;
 const ROT_TXT = { fontSize: 10.5, color: "var(--muted)" };
 const VAL_TXT = { fontSize: 11, color: "var(--text)" };
 const COR_EIXO = "var(--border)";
+
+// Largura real de um texto, para dimensionar margem que `containLabel` não
+// cobre: rótulo de série (`label.position`) fica FORA da conta dele, então
+// `grid.right` fixo é chute — e chute errado corta "…· 4 processos".
+function _larguraTexto(txt, px) {
+  const ctx = (_larguraTexto._ctx ??=
+    document.createElement("canvas").getContext("2d"));
+  ctx.font = `${px}px ${_fonteUI()}`;
+  return ctx.measureText(txt).width;
+}
 
 // x/y do evento nativo do ECharts — mesma assinatura que mostrarTt já espera
 // (clientX, clientY), pra reusar o tooltip único sem reescrevê-lo.
@@ -155,7 +174,11 @@ function _ptEvento(params) {
 // uma só variável faria o dispose() de um derrubar o outro
 function _iniciarEchart(el) {
   if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
-  const chart = echarts.init(el, null, { renderer: "svg" });
+  // A família entra como tema (ponto único), não gráfico a gráfico — ver o
+  // comentário de _fonteUI: sem ela o ECharts reserva espaço medindo com a
+  // sans-serif padrão e desenha com a fonte do tema, que é mais larga.
+  const chart = echarts.init(el, { textStyle: { fontFamily: _fonteUI() } },
+                             { renderer: "svg" });
   el.__echart = chart;
   return chart;
 }
@@ -215,15 +238,31 @@ function grafBarras(el, itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 3
   }
   el.style.height = Math.max(120, itens.length * 36 + 20) + "px";
   const chart = _iniciarEchart(el);
+  const rotulosValor = itens.map(
+    it => compacto(valor(it)) + (sub ? " · " + sub(it) : ""));
+  // 5 px é a distância padrão entre o fim da barra e o rótulo; +3 de folga
+  // para o arredondamento da medição não deixar o último caractere na borda
+  const folgaDireita = Math.ceil(Math.max(
+    ...rotulosValor.map(t => _larguraTexto(t, VAL_TXT.fontSize)))) + 8;
+  // o que sobra do cartão depois do valor, com um terço reservado à barra:
+  // sem esse teto o rótulo do eixo cresce até engolir a área de plotagem
+  const larguraRotulo = Math.max(
+    64, Math.floor((el.clientWidth - folgaDireita) * 0.62));
   chart.setOption({
     animation: false,
-    grid: { left: 4, right: 70, top: 8, bottom: 8, containLabel: true },
+    grid: { left: 4, right: folgaDireita, top: 8, bottom: 8,
+            containLabel: true },
     xAxis: { type: "value", show: false },
     yAxis: { type: "category", inverse: true, data: itens.map(it => rotulo(it) ?? "–"),
-      axisLine: { show: false }, axisTick: { show: false }, axisLabel: ROT_TXT },
+      axisLine: { show: false }, axisTick: { show: false },
+      // Teto no rótulo do eixo: "Serviços de Terceiros - Pessoa Jurídica"
+      // sozinho comia 201 px de um cartão de 294 e não sobrava área de
+      // plotagem nenhuma — as barras sumiam e os valores caíam fora do
+      // cartão. O texto inteiro continua no tooltip do hover.
+      axisLabel: { ...ROT_TXT, width: larguraRotulo, overflow: "truncate" } },
     series: [{ type: "bar", barWidth: 17,
-      data: itens.map(it => ({ value: valor(it) || 0,
-        _rotuloValor: compacto(valor(it)) + (sub ? " · " + sub(it) : ""),
+      data: itens.map((it, i) => ({ value: valor(it) || 0,
+        _rotuloValor: rotulosValor[i],
         itemStyle: { color: cor, borderRadius: [0, 4, 4, 0] } })),
       emphasis: { disabled: true },
       label: { show: true, position: "right", ...VAL_TXT,
@@ -683,8 +722,12 @@ function grafAgenda(el, itens) {
 
   let g = `<line x1="${pxX(0)}" y1="${yBase}" x2="${pxX(90)}" y2="${yBase}"
              class="eixo" stroke-width="2"/>`;
+  // As duas pontas ancoram para dentro: centralizadas em pxX(0)/pxX(90),
+  // que são as bordas da grade, metade do "hoje" e do "+90 dias" caía fora
+  // do cartão. As marcas do meio seguem centralizadas no ponto.
   [0, 30, 60, 90].forEach(d =>
-    g += `<text class="rot" x="${pxX(d)}" y="${yBase + 30}" text-anchor="middle"
+    g += `<text class="rot" x="${pxX(d)}" y="${yBase + 30}"
+           text-anchor="${d === 0 ? "start" : d === 90 ? "end" : "middle"}"
            >${d ? `+${d} dias` : "hoje"}</text>`);
   // Largura estimada de cada caractere do rótulo (.val, 11px, maiúsculas —
   // texto em caixa alta é mais largo por caractere que caixa mista comum).
@@ -946,12 +989,7 @@ function vistaEconomia(d) {
            `Agrupado pelo CNPJ/CPF, não pelo nome — a mesma empresa aparece
             com grafias diferentes entre processos. Deságio alto não é
             atestado de bom fornecedor: pode ser estimativa inflada na
-            origem. Leia junto com a pesquisa de preços.`)}
-  <div class="macoes">
-    <button class="btn ghost" id="economia-relatorio">Relatório de economia
-      e comparativos</button>
-    <span class="dim" id="economia-status" role="status"></span>
-  </div>`;
+            origem. Leia junto com a pesquisa de preços.`)}`;
 }
 
 // ══ ciclo de vida ═════════════════════════════════════════════════════════
@@ -995,16 +1033,6 @@ async function carregarPainel() {
   $("p-analise").innerHTML = vistaAnalise(dados);
   $("p-vigilancia").innerHTML = vistaVigilancia(dados);
   $("p-economia").innerHTML = vistaEconomia(dados);
-  $("economia-relatorio")?.addEventListener("click", async () => {
-    const botao = $("economia-relatorio");
-    botao.disabled = true;
-    $("economia-status").textContent = "Gerando…";
-    const r = await api.gerar_relatorio("economia",
-      { ano: dados.ano, orgao: $("p-orgao").value || null });
-    botao.disabled = false;
-    $("economia-status").textContent = r.ok ? "Relatório aberto no navegador"
-                                             : (r.erro || "Falha ao gerar");
-  });
   desenharGraficos();
 }
 

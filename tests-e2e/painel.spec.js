@@ -241,16 +241,13 @@ test("economia fica lembrada como as outras subabas", async ({ page }) => {
   expect(salvo.v).toBe("economia");
 });
 
-test("botão de relatório da vista economia chama gerar_relatorio",
-    async ({ page }) => {
+test("a vista economia não repete o botão de relatório", async ({ page }) => {
+  // o atalho saiu do painel a pedido do usuário; o relatório continua
+  // inteiro na aba Relatórios, e é essa saída que não pode sumir junto
   await page.locator('.subabas button[data-vista="economia"]').click();
-  await page.locator("#economia-relatorio").click();
-  const chamada = await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "gerar_relatorio").pop());
-  expect(chamada.tipo).toBe("economia");
-  expect(chamada.params.ano).toBe(2026);
-  await expect(page.locator("#economia-status"))
-    .toContainText("aberto no navegador");
+  await expect(page.locator("#economia-relatorio")).toHaveCount(0);
+  await expect(page.locator('#rel-tipo option[value="economia"]'))
+    .toHaveCount(1);
 });
 
 test("vigilância mostra medidores, funil e agenda", async ({ page }) => {
@@ -576,4 +573,31 @@ test("falha na consulta explica em vez de deixar a tela muda",
   await expect(page.locator("#p-execucao")).toContainText("Não consegui montar");
   await expect(page.locator("#p-execucao")).toContainText("database is locked");
   await expect(page.locator("#painel")).not.toHaveClass(/carregando/);
+});
+
+test("nenhum rótulo de gráfico escapa do cartão, nas quatro vistas",
+    async ({ page }) => {
+  // O ECharts reserva espaço medindo o texto; sem `fontFamily` declarado ele
+  // media com a sans-serif padrão e desenhava com a fonte do tema, mais
+  // larga — "Concorrência - Eletrônica" perdia o "C" e "· 4 processos"
+  // saía pela direita, na tela E no PDF do painel, que captura o mesmo SVG.
+  const transbordos = () => page.evaluate(() => {
+    const fora = [];
+    document.querySelectorAll(".vista:not(.oculto) .graf[data-graf]")
+      .forEach(el => {
+        const cx = el.getBoundingClientRect();
+        el.querySelectorAll("text").forEach(t => {
+          const r = t.getBoundingClientRect();
+          if (cx.left - r.left > 0.5 || r.right - cx.right > 0.5)
+            fora.push(`${el.dataset.graf}: ${t.textContent.slice(0, 24)}`);
+        });
+      });
+    return fora;
+  });
+
+  for (const v of ["execucao", "analise", "vigilancia", "economia"]) {
+    if (v !== "execucao")
+      await page.locator(`.subabas button[data-vista="${v}"]`).click();
+    await expect.poll(transbordos, { message: `vista ${v}` }).toEqual([]);
+  }
 });

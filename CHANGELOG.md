@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.37.0 — 2026-08-14
+
+**Nome de modalidade não é mais cortado no gráfico**
+
+"Concorrência - Eletrônica" perdia o **C** na borda do cartão, e do outro
+lado "R$ 7,2 mi · 4 processos" virava "· 4 proces". Acontecia na tela e no
+PDF do painel, que captura o mesmo desenho.
+
+A causa: o motor de gráficos reserva o espaço do texto medindo-o antes de
+desenhar, e sem a fonte declarada ele media com uma fonte e desenhava com
+outra, mais larga — a reserva saía curta. A margem da direita, além disso,
+era um número fixo que não sabia o tamanho do rótulo que ia caber ali.
+Agora a fonte vai declarada e a margem sai da medida do rótulo mais longo.
+
+Aproveitando a mesma passada, três outros gráficos que também deixavam
+texto escapar do cartão foram corrigidos: deságio por modalidade, mapa de
+calor e a linha do tempo de vencimentos (as marcas "hoje" e "+90 dias"
+ficavam metade para fora). Nome muito comprido de categoria ou fornecedor
+passa a ser cortado com reticências em vez de engolir o gráfico inteiro —
+o nome completo continua aparecendo ao passar o mouse.
+
+Há teste que varre as quatro vistas e falha se **qualquer** texto de
+gráfico ultrapassar a borda do cartão.
+
+**O botão de relatório saiu da vista Economia**
+
+Ele duplicava o que a aba **Relatórios** já oferece, e — por estar dentro
+da vista — era impresso junto no PDF do painel, onde um botão não tem
+função nenhuma. O relatório *Economia e Comparativos* segue inteiro em
+**Relatórios**.
+
+**A mensagem de status do PCA passa a ser anunciada** por leitor de tela,
+como as demais mensagens dinâmicas do programa já eram.
+
 ## 1.36.0 — 2026-08-14
 
 **Uma consulta que cai não leva a sincronização inteira junto**
