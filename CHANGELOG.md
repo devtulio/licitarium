@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.41.2 — 2026-08-14
+
+**O calendário da agenda estava pequeno demais**
+
+Na versão anterior o quadrado do dia ganhou um teto para não virar um
+tabuleiro ocupando meia tela — e o teto ficou apertado. O quadrado volta a
+crescer até 48 pixels quando há espaço, e continua encolhendo sozinho
+quando o cartão aperta: na largura *Compacta* fica em torno de 40 pixels,
+sem quebrar a grade.
+
 ## 1.41.1 — 2026-08-14
 
 **Gráficos cortados na impressão**
