@@ -201,6 +201,15 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   fechando a fronteira. Antes disso este documento afirmava que a captura
   "sai no papel sem conversão": era falso, e escrito sem imprimir para
   conferir.
+- **Item de grid precisa de `min-width:0` (1.42.0).** O padrão é
+  `min-width:auto`, que vale o min-content — e o min-content de um cartão com
+  gráfico é a largura FIXA do SVG do ECharts. Sem isso a faixa não encolhe;
+  e como não encolhe, o `ResizeObserver` nunca vê largura menor e o gráfico
+  nunca é redesenhado: as duas metades se travam. Trocar Expandida→Compacta
+  deixava a faixa 898 px para fora da janela. A regra cobre
+  `.faixa > *`, `.card`, `.graf`, `.graf-par` e `.graf-echart` — o
+  `.graf-par` (invólucro do corte vertical) ficou de fora na primeira
+  tentativa e as vistas Análise e Economia continuaram quebrando.
 - **O SVG do ECharts não sabe encolher (1.41.1).** Ele sai com `width`/
   `height` em pixels e **sem `viewBox`** — desenhado para a medida da tela.
   Colado num cartão de papel mais estreito, é cortado. `paraPapel()` em

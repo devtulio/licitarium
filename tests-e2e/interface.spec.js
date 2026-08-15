@@ -233,3 +233,38 @@ test("os cards de uma fileira têm a mesma anatomia", async ({ page }) => {
       .toBe(1);
   }
 });
+
+test("trocar a largura da página não deixa cartão para fora da janela",
+    async ({ page }) => {
+  // Item de grid nasce com min-width:auto = min-content, e o SVG do ECharts
+  // tem largura FIXA em pixels: o cartão se recusava a encolher, e como não
+  // encolhia o ResizeObserver nunca via largura menor e o gráfico nunca era
+  // redesenhado. Trocar de Expandida para Compacta deixava a faixa 898px
+  // para fora da janela — os cartões saíam cortados pela borda.
+  await page.setViewportSize({ width: 1500, height: 900 });
+  for (const vista of ["execucao", "analise", "vigilancia", "economia"]) {
+    if (vista !== "execucao")
+      await page.locator(`.subabas button[data-vista="${vista}"]`).click();
+    for (const [de, para] of [["expandida", "compacta"],
+                              ["compacta", "expandida"]]) {
+      await page.evaluate(l => document.documentElement.dataset.largura = l, de);
+      await page.waitForTimeout(400);
+      await page.evaluate(l => document.documentElement.dataset.largura = l, para);
+      await expect.poll(async () => page.evaluate(() => {
+        const raiz = document.documentElement;
+        const fora = [];
+        document.querySelectorAll("main *").forEach(el => {
+          const b = el.getBoundingClientRect();
+          if (b.width && b.right > raiz.clientWidth + 1 &&
+              el.parentElement.getBoundingClientRect().right
+                <= raiz.clientWidth + 1)
+            fora.push(el.className || el.tagName);
+        });
+        return { rolaDeLado: raiz.scrollWidth > raiz.clientWidth + 1,
+                 fora: [...new Set(fora)] };
+      }), { message: `${vista}: ${de} → ${para}` })
+        .toEqual({ rolaDeLado: false, fora: [] });
+    }
+  }
+  await page.evaluate(() => document.documentElement.dataset.largura = "compacta");
+});

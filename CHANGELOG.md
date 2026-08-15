@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.42.0 — 2026-08-14
+
+**Trocar a largura da página deixava os cartões para fora da janela**
+
+Em **Configurações → Largura da página**, sair de *Expandida* para
+*Compacta* encolhia a moldura da página mas não os cartões: eles ficavam do
+tamanho antigo e saíam cortados pela borda direita da janela, com barra de
+rolagem horizontal. Só voltava ao normal fechando e reabrindo o programa.
+
+A causa tem duas metades que se travavam uma na outra. O desenho do gráfico
+carrega a largura em que foi feito, e isso impedia o cartão de encolher; como
+o cartão não encolhia, o programa nunca percebia que havia menos espaço e
+nunca refazia o desenho menor. Um segurava o outro.
+
+Agora o cartão pode apertar, e ao apertar avisa — o gráfico se redesenha na
+medida nova. Vale nos dois sentidos e nas seis abas.
+
 ## 1.41.2 — 2026-08-14
 
 **O calendário da agenda estava pequeno demais**

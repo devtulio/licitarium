@@ -548,6 +548,17 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
                      border-color:var(--accent); font-weight:600; }
 .vista { display:grid; gap:12px; }
 .faixa { display:grid; gap:12px; }
+/* Item de grid nasce com `min-width:auto`, que vale o min-content dele. O
+   SVG do ECharts tem largura FIXA em pixels — a do momento em que foi
+   desenhado —, então o min-content do cartão é essa largura e a faixa se
+   recusa a encolher. E o impasse se fecha sozinho: como a caixa não
+   encolhe, o ResizeObserver nunca vê largura menor e o gráfico nunca é
+   redesenhado menor. Trocar de Expandida para Compacta deixava a faixa
+   898 px para fora da janela (medido, 2026-08-14) — o `main` encolhia e os
+   cartões não iam junto, saindo cortados pela borda.
+   `min-width:0` devolve ao grid o direito de apertar; a partir daí o
+   observer dispara e o desenho refaz na medida nova. */
+.faixa > *, .card, .graf, .graf-par, .graf-echart { min-width:0; }
 .f-4 { grid-template-columns:1.15fr 1fr 1fr 1fr; }
 .f-21 { grid-template-columns:1.6fr 1fr; }
 .f-11 { grid-template-columns:1fr 1fr; }
