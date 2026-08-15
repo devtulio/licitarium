@@ -648,13 +648,13 @@ details.raw pre { background:var(--surface2); border-radius:var(--radius);
    Substituiu a linha do tempo de 90 dias. É HTML, não SVG: a impressão do
    painel captura o innerHTML da vista, então uma grade CSS sai no papel
    sem passo nenhum de conversão. */
-/* Teto na célula, não medida fixa. Com `1fr` puro num cartão de página
-   inteira cada quadrado passava de 90 px e o calendário virava tabuleiro;
-   com teto de 266 px ficou pequeno demais na tela larga. 354 px por mês dá
-   célula de 48 px no espaço folgado e ela encolhe sozinha quando o cartão
-   aperta — na largura Compacta cai para ~40 px sem quebrar a grade. */
-.cal { display:grid; grid-template-columns:repeat(3, minmax(0, 354px));
-       gap:24px; }
+/* Três meses ocupando a largura toda do cartão. Sem teto: o teto (354 px/mês)
+   travava a grade à esquerda e deixava metade da página larga vazia. `1fr`
+   deixa os meses dividirem o espaço; a célula acompanha e a grade se ajusta
+   sozinha na largura Compacta. O piso vem da própria célula (min 34 px),
+   não da coluna, para o quadrado não achatar quando o cartão aperta. */
+.cal { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; }
+.cal-dia { min-width:34px; }
 .cal-mes h4 { font-size:11px; letter-spacing:.09em; text-transform:uppercase;
               color:var(--muted); font-weight:600; margin-bottom:7px; }
 .cal-sem, .cal-grade { display:grid; grid-template-columns:repeat(7, 1fr);

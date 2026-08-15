@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.42.1 — 2026-08-15
+
+**O calendário da agenda agora usa a largura toda da página**
+
+Ele estava preso à esquerda do cartão, com metade da página vazia ao lado —
+um teto de largura por mês, posto para o quadrado não ficar gigante, acabou
+prendendo a grade inteira. Agora os três meses dividem a largura disponível e
+o quadrado do dia acompanha: grande na tela cheia, menor na largura
+*Compacta*, sempre com a grade inteira à vista.
+
 ## 1.42.0 — 2026-08-14
 
 **Trocar a largura da página deixava os cartões para fora da janela**
