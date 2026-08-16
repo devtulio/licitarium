@@ -427,6 +427,49 @@ def test_documento_sai_em_a4_paisagem(tmp_path, monkeypatch):
     assert "break-after:page" in html            # uma vista por página
 
 
+def test_grade_do_papel_pode_apertar_o_svg_abaixo_do_min_content(
+        tmp_path, monkeypatch):
+    """Grid item começa com `min-width:auto` = min-content = a largura FIXA
+    do SVG do ECharts. Sem `min-width:0` a faixa não encolhe abaixo disso, a
+    página transborda o A4 paisagem (medido: body 2700px p/ 1017 úteis) e os
+    gráficos da direita saem cortados no PDF real (2026-08-16). A tela ganhou
+    o `min-width:0` na 1.42.0 (estilo.css:561); o papel usa CSS_PAINEL
+    próprio e não carrega o estilo.css — este é o mesmo conserto do outro
+    lado da fronteira tela/papel. Removê-lo daqui reabre o corte."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    licitarium.abrir_db().close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    r = licitarium.Api().imprimir_painel(
+        [["execucao", "<div class='card'>x</div>"]], ANO)
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert ".faixa > *, .card, .graf, .graf-par, .graf-echart { min-width:0; }" \
+        in html, "grade do papel sem min-width:0 volta a cortar gráfico"
+
+
+def test_ultima_vista_nao_quebra_pagina_e_deixa_o_rodape_sozinho(
+        tmp_path, monkeypatch):
+    """`.secao-painel` quebra página depois de cada vista, mas a ÚLTIMA não
+    pode — depois dela só vem o `<footer>`. Como o footer é o último filho da
+    página, a última seção não é `:last-child`; com esse seletor o reset não
+    casava e a última vista mantinha o break-after:page, jogando o rodapé
+    sozinho numa página em branco no fim (PDF real, 2026-08-16). O reset é por
+    `:last-of-type` (a última `<section>`, ignora o footer)."""
+    monkeypatch.setattr(licitarium, "DIR_DADOS", tmp_path)
+    monkeypatch.setattr(licitarium, "ARQUIVO_DB", tmp_path / "t.db")
+    licitarium.abrir_db().close()
+    monkeypatch.setattr(licitarium.webbrowser, "open", lambda *a, **k: None)
+
+    r = licitarium.Api().imprimir_painel(
+        [["execucao", "<div class='card'>x</div>"]], ANO)
+    html = Path(r["arquivo"]).read_text(encoding="utf-8")
+    assert ".secao-painel:last-of-type { break-after:auto; }" in html, \
+        "reset por :last-child deixa página em branco com o rodapé no fim"
+    assert ".secao-painel:last-child { break-after:auto" not in html, \
+        ":last-child não casa com a última vista (o footer vem depois)"
+
+
 def test_painel_impresso_nao_segue_o_tema_da_tela(tmp_path, monkeypatch):
     """O painel impresso é peça institucional, não vitrine do tema.
 

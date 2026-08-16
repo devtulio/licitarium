@@ -2,21 +2,36 @@
 
 ## 1.42.2 — 2026-08-16
 
-**Gráficos cortados à direita na impressão — de novo, e desta vez a raiz**
+**A impressão do painel, resolvida da raiz — quatro causas, não uma**
 
-Voltaram a sair cortados: o mês de agosto sumia das colunas, a série
-acumulada perdia de setembro em diante, o cartão "Por modalidade" não
-aparecia. As correções anteriores atacaram os sintomas; esta é a causa.
+Os gráficos vinham saindo errados no PDF do painel de formas diferentes a
+cada tentativa. Desta vez cada sintoma foi levado até a origem e travado com
+um teste. Foram quatro causas independentes:
 
-A moldura do documento tinha uma largura máxima fixa em pixels — 1080 para
-o painel deitado. Só que uma folha A4 deitada, descontadas as margens, tem
-cerca de 1017 pixels de área imprimível. A moldura era mais larga que o
-papel, e o que passava da borda era cortado. O retrato era pior ainda: 820
-contra 688 disponíveis.
+- **A moldura era mais larga que o papel.** Tinha uma largura máxima fixa em
+  pixels (1080 para o deitado); uma folha A4 deitada, fora as margens, tem
+  cerca de 1017. O que passava da borda era cortado. Agora a moldura ocupa
+  exatamente a área imprimível da folha.
 
-Agora a moldura ocupa exatamente a área imprimível da folha, seja A4 ou A3,
-deitada ou em pé — quem manda no tamanho é o papel, não um número escolhido
-para a tela.
+- **A grade não encolhia no papel.** Cada cartão de gráfico se recusava a
+  ficar mais estreito que o desenho que continha, então a faixa transbordava
+  a página e o gráfico da direita saía cortado. A tela já tinha o conserto; o
+  papel usa um estilo próprio e não o tinha.
+
+- **Um gráfico invadia o vizinho.** O desenho era capturado na largura da
+  tela do usuário — num monitor ultralargo, larguíssimo — e colado num cartão
+  estreito de A4, escapava por cima do gráfico ao lado. Agora o painel é
+  redesenhado numa medida de papel fixa antes de ir para a folha, não importa
+  o tamanho da janela.
+
+- **"Por modalidade" saía em branco na primeira impressão.** Um detalhe da
+  cópia do gráfico fazia a primeira impressão reaproveitar o gráfico da tela
+  em vez de desenhar um novo — some do papel e, de quebra, apagava o da tela.
+  Da segunda impressão em diante voltava. Corrigido: cada impressão desenha o
+  seu próprio, sem tocar na tela.
+
+E um acabamento: **acabou a página em branco no fim.** A última seção
+mantinha uma quebra de página que jogava só o rodapé para uma folha nova.
 
 ## 1.42.1 — 2026-08-15
 

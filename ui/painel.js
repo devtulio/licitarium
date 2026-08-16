@@ -1185,26 +1185,74 @@ async function prepararPainel(estadoInicial) {
 // porque quem imprime costuma ter navegado antes (achado 2026-08-14, ao
 // escrever a guarda do que viaja para o papel).
 //
-// Aqui cada vista é revelada por um instante, desenhada e escondida de
-// novo. É síncrono: ninguém vê o piscar, e nada fica pendurado.
+// O ECharts desenha o SVG na largura em pixels do contêiner na hora e crava
+// essa medida num `<div>` interno (`width:1625px`), que o SVG herda com
+// `width:100%`. Se a captura é na tela larga do usuário (um monitor ultrawide
+// dá viewBox de 2664 px) e o papel é um cartão A4 de ~480 px, o desenho não
+// encolhe — o `<div>` fixo estoura o cartão e um gráfico invade o vizinho
+// (PDF real, 2026-08-16: concentração por cima do deságio). Só injetar viewBox
+// não resolve: `width:100%` de um pai de largura indefinida vira a largura
+// intrínseca do viewBox, não a do cartão.
+//
+// A raiz é a LARGURA DE CAPTURA. Aqui a vista é clonada para um contêiner fora
+// da tela numa largura FIXA e os gráficos são REDESENHADOS ali — o ECharts
+// nasce na proporção do papel, sem herança de pixel da tela do usuário. Nada
+// pisca (o clone é offscreen) e a vista visível fica intacta. O viewBox ainda
+// é injetado para o vetor acompanhar a impressora.
+//
+// `LARGURA_PAPEL` é a largura de referência para a qual o painel foi desenhado
+// (~janela de desktop comum), NÃO a largura útil do papel: nela os contêineres
+// de altura fixa dos gráficos (196/220 px) rendem a proporção em que cada
+// vista cabe numa página A4 paisagem. Capturar na largura exata do papel
+// (~1017) deixa os gráficos altos demais e cada vista transborda para uma
+// segunda página (medido 2026-08-16: 1017→9 páginas, 1400→6). O que importa é
+// ser um valor FIXO, independente da janela — foi a tela ultrawide do usuário
+// que gerou viewBox de 2664 e o gráfico invadiu o vizinho.
+const LARGURA_PAPEL = 1400;
 function paraPapel(id) {
-  const vista = $(id);
-  const estavaOculta = vista.classList.contains("oculto");
-  if (estavaOculta) vista.classList.remove("oculto");
-  desenharGraficos(vista);
-  if (estavaOculta) vista.classList.add("oculto");
-  const copia = vista.cloneNode(true);
-  copia.querySelectorAll("svg[width]").forEach(svg => {
-    if (svg.getAttribute("viewBox")) return;      // os à mão já têm
-    const l = parseFloat(svg.getAttribute("width"));
-    const a = parseFloat(svg.getAttribute("height"));
-    if (!l || !a) return;
-    svg.setAttribute("viewBox", `0 0 ${l} ${a}`);
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    svg.setAttribute("width", "100%");
-    svg.removeAttribute("height");                // a altura sai do viewBox
-  });
-  return copia.innerHTML;
+  const palco = document.createElement("div");
+  palco.style.cssText =
+    `position:fixed; left:-99999px; top:0; width:${LARGURA_PAPEL}px;`;
+  const copia = $(id).cloneNode(true);
+  copia.classList.remove("oculto");         // precisa medir largura > 0
+  copia.style.width = "100%";
+  palco.appendChild(copia);
+  document.body.appendChild(palco);
+  try {
+    // `cloneNode` copia o atributo `_echarts_instance_` que o ECharts crava no
+    // elemento. Os gráficos de barra iniciam o ECharts no PRÓPRIO `.graf`
+    // (não num filho novo), então o clone chega com esse atributo e o
+    // `echarts.init` reusa a instância VIVA em vez de criar uma nova: desenha
+    // na tela, o clone fica em branco, e pior — o `dispose` no fim mata o
+    // gráfico vivo. Só acontecia na 1ª impressão (o dispose limpava o atributo
+    // e a 2ª já criava instância nova): "por modalidade" saía vazio no papel
+    // (PDF real, 2026-08-16). Tirar o atributo faz cada init nascer do zero,
+    // preso ao clone, sem nunca tocar a tela.
+    copia.querySelectorAll("[_echarts_instance_]").forEach(
+      el => el.removeAttribute("_echarts_instance_"));
+    copia.querySelectorAll(".graf[data-graf]").forEach(el => {
+      delete el.dataset.largura;            // força o redesenho na nova largura
+      el.innerHTML = "";                    // some o SVG capturado na tela
+    });
+    desenharGraficos(copia);                // ECharts redesenha na medida do papel
+    copia.querySelectorAll("svg[width]").forEach(svg => {
+      if (svg.getAttribute("viewBox")) return;      // os à mão já têm
+      const l = parseFloat(svg.getAttribute("width"));
+      const a = parseFloat(svg.getAttribute("height"));
+      if (!l || !a) return;
+      svg.setAttribute("viewBox", `0 0 ${l} ${a}`);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.setAttribute("width", "100%");
+      svg.removeAttribute("height");                // a altura sai do viewBox
+    });
+    return copia.innerHTML;
+  } finally {
+    // cada instância do ECharts prende um listener de resize na window; o
+    // `_iniciarEchart` guarda a instância em vários nós (`.graf`,
+    // `.graf-echart`, o alvo do corte), então varre-se tudo para não vazar
+    copia.querySelectorAll("*").forEach(el => el.__echart?.dispose());
+    palco.remove();
+  }
 }
 
 // A impressão leva as quatro vistas, cada uma numa página A4 deitada: o SVG é

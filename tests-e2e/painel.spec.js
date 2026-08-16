@@ -683,3 +683,51 @@ test("imprimir sem abrir as vistas leva os gráficos mesmo assim",
   expect((html.match(/<svg/g) || []).length,
          "vista escondida foi ao papel sem desenho").toBeGreaterThan(12);
 });
+
+test("o gráfico é capturado na largura do papel, não na da tela larga",
+    async ({ page }) => {
+  // O ECharts desenha o SVG na largura em pixels do contêiner e crava essa
+  // medida no viewBox. Capturado na tela do usuário (um monitor ultrawide dá
+  // ~2664 px), o gráfico não cabia no cartão A4 de ~480 px e invadia o
+  // vizinho no PDF real (concentração por cima do deságio, 2026-08-16). O
+  // `paraPapel` passou a redesenhar num palco fora da tela na largura do
+  // papel: o viewBox nasce na proporção do papel, não importa quão larga
+  // esteja a janela. Aqui a janela é forçada bem larga e mesmo assim nenhum
+  // viewBox de gráfico pode chegar perto da largura da tela.
+  await page.setViewportSize({ width: 2600, height: 1000 });
+  await page.locator("#btn-imprimir-painel").click();
+  const larguras = await page.evaluate(() => window.__chamadas
+    .filter(c => c.metodo === "imprimir_painel").pop().html
+    .match(/viewBox="0 0 (\d+(?:\.\d+)?) /g)
+    ?.map(m => parseFloat(m.replace(/viewBox="0 0 /, ""))) || []);
+  expect(larguras.length, "nenhum viewBox capturado").toBeGreaterThan(5);
+  // o palco de captura é fixo (~1400 px); com folga, longe dos 2600 da tela.
+  // O que se prova aqui é o desacoplamento da janela, não a medida exata.
+  expect(Math.max(...larguras),
+         "gráfico capturado na largura da tela, não do papel")
+    .toBeLessThanOrEqual(1450);
+});
+
+test("a PRIMEIRA impressão já leva o gráfico de barras, e não apaga o da tela",
+    async ({ page }) => {
+  // `cloneNode` copiava o atributo `_echarts_instance_`; como o gráfico de
+  // barras inicia o ECharts no próprio `.graf`, o clone reusava a instância
+  // viva em vez de criar nova — desenhava na tela, o papel saía em branco, e o
+  // dispose no fim matava o gráfico vivo. Só na 1ª impressão (a 2ª já achava o
+  // atributo limpo): "por modalidade" vazio no PDF real (2026-08-16). O
+  // gráfico vivo sobrevivia porque… não sobrevivia: some da tela até redesenho.
+  const vivoAntes = await page.locator(
+    '#p-execucao .graf[data-graf="modalidades"] svg').count();
+  expect(vivoAntes, "o gráfico já devia estar na tela").toBe(1);
+
+  const temBarras = await page.evaluate(() => {
+    const html = window.paraPapel("p-execucao");   // a PRIMEIRA chamada
+    const i = html.indexOf('data-graf="modalidades"');
+    return i >= 0 && html.slice(i, i + 1200).includes("<svg");
+  });
+  expect(temBarras, "1ª impressão saiu sem o gráfico de barras").toBe(true);
+
+  const vivoDepois = await page.locator(
+    '#p-execucao .graf[data-graf="modalidades"] svg').count();
+  expect(vivoDepois, "imprimir apagou o gráfico da tela").toBe(1);
+});

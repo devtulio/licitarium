@@ -2367,6 +2367,11 @@ _CSS_PAINEL_RESTO = """
   .f-21 { grid-template-columns:1.6fr 1fr; }
   .f-11 { grid-template-columns:1fr 1fr; }
   .f-3 { grid-template-columns:1fr 1fr 1fr; }
+  /* min-width:0 devolve ao grid o direito de apertar o item abaixo do
+     min-content (a largura fixa do SVG do ECharts). Sem isso, no papel a
+     faixa transborda a página e os gráficos da direita saem cortados —
+     espelha estilo.css:561 (a tela ganhou isso na 1.42.0, o papel não). */
+  .faixa > *, .card, .graf, .graf-par, .graf-echart { min-width:0; }
   .card { background:var(--superficie); border:1px solid var(--borda);
           border-top:3px solid var(--cor-categoria, var(--acento));
           border-radius:3px; padding:11px 14px 12px; break-inside:avoid; }
@@ -2423,7 +2428,11 @@ _CSS_PAINEL_RESTO = """
   /* instrução de clique não faz sentido no papel */
   .so-tela { display:none; }
   .secao-painel { break-after:page; }
-  .secao-painel:last-child { break-after:auto; }
+  /* :last-of-type, não :last-child — depois da última seção vem o <footer>,
+     então a última seção NÃO é o último filho da página. Com :last-child o
+     seletor não casava, a última vista mantinha o break-after:page e empurrava
+     o rodapé sozinho para uma página em branco no fim (PDF real, 2026-08-16). */
+  .secao-painel:last-of-type { break-after:auto; }
   .secao-painel > h2 { font-family:Georgia,serif; font-size:15pt;
                        font-weight:400; color:var(--acento); margin:0 0 10px; }
   .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
