@@ -1523,9 +1523,14 @@ def _css(paisagem, papel="A4"):
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{ font-family:'Segoe UI',system-ui,sans-serif; color:var(--texto);
           background:var(--bg); font-size:13px; line-height:1.45; }}
-  .pagina {{ max-width:{(1480 if papel == "A3" else 1080) if paisagem else 820}px;
-             margin:0 auto;
-             padding:26px 30px 50px; }}
+  /* Sem `max-width` em pixel na impressão: A4 paisagem com margem de 1,4 cm
+     tem ~1017 px úteis, e o antigo 1080px transbordava a caixa do papel — os
+     gráficos (largura 100% do bloco) saíam 63 px pela direita e eram
+     cortados. Quem define a largura é a `@page` acima; aqui a página só
+     ocupa o que sobrou. O `max-width` em px foi calibrado para pixel de
+     tela, e o defeito escondeu-se porque o teste antigo gerava o PDF
+     passando `margin` no `page.pdf()`, ignorando a `@page` do CSS. */
+  .pagina {{ max-width:100%; margin:0 auto; padding:26px 30px 50px; }}
   header {{ display:flex; align-items:center; gap:18px; padding-bottom:14px;
             border-bottom:1px solid var(--borda); margin-bottom:16px; }}
   h1 {{ font-family:Georgia,serif; font-size:21px; font-weight:400;

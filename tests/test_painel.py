@@ -848,3 +848,26 @@ def test_toda_classe_do_painel_tem_estilo_no_documento_impresso():
     assert not faltando, (
         "classes emitidas pelo painel sem regra no CSS do documento impresso "
         f"(nem dispensadas): {faltando}")
+
+
+def test_pagina_impressa_nao_tem_largura_fixa_maior_que_o_papel():
+    """A4 paisagem com margem de 1,4 cm tem ~1017 px úteis a 96 dpi.
+
+    O `.pagina` tinha `max-width: 1080px` (A4) / 1480px (A3) — calibrado em
+    pixel de tela, não na caixa do papel. Na impressão real (navegador
+    honrando a `@page`), o bloco ficava mais largo que a área imprimível e
+    os gráficos, de largura 100%, saíam ~63 px pela direita e eram cortados.
+    O retrato era pior: 820px contra 688px úteis (132 px fora).
+
+    O defeito escapou porque o teste de geometria gerava o PDF passando
+    `margin` no `page.pdf()`, ignorando a `@page` do CSS — media numa caixa
+    que a impressão real nunca usa. A régua tem de ser a caixa do papel.
+    """
+    for paisagem, papel in [(True, "A4"), (True, "A3"), (False, "A4")]:
+        css = relatorios._css(paisagem, papel)
+        pagina = [ln for ln in css.splitlines() if ".pagina {" in ln]
+        assert pagina, f"{papel} {paisagem}: regra .pagina não achada"
+        assert "max-width:100%" in pagina[0] or "max-width: 100%" in pagina[0], (
+            f"{papel} paisagem={paisagem}: .pagina com largura fixa "
+            f"({pagina[0].strip()}) — transborda a caixa do papel na "
+            "impressão real")

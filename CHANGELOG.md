@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.42.2 — 2026-08-16
+
+**Gráficos cortados à direita na impressão — de novo, e desta vez a raiz**
+
+Voltaram a sair cortados: o mês de agosto sumia das colunas, a série
+acumulada perdia de setembro em diante, o cartão "Por modalidade" não
+aparecia. As correções anteriores atacaram os sintomas; esta é a causa.
+
+A moldura do documento tinha uma largura máxima fixa em pixels — 1080 para
+o painel deitado. Só que uma folha A4 deitada, descontadas as margens, tem
+cerca de 1017 pixels de área imprimível. A moldura era mais larga que o
+papel, e o que passava da borda era cortado. O retrato era pior ainda: 820
+contra 688 disponíveis.
+
+Agora a moldura ocupa exatamente a área imprimível da folha, seja A4 ou A3,
+deitada ou em pé — quem manda no tamanho é o papel, não um número escolhido
+para a tela.
+
 ## 1.42.1 — 2026-08-15
 
 **O calendário da agenda agora usa a largura toda da página**

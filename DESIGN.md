@@ -210,6 +210,18 @@ Progresso do sync empurrado para a UI via `window.evaluate_js("onSyncProgress(..
   `.faixa > *`, `.card`, `.graf`, `.graf-par` e `.graf-echart` — o
   `.graf-par` (invólucro do corte vertical) ficou de fora na primeira
   tentativa e as vistas Análise e Economia continuaram quebrando.
+- **`max-width` em pixel na impressão transborda o papel (1.42.2).** A
+  `.pagina` tinha `max-width: 1080px` (A4 paisagem) — mas A4 paisagem com
+  margem de 1,4 cm tem ~**1017 px** úteis a 96 dpi; o bloco era mais largo
+  que a caixa imprimível e os gráficos (100% de largura) saíam ~63 px pela
+  direita, cortados. Retrato pior: 820 contra 688. Cura: `.pagina{max-width:
+  100%}` — quem define a largura é a `@page`, não um px de tela.
+  **O defeito escapou 3 versões** porque o teste de geometria gerava o PDF
+  passando `margin` no `page.pdf()`, ignorando a `@page` do CSS — media numa
+  caixa que a impressão real nunca usa. Para reproduzir impressão real:
+  `preferCSSPageSize:true` sem `margin`, ou medir dentro de um viewport do
+  tamanho da área imprimível. Guarda:
+  `test_pagina_impressa_nao_tem_largura_fixa_maior_que_o_papel`.
 - **O SVG do ECharts não sabe encolher (1.41.1).** Ele sai com `width`/
   `height` em pixels e **sem `viewBox`** — desenhado para a medida da tela.
   Colado num cartão de papel mais estreito, é cortado. `paraPapel()` em
