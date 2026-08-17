@@ -257,54 +257,8 @@ def test_filtro_por_orgao(api):
     assert api.listar("contratacoes", {"orgao": "999"})["total"] == 0
 
 
-def test_precos_na_ponte(api):
-    db = licitarium.abrir_db()
-    db.executemany(
-        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
-        " numero_item, descricao, valor_unitario_estimado,"
-        " valor_unitario_homologado, fornecedor_ni) VALUES (?,?,?,?,?,?,?,?,?)",
-        [("i1", "A", 2026, 1, 1, "PAPEL A4", 24.9, 18.0, "1"),
-         ("i2", "A", 2026, 1, 2, "PAPEL A3", 30.0, 22.0, "2"),
-         ("i3", "A", 2026, 1, 3, "CANETA", 2.0, None, None)])
-    db.commit()
-    db.close()
-    # padrão da aba mostra só o que tem preço fechado
-    assert api.listar("itens", {"so_homologados": True})["total"] == 2
-    assert api.listar("itens", {})["total"] == 3
-    s = api.estatisticas_preco("papel")
-    assert (s["n"], s["minimo"], s["maximo"], s["fornecedores"]) == (2, 18., 22., 2)
-    assert api.estatisticas_preco("  ") is None
-    assert api.estatisticas_preco("inexistente") is None
-    # ordenação por unitário usa o homologado quando existe
-    r = api.listar("itens", {"so_homologados": True, "ord": "unitario",
-                             "dir": "asc"})
-    assert [i["id"] for i in r["itens"]] == ["i1", "i2"]
 
 
-def test_busca_de_item_por_palavras_soltas(api):
-    db = licitarium.abrir_db()
-    db.executemany(
-        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
-        " numero_item, descricao, valor_unitario_homologado, fornecedor_nome)"
-        " VALUES (?,?,?,?,?,?,?,?)",
-        [("i1", "A", 2026, 1, 1, "PAPEL SULFITE A4 BRANCO", 18.0, "PAPELARIA"),
-         ("i2", "A", 2026, 1, 2, "CANETA ESFEROGRAFICA AZUL", 2.0, "X")])
-    db.commit()
-    db.close()
-    # ordem das palavras não importa, e nem precisa ser palavra inteira
-    for termo in ("papel a4", "a4 papel", "sulfite branc"):
-        assert [i["id"] for i in api.listar("itens", {"busca": termo})["itens"]] \
-            == ["i1"]
-    assert api.listar("itens", {"busca": "papel caneta"})["total"] == 0
-    assert api.listar("itens", {"busca": "papelaria"})["total"] == 1  # fornecedor
-    assert api.estatisticas_preco("a4 sulfite")["n"] == 1
-    # descrição que muda sai do índice junto
-    db = licitarium.abrir_db()
-    db.execute("UPDATE itens SET descricao='ENVELOPE' WHERE id='i1'")
-    db.commit()
-    db.close()
-    assert api.listar("itens", {"busca": "sulfite"})["total"] == 0
-    assert api.listar("itens", {"busca": "envelope"})["total"] == 1
 
 
 def test_indice_de_busca_reconstruido_em_banco_antigo(api, tmp_path):
@@ -410,15 +364,6 @@ def test_trocar_municipio_recusa_com_sync_em_andamento(api):
     # destravado, a troca funciona normalmente
     assert api.trocar_municipio("3536604", "Paulo de Faria", "SP")["ok"]
     assert api.listar("contratacoes", {})["total"] == 0
-
-
-def test_remover_referencia_recusa_com_sync_em_andamento(api):
-    api._sync_ativo.acquire()
-    try:
-        r = api.remover_municipio_referencia("3536604")
-        assert r == {"ok": False, "erro": licitarium.MSG_SYNC_ATIVO}
-    finally:
-        api._sync_ativo.release()
 
 
 def test_importar_acervo_recusa_com_sync_em_andamento(api, monkeypatch):

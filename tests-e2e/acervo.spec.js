@@ -9,7 +9,6 @@ test("salvar cópia relata o que foi guardado", async ({ page }) => {
   const msg = page.locator("#acervo-msg");
   await expect(msg).toContainText("Cópia salva (12.3 MB)");
   await expect(msg).toContainText("2.674 itens");
-  await expect(msg).toContainText("6 municípios de referência");
 });
 
 test("restaurar pede confirmação e avisa que precisa reabrir",

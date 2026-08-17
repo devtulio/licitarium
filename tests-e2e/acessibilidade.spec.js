@@ -52,21 +52,3 @@ test("as mensagens dinâmicas são regiões vivas", async ({ page }) => {
   for (const id of ["sync-msg", "brasao-status", "pca-status"])
     await expect(page.locator(`#${id}`)).toHaveAttribute("role", "status");
 });
-
-test("o checkbox da linha não é filho de um botão", async ({ page }) => {
-  // filho de role=button é apresentacional: o estado marcado se perdia e o
-  // rótulo do checkbox virava o nome da linha
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  const linha = page.locator("#lista .linha[data-nc]").first();
-  await expect(linha).not.toHaveAttribute("role", "button");
-  // quem carrega o papel de botão é a célula da descrição
-  await expect(linha.locator(".obj")).toHaveAttribute("role", "button");
-  // e o rótulo do checkbox diz de qual item ele é — antes os 50 da página
-  // compartilhavam o texto "Usar este preço na pesquisa", válido mas
-  // inútil numa lista. (Não dá para exigir rótulo único: a mesma descrição
-  // aparece de propósito em municípios diferentes.)
-  const rotulo = await page.locator("#lista .sel input").first()
-    .getAttribute("aria-label");
-  const descricao = await linha.locator(".obj").textContent();
-  expect(rotulo).toContain(descricao.trim());
-});

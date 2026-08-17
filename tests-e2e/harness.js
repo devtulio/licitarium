@@ -118,17 +118,7 @@ const DADOS = {
 function scriptPonte(temaBanco = "portal") {
   return `
     window.__chamadas = [];
-    // 3533908 = cidade média (coleta de horas); 3533007 não
-    // publica no PNCP; 9999999 simula falha de consulta
-    window.__estimativas = {
-      "3533908": { contratacoes: 5982, itens: 105283, mb: 384,
-                   minutos: 353, parcial: false },
-      "3533007": { contratacoes: 0, itens: 0, mb: 0, minutos: 0,
-                   parcial: false },
-      "9999999": { erro: "sem conexão com o PNCP" },
-    };
     window.PAINEL_DADOS = ${JSON.stringify(PAINEL)};
-    window.__referencia = [{ ibge: "3535002", nome: "Palestina", uf: "SP", itens: 812, mb: 4.6 }];
     window.__temaBanco = ${JSON.stringify(temaBanco)};
     const DADOS = ${JSON.stringify(DADOS)};
     window.pywebview = { api: {
@@ -298,16 +288,10 @@ function scriptPonte(temaBanco = "portal") {
                                  contendo, ano, origem });
         return { ok: true, n: 0 };
       },
-      motivos_descarte: async () => ([
-        { id: "nao_comparavel", texto: "Item não comparável ao objeto pesquisado" },
-        { id: "embalagem", texto: "Embalagem ou unidade de medida diferente" },
-        { id: "inexequivel", texto: "Preço manifestamente inexequível" },
-      ]),
       exportar_acervo: async () => {
         window.__chamadas.push({ metodo: "exportar_acervo" });
         return window.__respostaExportar ?? { ok: true, arquivo: "C:/tmp/c.zip",
-          mb: 12.3, contagens: { contratacoes: 131, itens: 2674,
-                                 municipios_referencia: 6 } };
+          mb: 12.3, contagens: { contratacoes: 131, itens: 2674 } };
       },
       importar_acervo: async () => {
         window.__chamadas.push({ metodo: "importar_acervo" });
@@ -339,24 +323,6 @@ function scriptPonte(temaBanco = "portal") {
       remover_brasao: async () => {
         window.__chamadas.push({ metodo: "remover_brasao" });
         window.__brasao = null;
-        return { ok: true };
-      },
-      listar_municipios_referencia: async () => window.__referencia,
-      estimar_municipio_referencia: async (c) => {
-        window.__chamadas.push({ metodo: "estimar_municipio_referencia", c });
-        return window.__estimativas[String(c)]
-          ?? { contratacoes: 207, itens: 4223, mb: 9.9, minutos: 14,
-               parcial: false };
-      },
-      adicionar_municipio_referencia: async (c, n, uf) => {
-        window.__chamadas.push({ metodo: "adicionar_municipio_referencia", c, n, uf });
-        window.__referencia = [...window.__referencia,
-                               { ibge: String(c), nome: n, uf, itens: 0, mb: 0 }];
-        return { ok: true };
-      },
-      remover_municipio_referencia: async (c) => {
-        window.__chamadas.push({ metodo: "remover_municipio_referencia", c });
-        window.__referencia = window.__referencia.filter(m => m.ibge !== String(c));
         return { ok: true };
       },
       municipios: async (texto, uf) => {

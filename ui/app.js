@@ -29,20 +29,6 @@ const SELO = MARCA.selo;
 
 const estado = { tipo:"contratacoes", pagina:1, municipio:null,
                  ord:null, dir:"desc", objetosAlvo:null };
-// há município de referência? decide se a aba Preços mostra a origem
-let temReferencia = false;
-// comparar por conteúdo muda a grade e o resumo inteiros
-let porConteudo = false;
-// corrigir pelo IPCA: preço de 2022 não se compara com preço de 2026
-let corrigirIpca = false;
-// pedido do usuário (2026-08-08): a busca abre com tudo desmarcado — marcar
-// é ato positivo, sem justificativa. precosIncluidos é a seleção (ids); um
-// item que chega a ser marcado e depois é tirado vira precosDescartados,
-// aí sim com motivo — item nunca marcado não passa por lá.
-// id do item -> { motivo, descricao, valor }. Gravado no banco por termo:
-// a pesquisa é peça de processo e precisa poder ser refeita amanhã.
-let precosDescartados = new Map();
-let precosIncluidos = new Set();
 let api = null;
 
 // ── splash ────────────────────────────────────────────────────────────────
@@ -282,8 +268,6 @@ $("wiz-ok").addEventListener("click", async () => {
 // ── app ───────────────────────────────────────────────────────────────────
 async function iniciarApp(e) {
   estado.municipio = e.municipio;
-  if (api.listar_municipios_referencia)
-    temReferencia = (await api.listar_municipios_referencia()).length > 0;
   $("wizard").classList.add("oculto");
   $("app").classList.remove("oculto");
   $("sub-edicao").textContent = `Versão gratuita (${e.versao})`;
@@ -296,8 +280,8 @@ async function iniciarApp(e) {
   await carregarFiltros();
   progressoSplash(0.85);
   await prepararPainel(e);
-  const aba = ["painel", "contratacoes", "contratos", "atas", "pca", "itens"]
-    .includes(e.aba) ? e.aba : "painel";
+  const aba = ["painel", "contratacoes", "contratos", "atas", "pca"]
+               .includes(e.aba) ? e.aba : "painel";
   document.querySelector(`nav.abas button[data-tipo="${aba}"]`).click();
   esconderSplash();
   // o programa consertou algo no banco para conseguir abrir: dizer, senão o
@@ -383,10 +367,6 @@ async function carregarFiltros() {
   preencher($("f-situacao"), f.situacoes);
   preencher($("f-orgao"),
             f.orgaos.map(o => ({nome: o.nome ?? o.cnpj, id: o.cnpj})));
-  // a unidade vem agrupada do backend ("CX" e "Caixa" são uma opção só) e
-  // ordenada pelo que mais aparece, que é o que se procura primeiro
-  preencher($("f-unidade"), (f.unidades ?? []).map(
-    u => ({nome: `${u.nome} (${u.n})`, id: u.nome})));
 }
 
 function filtrosAtuais() {
@@ -398,10 +378,6 @@ function filtrosAtuais() {
            vigentes: $("f-vigentes").checked || null,
            vencendo: $("f-vence60").checked || null,
            parada: $("f-parada").checked || null,
-           so_homologados: $("f-homologados").checked || null,
-           origem: $("f-so-meu").checked ? "proprio" : null,
-           unidade: $("f-unidade").value || null,
-           corrigir: corrigirIpca || null,
            busca: $("f-busca").value.trim() || null,
            // vindo de um alerta do Painel: quais objetos, não qual caixa
            objetos: estado.objetosAlvo || null,
@@ -410,9 +386,8 @@ function filtrosAtuais() {
 
 // [rótulo, chave de ordenação na whitelist do backend — null = não ordenável]
 const CAMPOS_FILTRO = ["f-ano", "f-modalidade", "f-situacao", "f-orgao",
-                       "f-unidade", "f-busca"];
+                       "f-busca"];
 const CAIXAS_FILTRO = ["f-propostas", "f-vigentes", "f-vence60", "f-parada"];
-// f-homologados é padrão ligado na aba Preços, não conta como "filtro ativo"
 
 function temFiltroAtivo() {
   return CAMPOS_FILTRO.some(id => $(id).value)
@@ -443,11 +418,6 @@ const COLUNAS = {
   pca:          [["Item","item"], ["Descrição","descricao"],
                  ["Categoria","categoria"], ["Qtde","quantidade"],
                  ["Valor","valor"]],
-  itens:        [["",null], ["Descrição","descricao"], ["Unid.","unidade"],
-                 ["Qtde","quantidade"], ["Valor unitário","unitario"],
-                 ["Fornecedor","fornecedor"], ["Município","municipio"],
-                 ["Processo","origem"]],
-
 };
 
 // Sufixo societário não identifica ninguém e come metade da coluna:
@@ -544,38 +514,6 @@ function renderLinha(tipo, d) {
       <span class="dim">${dataBr(d.vigencia_fim)}</span>
       <span>${celulaStatusVigencia(d)}</span>
       <span class="num">${dinheiro(d.valor_global)}</span>`;
-  if (tipo === "itens") {
-    const homologado = d.valor_unitario_homologado != null;
-    const unit = homologado
-      ? dinheiro(d.valor_unitario_homologado)
-      : `<span class="est" title="Sem resultado homologado: valor de referência
-          do edital">${dinheiro(d.valor_unitario_estimado)} <small>est.</small></span>`;
-    return `<span class="sel"><input type="checkbox" data-item="${esc(d.id)}"
-        ${precosIncluidos.has(String(d.id)) ? "checked" : ""}
-        aria-label="Usar na pesquisa: ${esc(d.descricao ?? "item")}"></span>
-      <span class="obj" role="button" tabindex="0">${
-        esc(d.descricao ?? "–")}</span>
-      <span class="dim">${esc(d.unidade ?? "–")}</span>
-      <span class="dim">${d.quantidade_homologada ?? d.quantidade ?? "–"}</span>
-      <span class="num">${unit}</span>
-      ${corrigirIpca ? `<span class="num">${
-        d.corrigido != null ? dinheiro(d.corrigido)
-          : `<span class="dim" title="Sem data de resultado, ou posterior ao
-              último índice publicado">–</span>`}</span>` : ""}
-      ${porConteudo ? `<span class="num">${
-        d.por_conteudo
-          ? `${dinheiroFino(d.por_conteudo.valor)}
-             <span class="base">/${esc(d.por_conteudo.rotulo)}</span>`
-          : `<span class="dim" title="A embalagem não diz quanto vem dentro"
-              >–</span>`}</span>` : ""}
-      <span class="dim" title="${esc(d.fornecedor_nome ?? "")}"
-        >${esc(fornecedorCurto(d.fornecedor_nome))}</span>
-      <span class="dim${d.referencia ? " de-fora" : ""}"
-        title="${d.referencia ? "Preço de município de referência"
-                              : "Preço do seu município"}"
-        >${esc(d.municipio_nome ?? "–")}</span>
-      <span class="dim">${d.sequencial ?? "–"}/${d.ano ?? ""}</span>`;
-  }
   if (tipo === "pca")
     return `<span class="dim">${esc(d.numero_item)}</span>
       <span class="obj">${esc(d.descricao ?? "–")}</span>
@@ -588,151 +526,6 @@ function renderLinha(tipo, d) {
     <span class="dim">${dataBr(d.vigencia_inicio)}</span>
     <span class="dim">${dataBr(d.vigencia_fim)}</span>
     <span>${celulaStatusVigencia(d)}</span>`;
-}
-
-// Quanto a série varia em relação à própria média. Acima de 25% o TCU e os
-// manuais de pesquisa de preços já tratam a amostra como dispersa demais
-// para a média servir de estimativa — daí a leitura vir escrita, e não só
-// o número.
-function leituraCv(cv) {
-  if (cv < 0.15) return "preços homogêneos";
-  if (cv < 0.25) return "variação moderada";
-  if (cv < 0.50) return "amostra dispersa — prefira a mediana";
-  return "amostra muito dispersa — confira se os itens são comparáveis";
-}
-
-// Quem fica de fora precisa aparecer: item cuja embalagem não diz o
-// conteúdo, ou que está em outra unidade-base (quilo no meio de folhas).
-// Documento que atualiza valor tem de dizer com que índice e até quando.
-function correcaoHtml(s) {
-  if (!s.corrigido) return "";
-  const fora = s.sem_indice
-    ? ` ${s.sem_indice} ${s.sem_indice === 1 ? "item ficou" : "itens ficaram"}
-        de fora, por não ter data de resultado ou ser posterior ao índice.`
-    : "";
-  // Quando sai parte grande da série, o número que mudou não é só de escala:
-  // é outra amostra. Sem este aviso, a mediana maior lê como inflação.
-  const aviso = s.amostra_reduzida
-    ? `<div class="disp alerta"><b>Atenção:</b> a correção deixou de fora
-        ${s.sem_indice} dos ${s.sem_indice + s.n} preços — os mais recentes,
-        ainda sem índice publicado. A série ficou com outra composição, então
-        a diferença para os valores originais <b>não é só correção
-        monetária</b>.</div>`
-    : "";
-  return `<div class="disp">Valores corrigidos pelo <b>IPCA</b> até
-    <b>${esc(s.ipca_ate_extenso ?? "–")}</b>, a partir da data do resultado de
-    cada contratação.${fora}</div>${aviso}`;
-}
-
-function semConversaoHtml(s) {
-  if (!s.por_conteudo || !s.sem_conversao) return "";
-  const n = s.sem_conversao;
-  return `<div class="disp"><b>${n} ${n === 1 ? "item ficou" : "itens ficaram"}
-    de fora desta comparação</b> — ${n === 1 ? "a embalagem dele não diz" :
-    "as embalagens não dizem"} quanto vem dentro, ou ${
-    n === 1 ? "está" : "estão"} em outra unidade de medida. O resumo acima é
-    só do que dá para comparar por ${esc(s.rotulo_base)}.</div>`;
-}
-
-// Box-plot de Tukey + escore Z modificado (MAD) via ECharts — antes desta
-// versão (2026-08-11) a pesquisa de preços não tinha gráfico nenhum na
-// tela, só texto; e o próprio texto não conseguia mostrar as DUAS cercas
-// juntas do jeito que um desenho mostra. `renderer:'svg'` porque o app
-// pode imprimir a partir do que a tela desenha — canvas pixela, svg não.
-// Com `s.itens` (preço por item, 1.24.0): modo "Anotada" — ponto por item,
-// jitter em zigue-zague por ORDEM DE VALOR (não de cadastro, achado do
-// usuário: dois preços vizinhos nunca caem na mesma altura, senão o
-// rótulo gruda). Sem `s.itens`: modo agregado só com a caixa.
-function _jitterPorValor(n, passo = 15) {
-  const niveis = [0];
-  for (let i = 1; i < n; i++) {
-    const grupo = Math.ceil(i / 2);
-    niveis.push((i % 2 === 1 ? -1 : 1) * grupo * passo);
-  }
-  return niveis;
-}
-function desenharBoxplotPreco(el, s, paraImpressao) {
-  if (!window.echarts || s.q1 == null) {
-    // limpa o que sobrou de um desenho anterior — sem isso, um contêiner
-    // oculto (o da prévia de impressão, sem tela pra esconder visualmente)
-    // capturaria o SVG de outra pesquisa quando esta não tem quartil
-    el.innerHTML = "";
-    el.classList.add("oculto");
-    return;
-  }
-  el.classList.remove("oculto");
-  const s1 = _corTemaEchart("--s1", "#2a78d6", paraImpressao), s2 = _corTemaEchart("--s2", "#eb6834", paraImpressao),
-    erro = _corTemaEchart("--erro", "#a6231b", paraImpressao), warn = _corTemaEchart("--warn", "#7a5c0e", paraImpressao),
-    muted = _corTemaEchart("--muted", "#5b6066", paraImpressao), border = _corTemaEchart("--border", "#d3d6da", paraImpressao);
-  const val = s.por_conteudo ? dinheiroFino : dinheiro;
-  const fmt = v => val(v);
-  const itens = s.itens || [];
-  const markLines = [];
-  if (s.limite_sup != null)
-    markLines.push({ xAxis: s.limite_sup, lineStyle: { color: s1, type: "dashed", width: 1.4 },
-      label: { formatter: "Tukey", color: s1, fontSize: 10, position: "insideEndTop" } });
-  if (s.limite_sup_robusto != null)
-    markLines.push({ xAxis: s.limite_sup_robusto, lineStyle: { color: warn, type: "dotted", width: 1.4 },
-      label: { formatter: "MAD", color: warn, fontSize: 10, position: "insideEndBottom" } });
-
-  const boxplotTooltip = d =>
-    `mín <b>${fmt(d[1])}</b><br/>Q1 <b>${fmt(d[2])}</b><br/>` +
-    `mediana <b>${fmt(d[3])}</b><br/>Q3 <b>${fmt(d[4])}</b><br/>máx <b>${fmt(d[5])}</b>`;
-
-  const series = [
-    { type: "boxplot", data: [[s.minimo, s.q1, s.mediana, s.q3, s.maximo]],
-      itemStyle: { color: `${s1}2e`, borderColor: s1, borderWidth: 1.6 },
-      boxWidth: ["24%", "24%"], markLine: { symbol: "none", animation: false, data: markLines } },
-    { type: "scatter", data: [{ value: [s.media, 0] }], symbol: "diamond",
-      symbolSize: 11, itemStyle: { color: s2 }, z: 6 }
-  ];
-
-  el.style.height = itens.length ? "240px" : "150px";
-
-  if (itens.length) {
-    const ordenados = [...itens].sort((a, b) => a.valor - b.valor);
-    const niveis = _jitterPorValor(ordenados.length);
-    series.push({ type: "scatter", z: 5, symbolSize: 8,
-      data: ordenados.map((it, i) => {
-        const j = niveis[i];
-        const extrema = it.valor > s.limite_sup
-          || (s.limite_sup_robusto != null && it.valor > s.limite_sup_robusto);
-        return { value: [it.valor, 0], item: it, symbolOffset: [0, j],
-          label: { show: true, formatter: fmt(it.valor).replace(/^R\$\s*/, ""),
-            fontSize: 10, position: j <= 0 ? "top" : "bottom",
-            color: extrema ? erro : muted },
-          itemStyle: { color: extrema ? erro : muted } };
-      }) });
-  }
-
-  // instância presa ao PRÓPRIO elemento, não a uma variável de módulo —
-  // a tela (#precos-boxplot) e a prévia oculta de impressão
-  // (#grafico-oculto) desenham ao mesmo tempo, em elementos diferentes;
-  // uma só variável faria o dispose() de um derrubar o outro
-  if (el.__echart) { el.__echart.dispose(); el.__echart = null; }
-  const chart = echarts.init(el, null, { renderer: "svg" });
-  el.__echart = chart;
-  chart.setOption({
-    // sem isso, o SVG capturado pra impressão pega o 1º frame da
-    // animação (barras crescendo de zero) — gráfico "zerado" no papel
-    animation: false,
-    grid: { left: 8, right: 16, top: 22, bottom: 22 },
-    xAxis: { type: "value", min: 0, axisLine: { lineStyle: { color: border } },
-      axisLabel: { color: muted, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: .4 } } },
-    yAxis: { type: "category", data: [""], axisLine: { show: false }, axisTick: { show: false } },
-    tooltip: { trigger: "item", backgroundColor: "#17181a", borderWidth: 0,
-      textStyle: { color: "#fff", fontSize: 12 },
-      formatter: p => {
-        if (p.seriesType === "boxplot") return boxplotTooltip(p.data);
-        if (!p.data.item) return `média <b>${fmt(s.media)}</b>`;
-        const it = p.data.item;
-        const extrema = it.valor > s.limite_sup
-          || (s.limite_sup_robusto != null && it.valor > s.limite_sup_robusto);
-        return `<b>${esc(it.descricao)}</b><br/>${esc(it.fornecedor || "")}<br/>${fmt(it.valor)}` +
-          (extrema ? '<br/><span style="color:#f08a80">fora da faixa esperada</span>' : "");
-      } },
-    series
-  });
 }
 
 // paleta fixa do papel — mesma paleta que relatorios.py usa no documento
@@ -846,244 +639,11 @@ function desenharColunasEcharts(el, meses, corVar) {
   });
 }
 
-function dispersaoHtml(s) {
-  if (s.desvio == null) return "";
-  const val = s.por_conteudo ? dinheiroFino : dinheiro;
-  const quartis = s.q1 != null
-    ? `Metade dos preços entre <b>${val(s.q1)}</b> e
-       <b>${val(s.q3)}</b>. `
-    : "";
-  const pct = (s.cv * 100).toLocaleString("pt-BR",
-    {maximumFractionDigits: 0});
-  const concentracao = (s.alertas_concentracao ?? []).length
-    ? `<div class="disp"><b>Concentração:</b>
-        ${esc(s.alertas_concentracao.join("; "))} — preços da mesma fonte
-        não são evidências independentes.</div>`
-    : "";
-  const sens = s.sensibilidade;
-  const sensibilidade = sens
-    ? `<div class="disp"><b>Sensibilidade:</b> sem o preço mais destoante
-        (${val(sens.removido)}), a mediana passaria de
-        ${val(sens.mediana_antes)} para ${val(sens.mediana_depois)} e a
-        média de ${val(sens.media_antes)} para ${val(sens.media_depois)}.
-        Não decide sozinho: mostra o efeito de tirar o pior caso.</div>`
-    : "";
-  return `<div class="disp">${quartis}Desvio padrão
-    <b>${val(s.desvio)}</b> · coeficiente de variação <b>${pct}%</b>
-    <span class="dim">(${leituraCv(s.cv)})</span>${
-      s.q1 == null
-        ? ` <span class="dim">— com ${s.n} ${s.n === 1 ? "preço" : "preços"}
-            não dá para medir quartis</span>`
-        : ""}</div>${concentracao}${sensibilidade}`;
-}
-
-// Aponta, não remove: descartar preço de uma pesquisa é decisão de quem
-// assina, e o art. 23 exige justificativa para desprezar valor coletado.
-// O intervalo mostrado é o de Tukey quando existe (n >= 5); com menos
-// preços só o escore Z modificado (sobre o desvio absoluto mediano) entra
-// em ação, e a faixa dele é que aparece.
-function foraDaCurvaHtml(s) {
-  const n = (s.fora_da_curva ?? []).length;
-  if (!n) return "";
-  const val = s.por_conteudo ? dinheiroFino : dinheiro;
-  const temTukey = s.limite_sup != null;
-  const inf = temTukey ? s.limite_inf : s.limite_inf_robusto;
-  const sup = temTukey ? s.limite_sup : s.limite_sup_robusto;
-  const criterio = temTukey ? "critério de Tukey"
-    : "escore Z modificado sobre o desvio absoluto mediano";
-  const faixa = inf != null
-    ? ` (fora de ${val(Math.max(0, inf))} a ${val(sup)}, pelo ${criterio})`
-    : "";
-  return `<div class="fora">
-    <span>${n === 1 ? "1 preço destoa" : `${n} preços destoam`} do
-      conjunto${faixa}. Confira se são
-      itens comparáveis antes de usar.</span>
-    <button class="btn ghost" id="btn-descartar-fora">
-      Descartar ${n === 1 ? "o item" : "os itens"}</button></div>`;
-}
-
-let ultimoTermoPrecos = null;
-
-// releitura completa do mapa de descartes a partir do banco — usada na troca
-// de termo e depois de uma classificação em lote, onde vários itens mudam
-// de estado no servidor de uma vez (mesclar no Map local arriscaria sobrar
-// entrada de item que acabou de ser restaurado)
-async function recarregarDescartes(termo) {
-  precosDescartados = new Map();
-  if (api.descartes && termo)
-    for (const d of await api.descartes(termo))
-      precosDescartados.set(String(d.item_id),
-        {motivo: d.motivo, descricao: d.descricao, valor: d.valor});
-  atualizarSelecaoPrecos();
-}
-
-// pedido do usuário (2026-08-08): a seleção é persistida por termo — releitura
-// completa (não mescla no Set local) pelo mesmo motivo de recarregarDescartes:
-// depois de "Selecionar todos" ou de classificar por unidade, vários itens
-// mudam de estado no servidor de uma vez.
-async function recarregarSelecao(termo) {
-  precosIncluidos = new Set();
-  if (api.selecionados && termo)
-    for (const id of await api.selecionados(termo))
-      precosIncluidos.add(String(id));
-}
-
-// pedido do usuário (2026-08-08): além de marcar item a item, dá pra
-// selecionar por fornecedor, faixa de valor ou texto contido na descrição —
-// os três somam à seleção atual (nunca substituem, mesma regra da unidade).
-async function toolbarSelecaoPrecos(termo, ano, origemVal) {
-  const fornecedores = api.fornecedores_pesquisa_precos
-    ? await api.fornecedores_pesquisa_precos(termo, ano, origemVal) : [];
-  const opcoesForn = fornecedores.map(f =>
-    `<option value="${esc(f.ni)}">${esc(f.nome ?? f.ni)} (${f.n})</option>`
-  ).join("");
-  return `<div class="filtros">
-    <select id="sel-fornecedor-preco" aria-label="Selecionar por fornecedor">
-      <option value="">Selecionar por fornecedor…</option>${opcoesForn}
-    </select>
-    <input type="number" id="sel-valor-min" placeholder="De R$" step="0.01"
-      aria-label="Selecionar valor mínimo" style="width:100px">
-    <input type="number" id="sel-valor-max" placeholder="Até R$" step="0.01"
-      aria-label="Selecionar valor máximo" style="width:100px">
-    <button class="btn ghost" id="btn-selecionar-faixa">Selecionar faixa</button>
-    <input type="text" id="sel-texto" placeholder="Texto na descrição…"
-      aria-label="Selecionar por texto na descrição" style="flex:1; min-width:170px">
-    <button class="btn ghost" id="btn-selecionar-texto">Selecionar</button>
-  </div>`;
-}
-
-function ligarToolbarSelecaoPrecos(termo, ano, origemVal) {
-  $("sel-fornecedor-preco").addEventListener("change", async (e) => {
-    const ni = e.target.value;
-    if (!ni || !api.selecionar_por_fornecedor) return;
-    await api.selecionar_por_fornecedor(termo, ni, ano, origemVal);
-    await recarregarDescartes(termo);
-    await recarregarSelecao(termo);
-    carregarLista();
-    mostrarResumoPrecos();
-  });
-  $("btn-selecionar-faixa").addEventListener("click", async () => {
-    const minimo = $("sel-valor-min").value ? +$("sel-valor-min").value : null;
-    const maximo = $("sel-valor-max").value ? +$("sel-valor-max").value : null;
-    if ((minimo == null && maximo == null) || !api.selecionar_por_faixa) return;
-    await api.selecionar_por_faixa(termo, minimo, maximo, ano, origemVal);
-    await recarregarDescartes(termo);
-    await recarregarSelecao(termo);
-    carregarLista();
-    mostrarResumoPrecos();
-  });
-  $("btn-selecionar-texto").addEventListener("click", async () => {
-    const texto = $("sel-texto").value.trim();
-    if (!texto || !api.selecionar_por_texto) return;
-    await api.selecionar_por_texto(termo, texto, ano, origemVal);
-    await recarregarDescartes(termo);
-    await recarregarSelecao(termo);
-    carregarLista();
-    mostrarResumoPrecos();
-  });
-}
-
-async function mostrarResumoPrecos() {
-  // carregarLista já garante descartes/seleção carregados antes de chamar
-  // esta função (a corrida entre desenhar as linhas e ler o Set de
-  // seleção era real — ver comentário lá); aqui só falta ler o termo atual
-  const caixa = $("precos-resumo");
-  // esta função reescreve a caixa inteira, e os controles de seleção por
-  // critério moram dentro dela: sem guardar o foco, quem usa teclado era
-  // jogado para o topo da página a cada seleção em lote (auditoria de
-  // acessibilidade, 2026-08-09)
-  const focado = document.activeElement?.id || null;
-  const termo = $("f-busca").value.trim();
-  if (estado.tipo !== "itens" || termo.length < 3 || !api.estatisticas_preco) {
-    caixa.classList.add("oculto");
-    return;
-  }
-  const ano = $("f-ano").value ? +$("f-ano").value : null;
-  const origemVal = $("f-so-meu").checked ? "proprio" : null;
-  const s = await api.estatisticas_preco(termo, ano, origemVal,
-    null, porConteudo, corrigirIpca, [...precosIncluidos]);
-  if (!s) { caixa.classList.add("oculto"); return; }
-  // "X de Y selecionados" — Y é a busca inteira, sem olhar seleção nem
-  // descarte (pedido do usuário, item 1: contador visível)
-  // role="status": é o único retorno das seleções em lote ("Selecionar
-  // todos", faixa, texto) — sem ele o leitor de tela não sabe se marcou 0
-  // ou 400 (auditoria de acessibilidade, 2026-08-09)
-  const contador = s.total != null
-    ? `<div class="dim" role="status" style="font-size:12px; margin:-4px 0 8px">${
-        s.nada_selecionado ? 0 : s.n} de ${s.total} selecionados</div>` : "";
-  if (s.nada_selecionado) {
-    caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
-      ${contador}
-      <div class="disp">Nenhum item selecionado ainda. Marque os que quer
-        comparar na lista abaixo, ou
-        <button class="btn ghost" id="btn-selecionar-todos-resumo"
-          style="margin-left:4px">Selecionar todos</button></div>
-      ${await toolbarSelecaoPrecos(termo, ano, origemVal)}`;
-    caixa.classList.remove("oculto");
-    $("btn-selecionar-todos-resumo").addEventListener("click", selecionarTodosPrecos);
-    ligarToolbarSelecaoPrecos(termo, ano, origemVal);
-    if (focado) $(focado)?.focus();
-    return;
-  }
-  if (!s.n) {          // modo ligado e nenhum item com conteúdo legível
-    caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"</h3>
-      <div class="disp">Nenhum dos ${s.sem_conversao} itens desta pesquisa diz
-        quanto vem na embalagem, então não há como compará-los por conteúdo.
-        Desligue a caixa para ver os preços como foram pagos.</div>`;
-    caixa.classList.remove("oculto");
-    return;
-  }
-  const cel = (v, r, destaque) =>
-    `<div class="cel${destaque ? " destaque" : ""}">
-       <div class="v">${v}</div><div class="r">${r}</div></div>`;
-  // no modo por conteúdo tudo é R$ por unidade-base, e o rótulo diz qual
-  const val = s.por_conteudo ? dinheiroFino : dinheiro;
-  // "mediana por unidade" no modo; fora dele, os rótulos de sempre
-  const rot = (curto, longo) => s.por_conteudo
-    ? `${curto} por ${esc(s.rotulo_base)}` : longo;
-  // quem decide precisa saber quanto do resultado é da própria série
-  const origem = s.referencia
-    ? ` <small class="dim">— ${s.proprios} do seu município e ${s.referencia} de referência</small>`
-    : "";
-  caixa.innerHTML = `<h3>Preços pagos para "${esc(termo)}"${origem}</h3>
-    ${contador}
-    <div class="grade">
-      ${cel(val(s.minimo), rot("menor", "menor unitário"))}
-      ${cel(val(s.mediana), rot("mediana", "mediana"), true)}
-      ${cel(val(s.media), rot("média", "média"))}
-      ${cel(val(s.maximo), rot("maior", "maior unitário"))}
-      ${cel(s.n, "itens homologados")}
-      ${cel(s.fornecedores, "fornecedores")}
-      <button class="btn ghost" id="btn-rel-precos" style="align-self:center">
-        Relatório de pesquisa de preços</button>
-    </div>
-    ${correcaoHtml(s)}${semConversaoHtml(s)}
-    <div id="precos-boxplot" class="oculto" style="height:150px"></div>
-    ${dispersaoHtml(s)}${foraDaCurvaHtml(s)}
-    ${await toolbarSelecaoPrecos(termo, ano, origemVal)}`;
-  caixa.classList.remove("oculto");
-  desenharBoxplotPreco($("precos-boxplot"), s);
-  $("btn-rel-precos").addEventListener("click", abrirRelatorioPrecos);
-  $("btn-descartar-fora")?.addEventListener("click", async () => {
-    for (const id of s.fora_da_curva ?? []) {
-      const idStr = String(id);
-      precosIncluidos.delete(idStr);
-      await api.desselecionar_preco(ultimoTermoPrecos ?? "", idStr);
-      await descartar(idStr);
-    }
-    carregarLista();
-    mostrarResumoPrecos();
-    atualizarSelecaoPrecos();
-  });
-  ligarToolbarSelecaoPrecos(termo, ano, origemVal);
-  if (focado) $(focado)?.focus();
-}
-
 // ── largura das colunas: arrastar ajusta, duplo clique dá autofit ─────────
 // A coluna elástica de cada aba (objeto/descrição) absorve a sobra e por
 // isso não tem alça: alargar qualquer outra encolhe ela, que é o que se
 // espera ao puxar "fornecedor" para ver o nome inteiro.
-const COL_FLEX = { contratacoes:2, contratos:1, atas:2, pca:1, itens:1 };
+const COL_FLEX = { contratacoes:2, contratos:1, atas:2, pca:1 };
 const LARGURA_MIN = 44;
 const FLEX_MIN = 170;       // espaço que a coluna elástica nunca cede
 let larguras = {};
@@ -1094,26 +654,12 @@ function larguraAtualPx() {
   return getComputedStyle(cab).gridTemplateColumns.split(" ").map(parseFloat);
 }
 
-// A aba Preços tem dois conjuntos de colunas; o resto tem um só.
 function colunasDe(tipo) {
-  if (tipo !== "itens") return COLUNAS[tipo];
-  const cols = [...COLUNAS.itens];
-  // cada modo insere a sua coluna logo depois do valor efetivamente pago
-  let i = 5;
-  if (corrigirIpca) cols.splice(i++, 0, ["Corrigido", null]);
-  if (porConteudo) cols.splice(i, 0, ["Por conteúdo", null]);
-  return cols;
+  return COLUNAS[tipo];
 }
 
-// A aba Preços muda de número de colunas conforme o modo ("corrigir pelo
-// IPCA" e "comparar por conteúdo" acrescentam uma cada). Guardar tudo sob
-// a chave "itens" fazia o arrasto no modo de 9 colunas sobrescrever as
-// larguras do modo de 8 — e a guarda abaixo só rejeitava mapa FALTANDO
-// entrada, nunca sobrando, então o modo base aplicava as 8 primeiras de um
-// layout de 9 e desalinhava (auditoria, 2026-08-09). A chave passa a
-// incluir a contagem: cada modo tem as suas.
 function chaveLarguras(tipo) {
-  return tipo === "itens" ? `itens:${colunasDe(tipo).length}` : tipo;
+  return tipo;
 }
 
 function aplicarLarguras(tipo) {
@@ -1213,22 +759,8 @@ function restaurarLarguras() {
 }
 
 async function carregarLista() {
-  // a seleção/descartes têm de estar carregados ANTES de desenhar as
-  // linhas — senão a caixa nasce lendo o Set vazio e some marcada errado
-  // até o próximo redesenho (corrida real, achada rodando os testes)
-  if (estado.tipo === "itens") {
-    const termo = $("f-busca").value.trim();
-    if (termo !== ultimoTermoPrecos) {
-      ultimoTermoPrecos = termo;
-      await recarregarDescartes(termo);
-      await recarregarSelecao(termo);
-    }
-  }
-  mostrarResumoPrecos();
   const r = await api.listar(estado.tipo, filtrosAtuais(), estado.pagina);
-  const g = `g-${estado.tipo}`
-    + (estado.tipo === "itens" && porConteudo ? " conteudo" : "")
-    + (estado.tipo === "itens" && corrigirIpca ? " corrigido" : "");
+  const g = `g-${estado.tipo}`;
   const cab = `<div class="linha cab ${g}">` +
     colunasDe(estado.tipo).map(([rotulo, chave]) => {
       const ativa = chave && estado.ord === chave;
@@ -1237,21 +769,10 @@ async function carregarLista() {
         aria-sort="${ativa ? (estado.dir === "asc" ? "ascending" : "descending") : "none"}"` : "";
       return `<span${sort}>${rotulo} ${seta}</span>`;
     }).join("") + `</div>`;
-  const selecionavel = estado.tipo === "itens";
   const linhas = r.itens.map(d => {
     const nc = esc(d.numero_controle ?? d.id);
-    // A linha selecionável é um <div> porque precisa aninhar o checkbox —
-    // <input> dentro de <button> é HTML inválido. Mas ela também NÃO leva
-    // role="button" (auditoria de acessibilidade, 2026-08-09): filho de
-    // botão é apresentacional, então o checkbox perdia o estado marcado e
-    // seu rótulo virava o nome da linha. Quem carrega o papel de botão é a
-    // célula da descrição — o keydown continua sendo tratado aqui em cima,
-    // porque o evento borbulha da célula para a linha.
-    return selecionavel
-      ? `<div class="linha ${g}" data-nc="${nc}">`
-        + renderLinha(estado.tipo, d) + `</div>`
-      : `<button class="linha ${g}" data-nc="${nc}">`
-        + renderLinha(estado.tipo, d) + `</button>`;
+    return `<button class="linha ${g}" data-nc="${nc}">`
+      + renderLinha(estado.tipo, d) + `</button>`;
   }).join("");
   const comFiltro = temFiltroAtivo();
   $("btn-limpar").classList.toggle("oculto", !comFiltro);
@@ -1269,60 +790,8 @@ async function carregarLista() {
   ligarAlcas();
   $("vazio-limpar")?.addEventListener("click", limparFiltros);
   $("vazio-sync")?.addEventListener("click", () => api.sincronizar());
-  $("lista").querySelectorAll(".linha[data-nc]").forEach(b => {
-    b.addEventListener("click", e => {
-      // clicar na caixa de seleção não pode abrir o detalhe
-      if (e.target.closest(".sel")) return;
-      abrirDetalhe(b.dataset.nc);
-    });
-    if (b.tagName === "DIV")
-      b.addEventListener("keydown", e => {
-        if (e.target.closest(".sel")) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault(); abrirDetalhe(b.dataset.nc);
-        }
-      });
-  });
-  $("lista").querySelectorAll('.sel input[data-item]').forEach(c =>
-    c.addEventListener("change", async () => {
-      const id = String(c.dataset.item);
-      const marcou = c.checked;
-      // A tela mostra o que `precosIncluidos` diz; o documento sai do que
-      // a tabela `precos_selecionados` tem. Se a gravação não pega e
-      // ninguém lê o retorno, os dois divergem sem sintoma — a mediana da
-      // tela deixa de ser a do papel (auditoria de falha silenciosa,
-      // 2026-08-09). Sem `?.` também: os métodos existem, e o `?.` só
-      // esconderia uma renomeação futura.
-      let gravou = false;
-      try {
-        if (marcou) {
-          // marcar é seleção pura, sem motivo — reconsiderar um item que
-          // tinha sido tirado (com razão) limpa o descarte dele também
-          precosIncluidos.add(id);
-          precosDescartados.delete(id);
-          gravou = (await api.selecionar_preco(
-            ultimoTermoPrecos ?? "", id))?.ok === true;
-        } else {
-          precosIncluidos.delete(id);
-          gravou = (await api.desselecionar_preco(
-            ultimoTermoPrecos ?? "", id))?.ok === true;
-          if (gravou) await descartar(id, c.closest(".linha"));
-        }
-      } catch { gravou = false; }     // o Proxy da ponte já avisou na tela
-      if (!gravou) {
-        // desfaz e relê do banco, que é quem manda: a tela não pode
-        // afirmar uma seleção que o documento não vai enxergar
-        c.checked = !marcou;
-        $("sync-msg").textContent =
-          "Não consegui gravar a seleção — a lista foi recarregada.";
-        await recarregarSelecao(ultimoTermoPrecos ?? "");
-        await recarregarDescartes(ultimoTermoPrecos ?? "");
-        carregarLista();
-        return;
-      }
-      mostrarResumoPrecos();          // o resumo reflete só o que ficou
-      atualizarSelecaoPrecos();
-    }));
+  $("lista").querySelectorAll(".linha[data-nc]").forEach(b =>
+    b.addEventListener("click", () => abrirDetalhe(b.dataset.nc)));
   $("lista").querySelectorAll(".cab span[data-ord]").forEach(s => {
     const ordenar = () => {
       const chave = s.dataset.ord;
@@ -1352,16 +821,18 @@ function mudarAba(tipo) {
             x => x.dataset.tipo === tipo);
   estado.tipo = tipo;
   estado.pagina = 1;
-  // o Painel não é uma lista: troca a tela em vez de trocar as colunas
+  // Painel não é lista: troca a tela inteira em vez das colunas, e esconde
+  // o rodapé/filtros/KPIs da lista.
   const ehPainel = tipo === "painel";
+  const semLista = ehPainel;
   $("painel").classList.toggle("oculto", !ehPainel);
   for (const id of ["filtros-lista", "lista", "rodape-lista", "kpis-topo"])
-    $(id)?.classList.toggle("oculto", ehPainel);
-  // os alertas do topo pertencem às listas: no painel eles viram chips
-  if (ehPainel) $("alertas").classList.add("oculto");
+    $(id)?.classList.toggle("oculto", semLista);
+  // os alertas do topo pertencem às listas: fora delas ficam escondidos
+  if (semLista) $("alertas").classList.add("oculto");
   else if ($("alertas").innerHTML.trim()) $("alertas").classList.remove("oculto");
   if (api.set_config) api.set_config("aba", tipo);
-  if (ehPainel) return;
+  if (semLista) return;
   estado.ord = null; estado.dir = "desc";
   estado.objetosAlvo = null;
   const soContratacoes = tipo === "contratacoes";
@@ -1372,18 +843,7 @@ function mudarAba(tipo) {
   const ehVigencia = ["contratos", "atas"].includes(tipo);
   $("cx-vigentes").classList.toggle("oculto", !ehVigencia);
   $("cx-vence60").classList.toggle("oculto", !ehVigencia);
-  const ehItens = tipo === "itens";
-  $("cx-homologados").classList.toggle("oculto", !ehItens);
-  $("f-unidade").classList.toggle("oculto", !ehItens);
-  if (!ehItens) $("f-unidade").value = "";
-  $("cx-conteudo").classList.toggle("oculto", !ehItens);
-  $("cx-corrigir").classList.toggle("oculto", !ehItens);
-  // o filtro de origem só faz sentido havendo município de referência
-  $("cx-so-meu").classList.toggle("oculto", !ehItens || !temReferencia);
-  $("btn-selecionar-todos").classList.toggle("oculto", !ehItens);
-  $("f-busca").placeholder = ehItens
-    ? "Buscar item — ex.: papel A4, óleo, pneu…"
-    : "Buscar no objeto…";
+  $("f-busca").placeholder = "Buscar no objeto…";
   $("f-propostas").checked = false;
   $("f-vigentes").checked = false;
   $("f-vence60").checked = false;
@@ -1393,20 +853,11 @@ function mudarAba(tipo) {
 document.querySelectorAll("nav.abas button").forEach(b =>
   b.addEventListener("click", () => {
     mudarAba(b.dataset.tipo);
-    estado.tipo === "painel" ? carregarPainel() : carregarLista();
+    if (estado.tipo === "painel") carregarPainel();
+    else carregarLista();
   }));
-$("f-conteudo").addEventListener("change", () => {
-  porConteudo = $("f-conteudo").checked;
-  estado.pagina = 1;
-  carregarLista();
-});
-$("f-corrigir").addEventListener("change", () => {
-  corrigirIpca = $("f-corrigir").checked;
-  estado.pagina = 1;
-  carregarLista();
-});
-["f-propostas", "f-vigentes", "f-vence60", "f-parada", "f-homologados",
- "f-so-meu"].forEach(id => $(id).addEventListener("change",
+["f-propostas", "f-vigentes", "f-vence60", "f-parada"].forEach(id =>
+  $(id).addEventListener("change",
     () => { estado.pagina = 1; carregarLista(); }));
 
 // navegação programática (KPIs e alertas). Cada campo é sempre escrito, não
@@ -1435,40 +886,6 @@ $("kpi-card-vigentes").addEventListener("click",
   () => irPara("contratos", {vigentes: true, ord: "vigencia", dir: "asc"}));
 ["f-ano","f-modalidade","f-situacao","f-orgao"].forEach(id =>
   $(id).addEventListener("change", () => { estado.pagina = 1; carregarLista(); }));
-// achado do usuário (2026-08-08): escolher uma unidade aqui já filtrava a
-// lista, mas não classificava a pesquisa de preços — buscar "alface" mistura
-// maço, quilo e unidade, e comparar por uma só exigia marcar item por item
-// na mão. Agora a escolha já seleciona só os da unidade.
-$("f-unidade").addEventListener("change", async () => {
-  estado.pagina = 1;
-  const unidade = $("f-unidade").value;
-  const termo = $("f-busca").value.trim();
-  if (unidade && estado.tipo === "itens" && termo && api.classificar_por_unidade) {
-    await api.classificar_por_unidade(termo, unidade,
-      $("f-ano").value ? +$("f-ano").value : null,
-      $("f-so-meu").checked ? "proprio" : null);
-    await recarregarDescartes(termo);
-    await recarregarSelecao(termo);
-  }
-  carregarLista();
-  mostrarResumoPrecos();
-});
-
-// pedido do usuário (2026-08-08): opção de marcar tudo que a busca trouxe de
-// uma vez — sobre a pesquisa inteira, não só a página visível na tela.
-async function selecionarTodosPrecos() {
-  const termo = $("f-busca").value.trim();
-  if (!termo || !api.selecionar_todos_precos) return;
-  await api.selecionar_todos_precos(termo,
-    $("f-ano").value ? +$("f-ano").value : null,
-    $("f-so-meu").checked ? "proprio" : null);
-  await recarregarDescartes(termo);
-  await recarregarSelecao(termo);
-  carregarLista();
-  mostrarResumoPrecos();
-  atualizarSelecaoPrecos();
-}
-$("btn-selecionar-todos")?.addEventListener("click", selecionarTodosPrecos);
 let buscaTimer;
 $("f-busca").addEventListener("input", () => {
   clearTimeout(buscaTimer);
@@ -1737,9 +1154,10 @@ async function montarOpcoesRelatorio() {
   const sel = $("rel-ano");
   sel.length = 0;
   const soExercicio = ["executivo", "fracionamento"].includes(tipo);
-  $("rel-termo-caixa").classList.toggle("oculto", tipo !== "precos");
+  // nenhum relatório vigente pede termo de busca; a caixa fica sempre oculta
+  $("rel-termo-caixa").classList.add("oculto");
   if (!soExercicio) {
-    if (!["contratacoes", "precos"].includes(tipo))
+    if (tipo !== "contratacoes")
       sel.add(new Option("Vigentes hoje", "vigentes"));
     sel.add(new Option("Todo o período", "todos"));
   }
@@ -1762,15 +1180,6 @@ $("btn-relatorios").addEventListener("click", async () => {
   abrirModal("veu-relatorios");
 });
 $("rel-tipo").addEventListener("change", montarOpcoesRelatorio);
-// atalho: na aba Preços, o termo buscado já vai preenchido no relatório
-function abrirRelatorioPrecos() {
-  $("rel-tipo").value = "precos";
-  montarOpcoesRelatorio().then(() => {
-    $("rel-termo").value = $("f-busca").value.trim();
-    $("rel-status").textContent = "";
-    abrirModal("veu-relatorios");
-  });
-}
 $("rel-gerar").addEventListener("click", async () => {
   const periodo = $("rel-ano").value;
   const params = {
@@ -1780,35 +1189,9 @@ $("rel-gerar").addEventListener("click", async () => {
     orgao: $("rel-orgao").value || null,
     termo: $("rel-termo").value || null,
   };
-  // o que o usuário descartou na tela não entra no documento — mas só
-  // quando o relatório é o da própria pesquisa em curso
-  if ($("rel-tipo").value === "precos" && precosDescartados.size
-      && params.termo === ultimoTermoPrecos)
-    params.excluidos = [...precosDescartados.keys()];
-  if ($("rel-tipo").value === "precos" && !params.termo) {
-    $("rel-status").textContent = "Informe o que pesquisar";
-    $("rel-termo").focus();
-    return;
-  }
   $("rel-gerar").disabled = true;
   $("rel-status").textContent = "Gerando…";
-  // desenha o mesmo gráfico da aba Preços num contêiner fora da tela,
-  // captura o SVG e manda pro papel — sem isso o relatório de preços
-  // nunca passa pela tela antes de imprimir (diferente do Painel) e
-  // ficaria preso ao SVG à mão pra sempre. Se a prévia falhar (nada
-  // selecionado, por exemplo), segue sem grafico_html: gerar_relatorio
-  // já dá o mesmo erro por conta própria, então o usuário não fica sem
-  // explicação — só sem o gráfico bonito.
-  if ($("rel-tipo").value === "precos" && api.dados_grafico_precos) {
-    const g = await api.dados_grafico_precos(
-      params.termo, params.ano, params.orgao, params.excluidos,
-      false, false);
-    if (g?.ok) {
-      desenharBoxplotPreco($("grafico-oculto"), g.resumo, true);
-      params.grafico_html = $("grafico-oculto").innerHTML;
-    }
-  }
-  // mesma ideia pros dois relatórios que usam os gráficos do Painel —
+  // os dois relatórios que usam os gráficos do Painel —
   // api.painel() já devolve exatamente o que dados_painel() usaria, então
   // não precisa de método novo. Cada gráfico é desenhado no MESMO
   // contêiner oculto, um de cada vez, e capturado antes do próximo.
@@ -1852,194 +1235,6 @@ $("rel-gerar").addEventListener("click", async () => {
     : (r.erro || "Falha ao gerar");
 });
 
-// ── municípios de referência (banco de preços) ────────────────────────────
-// backend já devolve por tamanho desc (o padrão); nome/itens são reordenados
-// aqui — lista é pequena (poucas dezenas), não vale ida ao banco por critério
-const ORDENS_REFERENCIA = {
-  tamanho: (a, b) => (b.mb || 0) - (a.mb || 0),
-  nome: (a, b) => a.nome.localeCompare(b.nome, "pt-BR"),
-  itens: (a, b) => (b.itens || 0) - (a.itens || 0),
-};
-$("ref-ordem").addEventListener("change", renderReferencia);
-
-async function renderReferencia() {
-  const lista = await api.listar_municipios_referencia();
-  lista.sort(ORDENS_REFERENCIA[$("ref-ordem").value]);
-  // mesmo formato dos órgãos monitorados logo acima: nome, identificação
-  // embaixo e o controle à direita
-  $("cfg-referencia").innerHTML = lista.map(m =>
-    `<div class="orgrow"><span>${esc(m.nome)} — ${esc(m.uf)}
-       <small>IBGE ${esc(m.ibge)} · ${m.itens
-         ? `${m.itens.toLocaleString("pt-BR")} ${m.itens === 1 ? "preço" : "preços"} no banco`
-           + ` · ocupa ~${(m.mb || 0).toLocaleString("pt-BR")} MB`
-         : "ainda sem preços — serão baixados na próxima sincronização"}</small></span>
-     <button class="btn ghost" data-remover="${esc(m.ibge)}">Remover</button></div>`)
-    .join("") || `<div class="dim">Nenhum — o banco de preços usa só o seu
-      município.</div>`;
-  $("cfg-referencia").querySelectorAll("button[data-remover]").forEach(b =>
-    b.addEventListener("click", async () => {
-      const nome = b.closest(".orgrow").querySelector("span")
-        .firstChild.textContent.trim();
-      if (!confirm(`Remover ${nome}?\n\n`
-                   + "Os preços que ele trouxe saem do banco.")) return;
-      b.disabled = true;
-      const r = await api.remover_municipio_referencia(b.dataset.remover);
-      if (!r?.ok) {
-        alert(r?.erro || "Não consegui remover.");
-        b.disabled = false;
-        return;
-      }
-      await renderReferencia();
-    }));
-}
-
-// O peso varia em ordens de grandeza entre municípios: um vizinho pequeno
-// custa minutos, uma cidade média custa horas e centenas de MB. Perguntar
-// antes evita a descoberta desagradável no meio da coleta.
-async function confirmarVolume(codigo, nome) {
-  if (!api.estimar_municipio_referencia) return true;
-  $("sync-msg").textContent = `Consultando o volume de ${nome}…`;
-  const e = await api.estimar_municipio_referencia(codigo);
-  $("sync-msg").textContent = "";
-  const nl = "\n";
-  if (!e || e.erro) {
-    return confirm(`Não consegui consultar o volume de ${nome}`
-      + `${e && e.erro ? ` (${e.erro})` : ""}.${nl}${nl}`
-      + "Adicionar mesmo assim?");
-  }
-  if (!e.contratacoes) {
-    alert(`${nome} não tem contratações publicadas no PNCP — não traria `
-      + "nenhum preço.");
-    return false;
-  }
-  const tempo = e.minutos >= 60
-    ? `${(e.minutos / 60).toFixed(1).replace(".", ",")} horas`
-    : `${e.minutos} minutos`;
-  // coleta de horas merece aviso destacado: é o caso de cidade média
-  const pesado = e.minutos >= 60
-    ? `${nl}${nl}ATENÇÃO: é uma coleta longa. Ela roda em segundo plano e `
-      + "você pode continuar usando o programa, mas leva bastante tempo."
-    : "";
-  return confirm(
-    `${nome} tem ${e.contratacoes.toLocaleString("pt-BR")} contratações`
-    + `${e.parcial ? " (pelo menos — algumas consultas falharam)" : ""}.`
-    + `${nl}${nl}A coleta deve trazer cerca de `
-    + `${e.itens.toLocaleString("pt-BR")} preços, ocupar `
-    + `${String(e.mb).replace(".", ",")} MB e levar aproximadamente `
-    + `${tempo}.${pesado}${nl}${nl}Adicionar mesmo assim?`);
-}
-
-// A razão pode vir depois: exigi-la no clique atrapalharia quem descarta
-// dez itens de uma vez. Quem cobra é o relatório.
-async function descartar(id, linha) {
-  const celulas = linha ? linha.querySelectorAll("span") : [];
-  precosDescartados.set(id, {
-    motivo: precosDescartados.get(id)?.motivo ?? null,
-    descricao: celulas[1]?.textContent.trim() ?? null,
-    valor: null,
-  });
-  await api.descartar_preco(ultimoTermoPrecos ?? "", id,
-                              precosDescartados.get(id).motivo);
-}
-
-// Motivos vêm do backend para tela e documento falarem igual; carregados
-// uma vez, porque a lista é fixa.
-let motivosDescarte = null;
-
-async function carregarMotivos() {
-  if (!motivosDescarte && api.motivos_descarte)
-    motivosDescarte = await api.motivos_descarte();
-  return motivosDescarte ?? [];
-}
-
-// O descarte é registrado por pesquisa: sai do cálculo, entra no relatório
-// numa seção própria e a razão fica gravada. Sem razão, o documento acusa.
-async function atualizarSelecaoPrecos() {
-  const caixa = $("precos-selecao");
-  if (!caixa) return;
-  const n = precosDescartados.size;
-  caixa.classList.toggle("oculto", n === 0);
-  if (!n) return;
-  const motivos = await carregarMotivos();
-  const opcoes = (atual) => motivos.map(m =>
-    `<option value="${esc(m.id)}"${m.id === atual ? " selected" : ""}
-      >${esc(m.texto)}</option>`).join("");
-  const linhas = [...precosDescartados.entries()].map(([id, d]) => {
-    const conhecido = motivos.some(m => m.id === d.motivo);
-    const livre = d.motivo && !conhecido;
-    return `<div class="descartado">
-      <span class="obj" title="${esc(d.descricao ?? "")}"
-        >${esc(d.descricao ?? id)}</span>
-      <span class="num dim">${d.valor != null ? dinheiro(d.valor) : ""}</span>
-      <select data-motivo="${esc(id)}" aria-label="Razão do descarte">
-        <option value="">Sem justificativa…</option>
-        ${opcoes(d.motivo)}
-        <option value="__outro"${livre ? " selected" : ""}>Outro…</option>
-      </select>
-      <input type="text" data-livre="${esc(id)}" maxlength="200"
-        class="${livre ? "" : "oculto"}" placeholder="Escreva a razão"
-        value="${esc(livre ? d.motivo : "")}">
-    </div>`;
-  }).join("");
-  const semRazao = [...precosDescartados.values()].filter(d => !d.motivo).length;
-  caixa.innerHTML =
-    `<div class="descarte-topo">
-       <span>${n} ${n === 1 ? "item descartado" : "itens descartados"} desta
-         pesquisa — ${n === 1 ? "não entra" : "não entram"} no resumo, mas
-         ${n === 1 ? "consta" : "constam"} no relatório com a razão.${
-           semRazao ? ` <b>${semRazao} sem justificativa.</b>` : ""}</span>
-       <button class="btn ghost" id="precos-restaurar">Restaurar todos</button>
-     </div>${linhas}`;
-  $("precos-restaurar").addEventListener("click", async () => {
-    // "restaurar" reconsidera — cada item volta a ser selecionado, não só
-    // sai da lista de descartados (senão ficaria fora da conta de novo).
-    // Cada gravação é conferida (mesmo cuidado do toggle individual,
-    // auditoria de falha silenciosa 2026-08-09): sem isso, uma falha no
-    // meio do lote deixava a tela "restaurada" com o banco ainda
-    // descartado. `selecionar_preco` já apaga o descarte no servidor
-    // quando grava — a releitura no fim reflete exatamente o que pegou.
-    let falhou = 0;
-    for (const id of [...precosDescartados.keys()]) {
-      let gravou = false;
-      try {
-        gravou = (await api.selecionar_preco(
-          ultimoTermoPrecos ?? "", id))?.ok === true;
-      } catch { gravou = false; }     // o Proxy da ponte já avisou na tela
-      if (gravou) precosIncluidos.add(id);
-      else falhou++;
-    }
-    if (falhou) {
-      $("sync-msg").textContent =
-        `Não consegui restaurar ${falhou} ${falhou === 1 ? "item" : "itens"}` +
-        " — a lista foi recarregada.";
-      await recarregarSelecao(ultimoTermoPrecos ?? "");
-    }
-    await recarregarDescartes(ultimoTermoPrecos ?? "");
-    carregarLista();
-    mostrarResumoPrecos();
-    atualizarSelecaoPrecos();
-  });
-  caixa.querySelectorAll("select[data-motivo]").forEach(sel =>
-    sel.addEventListener("change", async () => {
-      const id = sel.dataset.motivo;
-      const livre = caixa.querySelector(`input[data-livre="${CSS.escape(id)}"]`);
-      livre.classList.toggle("oculto", sel.value !== "__outro");
-      if (sel.value === "__outro") { livre.focus(); return; }
-      await registrarMotivo(id, sel.value || null);
-    }));
-  caixa.querySelectorAll("input[data-livre]").forEach(campo =>
-    campo.addEventListener("change", () =>
-      registrarMotivo(campo.dataset.livre, campo.value.trim() || null)));
-}
-
-async function registrarMotivo(id, motivo) {
-  const d = precosDescartados.get(id);
-  if (!d) return;
-  d.motivo = motivo;
-  await api.descartar_preco(ultimoTermoPrecos ?? "", id, motivo);
-  atualizarSelecaoPrecos();
-}
-
 // ── cópia do acervo ───────────────────────────────────────────────────────
 // Restaurar troca o banco inteiro, então a confirmação diz o que entra e o
 // que sai — e o programa precisa reabrir para ler o arquivo novo.
@@ -2050,8 +1245,7 @@ $("btn-exportar-acervo")?.addEventListener("click", async () => {
   if (!r.ok) { msg.textContent = r.erro ? `Falhou: ${r.erro}` : ""; return; }
   const c = r.contagens || {};
   msg.textContent = `Cópia salva (${r.mb} MB): ${c.contratacoes || 0}`
-    + ` contratações, ${(c.itens || 0).toLocaleString("pt-BR")} itens e`
-    + ` ${c.municipios_referencia || 0} municípios de referência.`;
+    + ` contratações e ${(c.itens || 0).toLocaleString("pt-BR")} itens.`;
 });
 
 $("btn-importar-acervo")?.addEventListener("click", async () => {
@@ -2069,40 +1263,6 @@ $("btn-importar-acervo")?.addEventListener("click", async () => {
         + "acervo restaurado.");
 });
 
-function ligarBuscaReferencia() {
-  const uf = $("ref-uf");
-  if (uf.options.length === 0) {
-    uf.add(new Option("UF", ""));
-    UFS.forEach(u => uf.add(new Option(u, u)));
-  }
-  const caixa = $("ref-sugestoes");
-  $("ref-busca").addEventListener("input", async () => {
-    const texto = $("ref-busca").value.trim();
-    if (texto.length < 2) { caixa.classList.add("oculto"); return; }
-    const achados = await api.municipios(texto, uf.value || null);
-    caixa.innerHTML = achados.map(m =>
-      `<button data-c="${m.c}" data-n="${esc(m.n)}" data-uf="${m.uf}">
-         ${esc(m.n)} — ${m.uf}</button>`).join("")
-      || `<button disabled>nenhum município encontrado</button>`;
-    caixa.classList.remove("oculto");
-    caixa.querySelectorAll("button[data-c]").forEach(b =>
-      b.addEventListener("click", async () => {
-        caixa.classList.add("oculto");
-        $("ref-busca").value = "";
-        if (!await confirmarVolume(b.dataset.c, b.dataset.n)) return;
-        const r = await api.adicionar_municipio_referencia(
-          b.dataset.c, b.dataset.n, b.dataset.uf);
-        if (r && r.ok === false) { alert(r.erro); return; }
-        await renderReferencia();
-        // os preços só chegam na próxima coleta: dizer isso evita a
-        // impressão de que o município entrou vazio
-        $("sync-msg").textContent =
-          `${b.dataset.n} adicionado — os preços chegam na próxima sincronização`;
-      }));
-  });
-}
-ligarBuscaReferencia();
-
 // ── config ────────────────────────────────────────────────────────────────
 // A modal demorava a abrir porque as ~5 chamadas à ponte pywebview
 // (get_estado, brasao, listar_orgaos, referência, log) rodavam uma
@@ -2114,7 +1274,7 @@ $("btn-config").addEventListener("click", async () => {
   abrirModal("veu-config");
   const [e, brasao, orgaos, log, sync] = await Promise.all([
     api.get_estado(), api.brasao(), api.listar_orgaos(), api.ultimo_log(),
-    api.status_sync?.() ?? {rodando: false}, renderReferencia()]);
+    api.status_sync?.() ?? {rodando: false}]);
   // abrir as Configurações no meio de uma coleta não recebe evento de
   // progresso retroativo: sem esta leitura, o botão de parar nasceria
   // desabilitado justo quando ele é necessário

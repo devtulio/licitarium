@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.44.0 — 2026-08-17
+
+**A pesquisa de preços saiu do Free — ele volta a ser o repositório de
+contratações**
+
+O Licitarium Free se concentra no que faz melhor: ser o **repositório das
+contratações públicas do município** no PNCP. A parte de preços — a pesquisa
+de preços por termo (banco de preços do art. 23) e a comparação de preços
+entre municípios — **deixou de fazer parte do Free**: vira um produto à parte,
+para quem precisar dela.
+
+O que mudou para você:
+
+- Saiu a aba de preços da barra. O Free agora tem **Painel · Contratações ·
+  Contratos · Atas · PCA** — e termina no PCA.
+- Saíram o cadastro de **municípios de referência** (Configurações) e a coleta
+  dos preços deles; o relatório de pesquisa de preços saiu do menu Relatórios.
+- Nada das suas contratações, contratos e atas muda: o acervo do município
+  continua inteiro, e os relatórios oficiais, o Painel e o Montar PCA seguem
+  iguais.
+
 ## 1.42.3 — 2026-08-16
 
 **Duas correções sincronizadas do Licitarium Pro (sistema irmão)**

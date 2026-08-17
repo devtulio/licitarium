@@ -281,71 +281,10 @@ def test_filtro_orgao_nos_relatorios(db, tmp_path):
     assert "Câmara de Testópolis" in Path(r["html"]).read_text(encoding="utf-8")
 
 
-def test_precos_estatisticas_e_relatorio(db, tmp_path, selecionar_tudo):
-    db.executemany(
-        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
-        " numero_item, descricao, unidade, quantidade_homologada,"
-        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
-        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [("a", "A", 2026, 1, 1, "PAPEL A4 75G", "RESMA", 10, 20.0, 200.0,
-          "1", "FORN A", "2026-03-10"),
-         ("b", "A", 2026, 1, 2, "PAPEL A4 90G", "RESMA", 5, 30.0, 150.0,
-          "2", "FORN B", "2026-04-10"),
-         ("c", "B", 2025, 9, 1, "PAPEL A4 75G", "RESMA", 8, 10.0, 80.0,
-          "1", "FORN A", "2025-05-10"),
-         ("d", "B", 2025, 9, 2, "CANETA AZUL", "UN", 100, 1.5, 150.0,
-          "1", "FORN A", "2025-05-10")])
-    db.commit()
-    d = relatorios.dados_precos(db, "papel")
-    assert d["resumo"]["n"] == 3
-    assert d["resumo"]["minimo"] == 10.0 and d["resumo"]["maximo"] == 30.0
-    assert d["resumo"]["mediana"] == 20.0          # 10, 20, 30
-    assert d["resumo"]["fornecedores"] == 2
-    assert [l["valor_unitario_homologado"] for l in d["linhas"]] == [10., 20., 30.]
-    # filtro por exercício
-    assert relatorios.dados_precos(db, "papel", ano=2025)["resumo"]["n"] == 1
-    selecionar_tudo(db, "papel A4")
-    r = relatorios.gerar(db, "precos", {"termo": "papel A4"}, "T", "SP", tmp_path)
-    html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "Pesquisa de Preços" in html and "art. 23" in html
-    assert "pesquisa_precos_papel_a4" in r["html"]
-    assert r["csv"] and Path(r["csv"]).exists()
 
 
-def test_precos_a_zero_reais_nao_quebra_o_coeficiente_de_variacao(
-        db, tmp_path, selecionar_tudo):
-    """cv = desvio/média, None quando a média é exatamente zero (itens de
-    doação/brinde na pesquisa). desvio ainda existe (é 0.0, "não é None"),
-    então a guarda antiga (checava desvio) deixava passar e
-    r["cv"] * 100 quebrava sobre None (achado da auditoria 2026-08-11)."""
-    db.executemany(
-        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
-        " numero_item, descricao, unidade, quantidade_homologada,"
-        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
-        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [("a", "A", 2026, 1, 1, "BRINDE CANETA", "UN", 10, 0.0, 0.0,
-          "1", "FORN A", "2026-03-10"),
-         ("b", "A", 2026, 1, 2, "BRINDE CANETA", "UN", 5, 0.0, 0.0,
-          "2", "FORN B", "2026-04-10")])
-    db.commit()
-    d = relatorios.dados_precos(db, "brinde caneta")
-    assert d["resumo"]["media"] == 0.0
-    assert d["resumo"]["desvio"] == 0.0
-    assert d["resumo"]["cv"] is None
-    selecionar_tudo(db, "brinde caneta")
-    r = relatorios.gerar(db, "precos", {"termo": "brinde caneta"}, "T", "SP",
-                         tmp_path)
-    html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "Pesquisa de Preços" in html   # não quebrou
 
 
-def test_precos_termo_vazio_e_sem_achados(db, tmp_path):
-    with pytest.raises(ValueError):
-        relatorios.gerar(db, "precos", {"termo": "  "}, "T", "SP", tmp_path)
-    r = relatorios.gerar(db, "precos", {"termo": "inexistente"}, "T", "SP",
-                         tmp_path)
-    assert "Nenhum item homologado" in Path(r["html"]).read_text(encoding="utf-8")
-    assert r["csv"] is None
 
 
 def test_num_contrato_normaliza():
@@ -507,18 +446,6 @@ def test_render_fracionamento_mostra_tipo_e_orgao_quando_ha_mais_de_um(
     assert "Compras" in html
 
 
-def test_categoria_relatorio_cobre_os_oito_tipos_em_quatro_cores():
-    """Selo de procedência (achado 2026-08-13, portado do diagnóstico de
-    identidade do licitarium-relatorios): cada tipo de relatório tem uma
-    categoria e uma cor — cadastral/analítico/vigilância/planejamento,
-    como a CGU distingue apuração/avaliação/consultoria na capa."""
-    tipos_com_pagina = {"contratacoes", "contratos", "atas", "executivo",
-                        "economia", "fracionamento", "minuta_pca", "precos"}
-    assert set(relatorios.CATEGORIA_RELATORIO) == tipos_com_pagina
-    cores = {cor for _, cor in relatorios.CATEGORIA_RELATORIO.values()}
-    assert len(cores) == 4
-    rotulos = {rotulo for rotulo, _ in relatorios.CATEGORIA_RELATORIO.values()}
-    assert rotulos == {"Cadastral", "Analítico", "Vigilância", "Planejamento"}
 
 
 def test_pagina_sem_categoria_fica_como_antes(db, tmp_path):
@@ -709,25 +636,6 @@ def test_url_pncp_do_processo():
         assert relatorios.url_pncp(*faltando) is None
 
 
-def test_relatorio_de_precos_liga_o_processo_ao_pncp(db):
-    """Transparência: quem recebe o documento confere na fonte oficial."""
-    db.execute(
-        "INSERT INTO itens (id, contratacao_controle, orgao_cnpj, ano,"
-        " sequencial, numero_item, descricao, unidade, quantidade_homologada,"
-        " valor_unitario_homologado, valor_total_homologado, fornecedor_nome,"
-        " data_resultado, municipio_ibge)"
-        " VALUES ('P#1','C-1','96291141000180',2024,4344,1,'PAPEL HIGIENICO',"
-        " 'Fardo 64,00 RO',200,28.8,5760.0,'QUALITY PAPER LTDA',"
-        " '2024-09-26','3536604')")
-    db.commit()
-    html = relatorios.render_precos(
-        relatorios.dados_precos(db, "papel"), "Orindiúva", "SP")
-    assert ('href="https://pncp.gov.br/app/editais/96291141000180/2024/4344"'
-            in html)
-    assert ">4344/2024</a>" in html
-    # município e unidade em coluna que não quebra
-    assert '<td class="muni">' in html and '<td class="unid">' in html
-    assert "white-space:nowrap" in html
 
 
 # ── auditoria de segurança (2026-08-09): dois sinks de XSS armazenado ────────
@@ -737,28 +645,6 @@ def test_relatorio_de_precos_liga_o_processo_ao_pncp(db):
 # inteiro por um .zip de terceiro, validado só por `quick_check`, sem
 # conferência de tipo de coluna.
 
-def test_quantidade_nao_numerica_nao_vira_html(db):
-    """`quantidade_homologada` é REAL, mas afinidade do SQLite não converte
-    texto — ele fica gravado como TEXT e saía cru no `<td class="num">`."""
-    payload = "<script>alert(1)</script>"
-    for i in range(6):
-        db.execute(
-            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
-            " unidade, valor_unitario_homologado, quantidade_homologada,"
-            " data_resultado, referencia)"
-            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,?,'2026-01-01',0)",
-            (f"Q#{i}", 10.0 + i, payload))
-    db.commit()
-    html = relatorios.render_precos(
-        relatorios.dados_precos(db, "papel"), "T", "SP")
-    assert payload not in html
-    assert "<script>" not in html
-
-    # a coluna promete número: o que não é número vira travessão
-    assert relatorios.quantidade(payload) == "–"
-    assert relatorios.quantidade(None) == "–"
-    assert relatorios.quantidade(300.0) == "300"
-    assert relatorios.quantidade(1500.5) == "1.500,50"
 
 
 def test_moeda_nao_numerica_nao_derruba_o_relatorio():
@@ -774,109 +660,26 @@ def test_moeda_nao_numerica_nao_derruba_o_relatorio():
     assert relatorios.moeda_fina(0.0466) == "R$ 0,0466"
 
 
-def test_preco_por_conteudo_nao_numerico_nao_quebra():
-    """Mesma raiz: preco_por_conteudo() faz valor/quantidade sem proteção,
-    e é chamada para TODA linha de dados_precos (relatorios.py:1231),
-    incondicional — não só quando a comparação "por conteúdo" está ligada."""
-    assert relatorios.preco_por_conteudo("N/D", "PAPEL A4 SULFITE", "UN") is None
-    assert relatorios.preco_por_conteudo(None, "PAPEL A4 SULFITE", "UN") is None
-    r = relatorios.preco_por_conteudo(100.0, "PAPEL A4 SULFITE C/500 FL", "PCT")
-    assert r is not None and r["valor"] == pytest.approx(0.2)
 
 
-def test_resumo_estatistico_descarta_valor_nao_numerico():
-    """4ª quina da mesma raiz — encontrada testando a correção do achado
-    #2: sum()/variância em resumo_estatistico() quebravam com TEXT numa
-    lista de valor_unitario_homologado (banco anterior à validação na
-    ingestão do PNCP). A linha malformada é descartada, a estatística
-    segue com o resto — mesmo critério de sync_ipca."""
-    assert relatorios.resumo_estatistico(["N/D", None]) is None
-    r = relatorios.resumo_estatistico([10.0, "N/D", 20.0, 30.0])
-    assert r["n"] == 3
-    assert r["media"] == 20.0
-    assert r["minimo"] == 10.0 and r["maximo"] == 30.0
 
 
-def test_precos_com_valor_corrompido_no_banco_nao_quebra_o_relatorio(
-        db, tmp_path, selecionar_tudo):
-    """render_precos com um banco anterior à validação na ingestão: uma
-    linha de valor_unitario_homologado corrompida (TEXT) convivendo com
-    linhas boas não pode derrubar o documento inteiro."""
-    db.executemany(
-        "INSERT INTO itens (id, contratacao_controle, ano, sequencial,"
-        " numero_item, descricao, unidade, quantidade_homologada,"
-        " valor_unitario_homologado, valor_total_homologado, fornecedor_ni,"
-        " fornecedor_nome, data_resultado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [("a", "A", 2026, 1, 1, "PAPEL A4 SULFITE", "RESMA", 10, 20.0, 200.0,
-          "1", "FORN A", "2026-03-10"),
-         ("b", "A", 2026, 1, 2, "PAPEL A4 SULFITE", "RESMA", 5, "N/D", None,
-          "2", "FORN B", "2026-04-10")])
-    db.commit()
-    selecionar_tudo(db, "papel a4 sulfite")
-    r = relatorios.gerar(db, "precos", {"termo": "papel a4 sulfite"}, "T",
-                         "SP", tmp_path)
-    html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "Pesquisa de Preços" in html
-    assert "N/D" not in html
 
 
-def test_competencia_do_ipca_com_marcacao_nao_vira_html(db):
-    """`mes_por_extenso` validava só o mês; o ano voltava cru na prosa da
-    correção monetária — "<payload>-06" virava "jun/<payload>"."""
-    payload = "<script>alert(1)</script>"
-    assert relatorios.mes_por_extenso(f"{payload}-06") is None
-    # competência fora do formato some, em vez de virar texto
-    assert relatorios.mes_por_extenso("2026-13") is None
-    assert relatorios.mes_por_extenso("2026") is None
-    assert relatorios.mes_por_extenso("2026-06") == "jun/2026"
-
-    db.execute("INSERT INTO ipca (competencia, variacao) VALUES (?, 0.5)",
-               (f"{payload}-06",))
-    for i in range(6):
-        db.execute(
-            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
-            " unidade, valor_unitario_homologado, quantidade_homologada,"
-            " data_resultado, referencia)"
-            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,10,"
-            " '2026-01-01',0)", (f"I#{i}", 10.0 + i))
-    db.commit()
-    html = relatorios.render_precos(
-        relatorios.dados_precos(db, "papel", corrigir_ipca=True), "T", "SP")
-    assert payload not in html
-    assert "<script>" not in html
 
 
-def test_documento_de_precos_recusa_sair_sem_selecao(db, tmp_path):
-    """Achado da auditoria de 2026-08-09 — o pior defeito que apareceu.
 
-    Com a tela dizendo "Nenhum item selecionado ainda", gerar o documento
-    produzia um relatório sobre a busca INTEIRA: mediana e máximo de uma
-    série que o usuário nunca curou, incluindo preço de município de
-    referência, e sem nenhum aviso no papel. Pesquisa de preços é peça de
-    processo — número errado ali é o pior defeito possível.
-    """
-    for i, valor in enumerate((10.0, 12.0, 15.0, 400.0, 500.0, 600.0)):
-        db.execute(
-            "INSERT INTO itens (id, contratacao_controle, ano, descricao,"
-            " unidade, valor_unitario_homologado, quantidade_homologada,"
-            " data_resultado, referencia)"
-            " VALUES (?,'A',2026,'PAPEL A4 SULFITE','UN',?,10,"
-            " '2026-01-01',0)", (f"S#{i}", valor))
-    db.commit()
 
-    with pytest.raises(ValueError, match="selecione"):
-        relatorios.gerar(db, "precos", {"termo": "papel"}, "T", "SP", tmp_path)
-
-    # com seleção, sai — e sobre o que foi selecionado, não sobre tudo
-    for i in range(3):
-        db.execute("INSERT INTO precos_selecionados (termo, item_id,"
-                   " criado_em) VALUES (?,?,'x')",
-                   (relatorios.chave_termo("papel"), f"S#{i}"))
-    db.commit()
-    r = relatorios.gerar(db, "precos", {"termo": "papel"}, "T", "SP", tmp_path)
-    html = Path(r["html"]).read_text(encoding="utf-8")
-    assert "R$ 12,00" in html                 # mediana dos 3 selecionados
-    assert "R$ 600,00" not in html            # o que ficou de fora, ficou
-
-    # a chamada direta (teste, uso fora da tela) segue sem exigir seleção
-    assert relatorios.dados_precos(db, "papel")["resumo"]["n"] == 3
+def test_categoria_relatorio_cobre_os_sete_tipos_em_quatro_cores():
+    """Selo de procedência: cada tipo de relatório tem categoria e cor
+    (Cadastral/Analítico/Vigilância/Planejamento). A parte de preços saiu do
+    Free (virou produto à parte)."""
+    tipos = {"contratacoes", "contratos", "atas", "executivo", "economia",
+             "fracionamento", "minuta_pca"}
+    assert set(relatorios.CATEGORIA_RELATORIO) == tipos
+    assert "precos" not in relatorios.CATEGORIA_RELATORIO
+    assert "comparados" not in relatorios.CATEGORIA_RELATORIO
+    cores = {cor for _, cor in relatorios.CATEGORIA_RELATORIO.values()}
+    assert len(cores) == 4
+    rotulos = {r for r, _ in relatorios.CATEGORIA_RELATORIO.values()}
+    assert rotulos == {"Cadastral", "Analítico", "Vigilância", "Planejamento"}

@@ -165,8 +165,7 @@ test("Configurações abre no clique e busca os dados em paralelo, não em fila"
     const lenta = (fn) => (...a) => new Promise(r =>
       setTimeout(() => r(fn(...a)), ms));
     const api = window.pywebview.api;
-    for (const m of ["get_estado", "brasao", "listar_orgaos", "ultimo_log",
-                     "listar_municipios_referencia"])
+    for (const m of ["get_estado", "brasao", "listar_orgaos", "ultimo_log"])
       api[m] = lenta(api[m].bind(api));
     const t0 = performance.now();
     document.querySelector("#btn-config").click();
@@ -239,142 +238,42 @@ test("tema troca via configurações e persiste via set_config",
   expect(salvo.v).toBe("observatorio");
 });
 
-test("aba Preços lista itens e resume o histórico do termo buscado",
-    async ({ page }) => {
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await expect(page.locator("#cx-homologados")).toBeVisible();
-  await expect(page.locator("#f-busca"))
-    .toHaveAttribute("placeholder", /papel A4/);
-  // "só com preço fechado" vem ligado: o item sem resultado não aparece
-  // (4 do município + 1 de referência)
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
-  await expect(page.locator(".linha:not(.cab)").first())
-    .toContainText("PAPEL SULFITE");
-  // resumo estatístico aparece ao buscar
-  await expect(page.locator("#precos-resumo")).toBeHidden();
-  await page.locator("#f-busca").fill("papel");
-  await expect(page.locator("#precos-resumo")).toBeVisible();
-  await expect(page.locator("#precos-resumo")).toContainText("mediana");
-  await expect(page.locator("#precos-resumo")).toContainText("18,75");
-  // achado da skill de pesquisa de preços do ChatGPT (2026-08-11): tela e
-  // papel têm de mostrar a mesma coisa — concentração e sensibilidade
-  // agora aparecem nos dois
-  await expect(page.locator("#precos-resumo")).toContainText("Concentração");
-  await expect(page.locator("#precos-resumo")).toContainText(
-    "1 fornecedor com mais de um preço na amostra");
-  await expect(page.locator("#precos-resumo")).toContainText("Sensibilidade");
-  await expect(page.locator("#precos-resumo")).toContainText("17,20");
-  // desmarcar traz também o item sem preço fechado
-  await page.locator("#f-homologados").uncheck();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(6);
-});
-
-test("colunas da aba Preços: nada quebra e o nome típico cabe inteiro",
-    async ({ page }) => {
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
-  const m = await page.evaluate(() => {
-    const quebrou = [], truncou = [];
-    document.querySelectorAll(".linha:not(.cab)").forEach(linha => {
-      [...linha.children].forEach((cel, i) => {
-        if (i <= 1) return;      // 0 = seleção; 1 = descrição, pode quebrar
-        // preço de município de referência leva a origem numa 2ª linha,
-        // de propósito: é o que distingue a série própria da de fora
-        if (cel.querySelector(".de-fora")) return;
-        const uma = parseFloat(getComputedStyle(cel).lineHeight) || 18;
-        const txt = cel.textContent.trim();
-        if (cel.scrollHeight > uma * 1.6) quebrou.push(txt);
-        if (cel.scrollWidth > cel.clientWidth + 1) truncou.push(txt);
-      });
-    });
-    return { quebrou, truncou };
-  });
-  expect(m.quebrou).toEqual([]);                 // nunca quebra linha
-  // razão social gigante (105 chars) corta com reticências; o resto cabe
-  expect(m.truncou.length).toBe(1);
-  expect(m.truncou[0]).toContain("COOPERATIVA");
-  // sufixo societário sai do nome exibido, íntegro no title
-  const forn = page.locator(".linha:not(.cab)").nth(2).locator("span").nth(5);
-  await expect(forn).toHaveText("CENTRAL HOLDING LOGISTICA");
-  await expect(forn).toHaveAttribute("title", "CENTRAL HOLDING LOGISTICA LTDA");
-});
-
 test("arrastar a alça redimensiona a coluna e persiste", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
+  await page.locator('nav.abas button[data-tipo="contratacoes"]').click();
   const larguraDe = i => page.evaluate(n => parseFloat(
     getComputedStyle(document.querySelector(".lista .cab"))
       .gridTemplateColumns.split(" ")[n]), i);
-  const antes = await larguraDe(5);                 // coluna Fornecedor
-  const alca = page.locator(".cab > span").nth(5).locator(".alca");
+  const antes = await larguraDe(1);                 // coluna Modalidade
+  const alca = page.locator(".cab > span").nth(1).locator(".alca");
   const cx = await alca.boundingBox();
   await page.mouse.move(cx.x + cx.width / 2, cx.y + cx.height / 2);
   await page.mouse.down();
   await page.mouse.move(cx.x + cx.width / 2 + 40, cx.y + cx.height / 2,
                         { steps: 5 });
   await page.mouse.up();
-  const depois = await larguraDe(5);
+  const depois = await larguraDe(1);
   expect(depois).toBeGreaterThan(antes + 30);
-  // a coluna elástica cedeu espaço, mas não abaixo do mínimo
-  expect(await larguraDe(1)).toBeGreaterThanOrEqual(160);
+  // a coluna elástica (Objeto, índice 2) cedeu espaço, mas não abaixo do mínimo
+  expect(await larguraDe(2)).toBeGreaterThanOrEqual(160);
   // largura salva para voltar na próxima abertura
   const salvo = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "set_config" && c.k === "colunas").pop());
-  expect(JSON.parse(salvo.v)["itens:8"][5]).toBeGreaterThan(antes + 30);
+  expect(JSON.parse(salvo.v)["contratacoes"][1]).toBeGreaterThan(antes + 30);
   // ordenação não dispara ao arrastar sobre o cabeçalho
   const chamadas = await page.evaluate(() => window.__chamadas.filter(
     c => c.metodo === "listar" && c.filtros && c.filtros.ord));
   expect(chamadas).toEqual([]);
 });
 
-test("duplo clique na alça ajusta a coluna ao conteúdo (autofit)",
-    async ({ page }) => {
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  const cortado = txt => page.evaluate(t => {
-    const c = [...document.querySelectorAll(".lista .linha:not(.cab)")]
-      .map(l => l.children[5]).find(e => e.textContent.includes(t));
-    return c.scrollWidth > c.clientWidth + 1;
-  }, txt);
-  // encolhe a coluna a ponto de cortar até um nome curto
-  await page.evaluate(() => {
-    larguras["itens:8"] = { 0:30, 2:52, 3:64, 4:124, 5:90, 6:100, 7:72 };
-    aplicarLarguras("itens");
-  });
-  expect(await cortado("ZILDA")).toBe(true);
-  await page.locator(".cab > span").nth(5).locator(".alca").dblclick();
-  expect(await cortado("ZILDA")).toBe(false);        // autofit recuperou
-  // e a coluna elástica não foi engolida pelo nome gigante
-  // (índice 1: a 0 é a caixa de seleção da pesquisa)
-  const flex = await page.evaluate(() => parseFloat(
-    getComputedStyle(document.querySelector(".lista .cab"))
-      .gridTemplateColumns.split(" ")[1]));
-  expect(flex).toBeGreaterThanOrEqual(160);
-  // ordenação não foi disparada pelos cliques do duplo clique
-  const ord = await page.evaluate(() => window.__chamadas.filter(
-    c => c.metodo === "listar" && c.filtros && c.filtros.ord));
-  expect(ord).toEqual([]);
-});
-
 test("restaurar larguras volta ao padrão", async ({ page }) => {
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await page.locator(".cab > span").nth(4).locator(".alca").dblclick();
+  await page.locator('nav.abas button[data-tipo="contratacoes"]').click();
+  await page.locator(".cab > span").nth(1).locator(".alca").dblclick();
   await expect(page.locator("#lista")).toHaveAttribute("style", /--cols/);
   await page.locator("#btn-config").click();
   await page.locator("#btn-restaurar-colunas").click();
   const style = await page.locator("#lista").getAttribute("style");
   expect(style || "").not.toContain("--cols");
-});
-
-test("resumo de preços abre o relatório com o termo preenchido",
-    async ({ page }) => {
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  await page.locator("#f-busca").fill("papel");
-  await page.locator("#btn-rel-precos").click();
-  await expect(page.locator("#veu-relatorios")).toBeVisible();
-  await expect(page.locator("#rel-tipo")).toHaveValue("precos");
-  await expect(page.locator("#rel-termo")).toHaveValue("papel");
 });
 
 test("relatório executivo manda os gráficos do Painel já desenhados pro papel",
@@ -766,38 +665,6 @@ test("selo de vigência: coluna própria, centralizada mesmo em linha alta",
   }
 });
 
-test("municípios de referência: lista, adiciona e remove", async ({ page }) => {
-  await page.locator("#btn-config").click();
-  const secao = page.locator("#cfg-referencia");
-  await expect(secao).toContainText("Palestina");
-  await expect(secao).toContainText("812 preços");
-  // quanto o município pesa no arquivo: quem decide remover precisa saber
-  await expect(secao).toContainText("ocupa ~4,6 MB");
-
-  // adicionar pelo autocomplete (o volume da coleta é confirmado antes —
-  // ver tests-e2e/volume.spec.js)
-  page.once("dialog", d => d.accept());
-  await page.locator("#ref-busca").fill("paulo");
-  await page.locator('#ref-sugestoes button[data-c="3536604"]').click();
-  const enviado = await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "adicionar_municipio_referencia").pop());
-  expect(enviado.n).toBe("Paulo de Faria");
-  await expect(secao).toContainText("Paulo de Faria");
-  // o usuário precisa saber que os preços ainda não chegaram
-  await expect(page.locator("#sync-msg"))
-    .toContainText("chegam na próxima sincronização");
-
-  // remover pede confirmação e leva os dados junto
-  page.once("dialog", d => {
-    expect(d.message()).toContain("Palestina");
-    expect(d.message()).toContain("saem do banco");
-    d.accept();
-  });
-  await page.locator('#cfg-referencia button[data-remover="3535002"]').click();
-  await expect(secao).not.toContainText("Palestina");
-  await expect(secao).toContainText("Paulo de Faria");
-});
-
 test("brasão: sem upload, a tela abre sem preview nem botão de remover",
     async ({ page }) => {
   await page.locator("#btn-config").click();
@@ -855,117 +722,6 @@ test("brasão: erro ao carregar aparece na tela, sem preview",
   await expect(page.locator("#cfg-brasao-preview")).toBeHidden();
 });
 
-test("municípios de referência: seletor de ordem reordena a lista",
-    async ({ page }) => {
-  // pedido do usuário (2026-08-08): tamanho é o padrão, mas nome e nº de
-  // preços também precisam estar disponíveis — nomes escolhidos de propósito
-  // pra que ordem alfabética, por tamanho e por nº de preços discordem
-  await page.evaluate(() => {
-    window.__referencia = [
-      { ibge: "1", nome: "Zeta", uf: "SP", itens: 5,   mb: 20 },
-      { ibge: "2", nome: "Alfa", uf: "SP", itens: 50,  mb: 1 },
-      { ibge: "3", nome: "Meia", uf: "SP", itens: 500, mb: 8 },
-    ];
-  });
-  await page.locator("#btn-config").click();
-  const nomes = () => page.locator("#cfg-referencia .orgrow")
-    .evaluateAll(els => els.map(el => el.querySelector("span")
-      .firstChild.textContent.trim().replace(" — SP", "")));
-
-  // as três ordens dão as três permutações abaixo, de propósito — se uma
-  // reordenação virar no-op ou copiar outro critério, o teste morde
-  await expect(page.locator("#ref-ordem")).toHaveValue("tamanho");
-  expect(await nomes()).toEqual(["Zeta", "Meia", "Alfa"]);      // 20 > 8 > 1
-
-  await page.locator("#ref-ordem").selectOption("nome");
-  expect(await nomes()).toEqual(["Alfa", "Meia", "Zeta"]);      // A-Z
-
-  await page.locator("#ref-ordem").selectOption("itens");
-  expect(await nomes()).toEqual(["Meia", "Alfa", "Zeta"]);      // 500 > 50 > 5
-});
-
-test("aba Preços mostra a origem e permite ficar só com o município",
-    async ({ page }) => {
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  // a coluna Município existe sempre e vale para as duas origens
-  await expect(page.locator(".cab")).toContainText("Município");
-  // e é ordenável como as demais
-  const cabMunicipio = page.locator('.cab span[data-ord="municipio"]');
-  await cabMunicipio.click();
-  await expect(cabMunicipio).toHaveAttribute("aria-sort", "ascending");
-  expect((await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "listar").pop())).filtros.ord).toBe("municipio");
-  const municipios = page.locator(".linha:not(.cab) > span:nth-child(7)");
-  await expect(municipios.first()).toHaveText("Orindiúva");
-  const deFora = page.locator(".linha:not(.cab) .de-fora");
-  await expect(deFora).toHaveCount(1);
-  await expect(deFora).toHaveText("Palestina");
-  await expect(deFora).toHaveAttribute("title", /município de referência/);
-  // o item do próprio município não recebe etiqueta: seria ruído em todas
-  await expect(page.locator(".linha:not(.cab)")).toHaveCount(5);
-
-  // o resumo diz quanto do resultado é da própria série
-  await page.locator("#f-busca").fill("papel");
-  await expect(page.locator("#precos-resumo h3"))
-    .toContainText("do seu município");
-
-  // filtro de origem só aparece havendo referência, e funciona
-  await expect(page.locator("#cx-so-meu")).toBeVisible();
-  await page.locator("#f-so-meu").check();
-  await expect(page.locator(".linha:not(.cab) .de-fora")).toHaveCount(0);
-  const enviado = await page.evaluate(() => window.__chamadas
-    .filter(c => c.metodo === "listar" && c.tipo === "itens").pop());
-  expect(enviado.filtros.origem).toBe("proprio");
-});
-
-test("largura de coluna guardada antes de a aba mudar não quebra a lista",
-    async ({ page }) => {
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  // formato antigo: 6 colunas, sem a de Município
-  await page.evaluate(() => {
-    larguras["itens:8"] = { 1: 52, 2: 74, 3: 124, 4: 320, 5: 78 };
-    aplicarLarguras("itens");
-  });
-  const cols = await page.evaluate(() => getComputedStyle(
-    document.querySelector(".lista .cab")).gridTemplateColumns);
-  // sem a guarda, a coluna que falta viraria "NaNpx" e o grid desabaria
-  expect(cols).not.toContain("NaN");
-  expect(cols.split(" ").length).toBe(8);
-  // o mapa incompatível é descartado, e não reaplicado na próxima troca
-  expect(await page.evaluate(() => larguras["itens:8"])).toBeUndefined();
-});
-
-test("largura arrastada num modo da aba Preços não corrompe o outro",
-    async ({ page }) => {
-  // "corrigir pelo IPCA" e "comparar por conteúdo" acrescentam uma coluna
-  // cada. Antes tudo era guardado sob a chave "itens", e a guarda só
-  // rejeitava mapa FALTANDO entrada, nunca sobrando: voltar ao modo base
-  // aplicava as 8 primeiras larguras de um layout de 9 e desalinhava
-  // (auditoria, 2026-08-09).
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  const colunas = () => page.evaluate(() => getComputedStyle(
-    document.querySelector(".lista .cab")).gridTemplateColumns.split(" ").length);
-  expect(await colunas()).toBe(8);
-
-  // no modo de 9 colunas, guarda larguras próprias
-  await page.locator("#f-corrigir").check();
-  expect(await colunas()).toBe(9);
-  await page.evaluate(() => {
-    guardarLarguras("itens", [30, 300, 48, 60, 110, 118, 190, 92, 66]);
-    aplicarLarguras("itens");
-  });
-  // as duas chaves convivem, uma por contagem de colunas
-  expect(await page.evaluate(() => Object.keys(larguras)))
-    .toContain("itens:9");
-
-  // de volta ao modo base, o layout de 9 não vaza para o de 8
-  await page.locator("#f-corrigir").uncheck();
-  expect(await colunas()).toBe(8);
-  const cols = await page.evaluate(() => getComputedStyle(
-    document.querySelector(".lista .cab")).gridTemplateColumns);
-  expect(cols).not.toContain("NaN");
-});
-
 test("Compacta é metade da janela, Expandida é a janela inteira",
     async ({ page }) => {
   // pedido do usuário (2026-08-08): a lista tinha teto próprio em pixels
@@ -990,22 +746,6 @@ test("Compacta é metade da janela, Expandida é a janela inteira",
   const listaExpandida = await page.locator("#lista").evaluate(
     el => el.getBoundingClientRect().width);
   expect(listaExpandida).toBeGreaterThan(2300);
-});
-
-test("filtros que mudam o cálculo se destacam dos que só filtram a lista",
-    async ({ page }) => {
-  // achado da auditoria (m3, 2026-08-08): "Corrigir pelo IPCA" e "Comparar
-  // por conteúdo" trocam o resumo inteiro; "Só do meu município" só filtra
-  // a lista — mesma aparência antes, sem hierarquia entre os dois grupos.
-  await page.locator('nav.abas button[data-tipo="itens"]').click();
-  const cores = await page.evaluate(() => ({
-    corrigir: getComputedStyle($("cx-corrigir")).backgroundColor,
-    conteudo: getComputedStyle($("cx-conteudo")).backgroundColor,
-    soMeu: getComputedStyle($("cx-so-meu")).backgroundColor,
-  }));
-  expect(cores.corrigir).not.toBe(cores.soMeu);
-  expect(cores.conteudo).not.toBe(cores.soMeu);
-  expect(cores.corrigir).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 });
 
 test("parar sincronização: botão só vale enquanto há coleta em curso",

@@ -78,7 +78,6 @@
       <button data-tipo="contratos" role="tab">Contratos</button>
       <button data-tipo="atas" role="tab">Atas</button>
       <button data-tipo="pca" role="tab">PCA</button>
-      <button data-tipo="itens" role="tab">Preços</button>
     </nav>
     <section id="painel" class="painel" aria-label="Painel">
       <div class="chips oculto" id="painel-chips"></div>
@@ -101,8 +100,6 @@
       <div id="p-vigilancia" class="vista oculto"></div>
       <div id="p-economia" class="vista oculto"></div>
     </section>
-    <div class="card precos oculto" id="precos-resumo"></div>
-    <div class="aviso-selecao oculto" id="precos-selecao"></div>
     <div class="filtros" id="filtros-lista">
       <select id="f-ano" aria-label="Ano"><option value="">Todos os anos</option></select>
       <select id="f-modalidade" aria-label="Modalidade">
@@ -111,8 +108,6 @@
         <option value="">Todas as situações</option></select>
       <select id="f-orgao" aria-label="Órgão">
         <option value="">Todos os órgãos</option></select>
-      <select id="f-unidade" class="oculto" aria-label="Unidade de medida">
-        <option value="">Todas as unidades</option></select>
       <label class="check-filtro" id="cx-propostas">
         <input type="checkbox" id="f-propostas"> Propostas abertas</label>
       <label class="check-filtro" id="cx-parada"
@@ -123,21 +118,6 @@
       <label class="check-filtro oculto" id="cx-vence60"
              title="Vigência termina nos próximos 60 dias">
         <input type="checkbox" id="f-vence60"> Vence em 60 dias</label>
-      <label class="check-filtro oculto" id="cx-homologados">
-        <input type="checkbox" id="f-homologados" checked> Só com preço fechado</label>
-      <label class="check-filtro oculto" id="cx-corrigir"
-             title="Traz cada preço a valor de hoje pelo IPCA, a partir da
-                    data do resultado">
-        <input type="checkbox" id="f-corrigir"> Corrigir pelo IPCA</label>
-      <label class="check-filtro oculto" id="cx-conteudo"
-             title="Compara pelo preço da unidade-base: a caixa com 5.000
-                    folhas e o pacote com 100 deixam de entrar na mesma conta">
-        <input type="checkbox" id="f-conteudo"> Comparar por conteúdo</label>
-      <label class="check-filtro oculto" id="cx-so-meu">
-        <input type="checkbox" id="f-so-meu"> Só do meu município</label>
-      <button class="btn ghost oculto" id="btn-selecionar-todos"
-              title="Marca todos os itens desta pesquisa, não só a página visível">
-        Selecionar todos</button>
       <input type="search" id="f-busca" placeholder="Buscar no objeto…"
              aria-label="Buscar">
       <span class="filtro-alerta oculto" id="filtro-alerta">🔔 Só os objetos
@@ -246,7 +226,6 @@
         <option value="executivo">Resumo Executivo Anual</option>
         <option value="economia">Economia e Comparativos por Modalidade e Categoria</option>
         <option value="fracionamento">Alerta de Fracionamento (uso interno)</option>
-        <option value="precos">Pesquisa de Preços</option>
       </select>
       <div id="rel-termo-caixa" class="oculto">
         <label for="rel-termo">O que pesquisar</label>
@@ -371,28 +350,6 @@
       </div>
     </div>
     <div class="card cfg">
-      <h2>Municípios de referência</h2>
-      <p class="dim" style="font-size:12.5px; margin-bottom:10px">
-        Os itens destes municípios entram <b>apenas no banco de preços</b>,
-        para dar base de comparação à pesquisa do art. 23. O acervo, os
-        relatórios e o PCA continuam só do seu município.</p>
-      <label for="ref-ordem" style="font-size:12.5px">Ordenar por</label>
-      <select id="ref-ordem" style="width:100%; margin-bottom:8px">
-        <option value="tamanho">Tamanho em disco (maior primeiro)</option>
-        <option value="nome">Nome (A-Z)</option>
-        <option value="itens">Preços no banco (mais primeiro)</option>
-      </select>
-      <div id="cfg-referencia"></div>
-      <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-end">
-        <label class="campo" style="width:90px"><span>UF</span>
-          <select id="ref-uf"></select></label>
-        <label class="campo" style="flex:1"><span>Município de referência</span>
-          <input type="text" id="ref-busca" placeholder="ex.: Olímpia"
-                 autocomplete="off"></label>
-      </div>
-      <div id="ref-sugestoes" class="sugestoes oculto"></div>
-    </div>
-    <div class="card cfg">
       <h2>Limites de dispensa — art. 75, Lei 14.133</h2>
       <div style="display:flex; gap:10px; flex-wrap:wrap">
         <div style="flex:1; min-width:180px">
@@ -410,8 +367,8 @@
     <div class="card cfg">
       <h2>Cópia do acervo</h2>
       <div class="ajuda">O acervo se refaz sozinho a partir do PNCP, mas
-        recoletar municípios de referência leva horas. A cópia guarda tudo
-        num arquivo .zip — inclusive os municípios cadastrados.</div>
+        baixar todo o histórico desde 2021 leva alguns minutos. A cópia guarda
+        tudo num arquivo .zip e protege contra perda do banco.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
         <button class="btn ghost" id="btn-exportar-acervo">Salvar cópia…</button>
         <button class="btn ghost" id="btn-importar-acervo">Restaurar cópia…</button>
@@ -431,10 +388,9 @@
   </div>
 </div>
 
-<!-- gráfico da pesquisa de preços redesenhado aqui, fora da tela, antes de
-     imprimir — o mesmo motor (ECharts) que a aba Preços usa, capturado e
-     mandado pro papel (achado 2026-08-11: sem isso, o relatório impresso
-     nunca passa pela tela e ficaria preso ao SVG à mão pra sempre) -->
+<!-- gráficos dos relatórios Executivo e Economia desenhados aqui, fora da
+     tela, com o mesmo motor (ECharts) do Painel, capturados e mandados pro
+     papel — sem isso o relatório impresso ficaria preso ao SVG à mão -->
 <div id="grafico-oculto" style="position:absolute; left:-9999px; top:0;
      width:900px; height:240px" aria-hidden="true"></div>
 
