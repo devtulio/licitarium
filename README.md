@@ -15,9 +15,10 @@ de Contratações Anual (PCA) e os **itens de cada compra, com o preço unitári
 pago e o fornecedor vencedor**. O acervo fica pesquisável, offline e permanente.
 
 O problema que ele resolve: consultar o próprio histórico de compras no portal
-exige navegar processo a processo, e não há como cruzar preços entre exercícios.
-O Licitarium baixa esse histórico uma vez, mantém atualizado sozinho e responde
-em milissegundos — inclusive quando o portal está fora do ar.
+exige navegar processo a processo, uma consulta de cada vez, e o acervo não
+fica pesquisável nem disponível offline. O Licitarium baixa esse histórico uma
+vez, mantém atualizado sozinho e responde em milissegundos — inclusive quando o
+portal está fora do ar.
 
 É um **programa de computador**, não um site: instalação por executável único,
 sem servidor, sem porta de rede, sem banco a configurar. Serve a qualquer
@@ -39,7 +40,7 @@ guarda): o lugar que guarda as licitações. **SVB · HASTA · PVBLICA.**
 
 ### Acervo
 
-Cinco abas, todas com busca, filtros (ano, modalidade, situação, órgão),
+Quatro abas, todas com busca, filtros (ano, modalidade, situação, órgão),
 ordenação por clique, colunas ajustáveis com o mouse e exportação CSV:
 
 | Aba | Conteúdo |
@@ -48,7 +49,6 @@ ordenação por clique, colunas ajustáveis com o mouse e exportação CSV:
 | **Contratos** | Contratos firmados, com fornecedor, valor global e vigência, com selo de situação (vigente / vence em 60 dias / encerrado) |
 | **Atas** | Atas de registro de preços, com objeto e vigência, com o mesmo selo de situação |
 | **PCA** | Itens do Plano de Contratações Anual de cada órgão |
-| **Preços** | Banco de preços: cada item contratado, com unidade, quantidade, valor unitário homologado e fornecedor vencedor |
 
 Clicar em qualquer linha abre o detalhe completo, incluindo o **registro
 integral em JSON** exatamente como consta no PNCP, e um link direto para a
@@ -57,53 +57,6 @@ página oficial do processo no portal.
 Na tela inicial, três indicadores clicáveis (total de contratações, valor
 homologado no ano, contratos vigentes) e alertas de **vencimento em 60 dias** e
 de **propostas em aberto**.
-
-### Banco de preços
-
-Busca por palavras soltas: `papel a4` encontra `PAPEL SULFITE A4 BRANCO` na
-ordem que você digitar, ignorando acentos (`oleo` acha `ÓLEO`) e aceitando
-palavra pela metade (`sulfit` acha `SULFITE`). Índice FTS5 interno — resposta
-instantânea mesmo com o acervo inteiro.
-
-Para cada termo: **menor preço, mediana, média, maior preço**, quantos itens e
-quantos fornecedores — subsídio direto à pesquisa de preços do **art. 23 da Lei
-14.133/2021**, com a origem de cada valor rastreável até o processo no PNCP.
-
-A série vem descrita: **faixa central, desvio padrão e coeficiente de
-variação**, com a leitura escrita ao lado — acima de 50% de variação, a amostra
-provavelmente mistura itens não comparáveis. Preço que destoa é **apontado pelo
-critério de Tukey**, nunca removido sozinho: o programa mostra a faixa normal e
-oferece o descarte, mas desprezar preço coletado é decisão de quem assina.
-O filtro por **unidade de medida** agrupa as grafias do portal — *CX*, *Caixa*
-e *CAIXAS* são uma opção só.
-
-**Corrigir pelo IPCA** traz cada preço a valor de hoje pela série 433 do Banco
-Central, a partir da data do resultado: R$ 208,04 de março de 2022 equivalem a
-R$ 252,06 em junho de 2026. A correção vai até o último mês publicado e o
-documento declara qual é — o programa não projeta índice.
-
-**Comparar por conteúdo** desfaz a distorção da embalagem: a caixa de papel A4
-com 5.000 folhas sai a R$ 0,0466 por folha e o pacote com 100, a R$ 0,3890 —
-8,4 vezes mais caro. O conteúdo é lido do que o órgão publicou, e gramatura,
-dimensão ou capacidade de artefato não são confundidas com conteúdo.
-
-Preço descartado sai do cálculo **com a razão registrada**: o relatório traz a
-seção *Itens desconsiderados nesta pesquisa*, com o motivo de cada um, e marca
-o que ficou sem justificativa. Os descartes ficam gravados por termo, então a
-pesquisa pode ser refeita e conferida depois.
-
-**Municípios de referência.** Um município pequeno compra pouco e compra
-variado — no acervo do piloto, 98% das descrições aparecem uma única vez, e
-mediana sobre um preço só não sustenta pesquisa. Por isso é possível indicar
-municípios vizinhos cujos itens alimentam **apenas o banco de preços**, com
-amparo no art. 23, §1º, I (contratações similares de outros entes). A origem
-de cada valor fica visível na tela e no relatório; o acervo, os indicadores,
-o PCA e os demais relatórios continuam exclusivamente do seu município.
-
-Antes de aceitar, o programa consulta quanto o município vai custar em tempo e
-em espaço — um vizinho pequeno cabe em minutos e poucos MB, uma cidade média
-leva horas e centenas de MB. Depois de coletado, cada um mostra na lista
-quanto ocupa no banco.
 
 ### Montar PCA
 
@@ -135,7 +88,6 @@ sentido, também em CSV:
 | Relação de Atas | Atas de registro de preços e vigências |
 | Resumo Executivo Anual | Visão consolidada do exercício |
 | Alerta de Fracionamento | Autocontrole: acompanha os limites do art. 75 por unidade |
-| Pesquisa de Preços | Levantamento do art. 23, do menor ao maior unitário |
 | Minuta do PCA | Plano sugerido, para revisão |
 
 Os relatórios seguem o tema escolhido na tela, mas a **impressão sai sempre
@@ -286,10 +238,10 @@ janela muda de tamanho; trocar de visão não vai ao banco de novo.
 
 ## Cópia do acervo
 
-O banco é um espelho reconstruível do PNCP, mas recoletar **municípios de
-referência** custa de minutos a horas cada um. Em Configurações, **Salvar
-cópia…** guarda o acervo inteiro num `.zip` e **Restaurar cópia…** o devolve,
-conferindo o arquivo antes e preservando o banco anterior.
+O banco é um espelho reconstruível do PNCP, mas baixar todo o histórico desde
+2021 leva alguns minutos. Em Configurações, **Salvar cópia…** guarda o acervo
+inteiro num `.zip` e **Restaurar cópia…** o devolve, conferindo o arquivo antes
+e preservando o banco anterior.
 
 ## Como citar
 
