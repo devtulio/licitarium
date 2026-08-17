@@ -42,6 +42,17 @@ def test_chave_ignora_pontuacao_e_palavras_vazias():
     assert pca_builder.chave_agrupamento("") == ""
 
 
+def test_chave_ignora_quantidade_no_inicio():
+    """Sincronizado do Licitarium Pro (2026-08-16): quantidade na FRENTE não
+    é produto — '06 TENDAS' e '12 TENDAS' são a mesma família (senão o número
+    virava radical e dividia o acumulado do fracionamento contra o mesmo
+    teto). Número no MEIO fica ('PNEU 295' precisa do 295)."""
+    assert pca_builder.chave_agrupamento("06 TENDAS") \
+        == pca_builder.chave_agrupamento("12 TENDAS") == "TENDAS"
+    assert pca_builder.chave_agrupamento("100 CADEIRAS ESCOLARES", 2) == "CADEIRAS ESCOLARES"
+    assert "295" in pca_builder.chave_agrupamento("PNEU 295")
+
+
 def test_consolida_agrupando_e_descarta_lote(db):
     grupos = {g["chave"]: g for g in pca_builder.consolidar(db)}
     assert "FILTRO AR MOTOR" in grupos

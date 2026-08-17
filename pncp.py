@@ -144,11 +144,18 @@ def _espera(tentativa):
 
 
 def _get(caminho, params, tentativas=5, base=None, pacing=True,
-         erro_404=False):
+         erro_404=False, retry_404=False):
     """GET com pacing e retry/backoff. Dict do JSON, ou None quando sem dados.
 
     Com pacing=False a espera entre chamadas é dispensada: quem controla o
     ritmo passa a ser o número de conexões simultâneas.
+
+    `retry_404=True` para LISTAGENS de consulta (contratações/itens): ali
+    "sem registros" é 204/corpo vazio, nunca 404 — um 404 é falha
+    transitória do portal, então retenta e, se persistir, levanta PncpErro
+    em vez de devolver None. Sem isso um 404 passageiro viraria "janela
+    vazia" e a marca d'água avançaria sobre dados não baixados (falha ≠
+    ausência; sincronizado do Licitarium Pro 2026-08-16).
     """
     global _ultima_req
     url = f"{base or BASE}{caminho}?{urllib.parse.urlencode(params)}"
@@ -174,6 +181,16 @@ def _get(caminho, params, tentativas=5, base=None, pacing=True,
                 # quem passa erro_404 não pode confundir "não achei" com
                 # "não existe" — ver ItensIndisponiveis
                 raise ItensIndisponiveis(f"HTTP 404 em {caminho}") from e
+            if e.code == 404 and retry_404:
+                # listagem de consulta: 404 é falha do portal, não "vazio"
+                if tentativa < tentativas - 1:
+                    _registrar_bloqueio()
+                    time.sleep(_espera(tentativa))
+                    continue
+                raise PncpErro(
+                    f"HTTP 404 persistente em {caminho} — listagem não "
+                    "responde; abortando para não gravar a janela como "
+                    "vazia") from e
             if e.code == 204 or e.code == 404:
                 return None  # sem registros para o filtro
             if e.code == 429 and tentativa < tentativas - 1:
@@ -210,7 +227,7 @@ def _paginar(caminho, params, tamanho_pagina, pacing=True):
     while True:
         dados = _get(caminho, {**params, "pagina": pagina,
                                "tamanhoPagina": tamanho_pagina},
-                     pacing=pacing)
+                     pacing=pacing, retry_404=True)
         if not dados or not dados.get("data"):
             return
         yield from dados["data"]

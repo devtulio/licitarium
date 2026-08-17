@@ -29,7 +29,9 @@ TITULOS = {"contratacoes": "Relação de Contratações",
            "minuta_pca": "Minuta do Plano de Contratações Anual"}
 
 # Valores do art. 75, I e II, da Lei 14.133/2021 conforme Decreto de
-# atualização — parametrizáveis nas configurações (confira o decreto vigente)
+# atualização — parametrizáveis nas configurações (confira o decreto vigente).
+# ESPELHO do Licitarium Pro (licitarium/servicos/consultas/painel.py): a
+# portaria de atualização muda estes valores nos DOIS sistemas.
 LIMITE_PADRAO_OBRAS = 125279.84
 LIMITE_PADRAO_COMPRAS = 62639.92
 

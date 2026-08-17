@@ -39,6 +39,14 @@ def chave_agrupamento(descricao, palavras=PALAVRAS_CHAVE_PADRAO):
     limpo = re.sub(r"[^0-9A-ZÁÂÃÉÊÍÓÔÕÚÇ ]", " ", (descricao or "").upper())
     limpo = PREFIXOS_VAZIOS.sub("", limpo.strip(), count=1)
     termos = [t for t in limpo.split() if t not in IRRELEVANTES]
+    # quantidade na FRENTE da descrição não é produto: "12 TENDAS" e
+    # "06 TENDAS" são a mesma família, e o número virava radical — inflava a
+    # contagem de famílias e, pior, DIVIDIA o acumulado do fracionamento em
+    # grupos que deveriam somar contra o mesmo teto (auditoria do Licitarium
+    # Pro 2026-08-13, sincronizada para cá 2026-08-16). Só o prefixo
+    # puramente numérico cai; número no meio fica — "PNEU 295" precisa do 295.
+    while len(termos) > 1 and termos[0].isdigit():
+        termos.pop(0)
     return " ".join(termos[:palavras])
 
 

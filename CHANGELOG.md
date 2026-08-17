@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.42.3 — 2026-08-16
+
+**Duas correções sincronizadas do Licitarium Pro (sistema irmão)**
+
+Uma análise de convergência entre o Free e o Pro apontou duas divergências
+em código que nasceu compartilhado — e nos dois casos a versão do Pro tinha
+uma correção que faltava aqui:
+
+- **Agrupamento por objeto:** uma quantidade no começo da descrição ("06
+  TENDAS", "12 TENDAS") virava parte do radical e separava em famílias
+  diferentes o que deveria somar junto. No termômetro de fracionamento isso
+  **dividia o acumulado contra o mesmo teto do art. 75** — o município podia
+  aparecer abaixo do limite quando não estava. Agora o número puro no início
+  é descartado; número no meio ("PNEU 295") continua contando.
+- **Coleta do PNCP:** um HTTP 404 numa listagem de consulta era lido como
+  "sem registros". Só que ali "vazio" é sempre 204 ou corpo vazio — um 404 é
+  falha passageira do portal. A leitura antiga fazia a marca d'água avançar
+  sobre uma janela que não foi baixada (perda silenciosa). Agora a listagem
+  retenta e, se o 404 persistir, aborta a fase em vez de gravá-la como vazia.
+
 ## 1.42.2 — 2026-08-16
 
 **A impressão do painel, resolvida da raiz — quatro causas, não uma**

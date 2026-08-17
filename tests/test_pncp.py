@@ -649,3 +649,20 @@ def test_parar_sem_coleta_em_curso_nao_mente():
     api = licitarium.Api()
     assert api.parar_sync() == {"ok": False, "rodando": False}
     assert not api._sync_parar.is_set()     # não deixa armadilha armada
+
+
+def test_get_404_em_listagem_falha_em_vez_de_fingir_vazio(monkeypatch):
+    """Sincronizado do Licitarium Pro (2026-08-16): numa listagem de consulta
+    'sem registros' é 204/corpo vazio, nunca 404 — um 404 é falha do portal.
+    Com retry_404 retenta e levanta PncpErro (não deixa a marca d'água
+    avançar sobre janela não baixada); sem ele, 404 continua sendo None
+    (endpoints onde 404 é semântico, ex.: CNPJ inexistente)."""
+    def raise_404(*a, **k):
+        raise urllib.error.HTTPError("http://x", 404, "Not Found", {}, None)
+    monkeypatch.setattr(pncp.urllib.request, "urlopen", raise_404)
+    monkeypatch.setattr(pncp.time, "sleep", lambda *a, **k: None)  # sem espera real
+
+    with pytest.raises(pncp.PncpErro):
+        pncp._get("/v1/contratacoes", {}, tentativas=2, pacing=False, retry_404=True)
+    # sem retry_404 o 404 volta a ser "sem registros" (comportamento antigo)
+    assert pncp._get("/v1/orgaos/x", {}, tentativas=2, pacing=False) is None
