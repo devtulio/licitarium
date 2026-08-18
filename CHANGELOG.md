@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.44.2 — 2026-08-18
+
+**O balão dos gráficos aparece na faixa toda da coluna, não só na barra fina**
+
+No Painel, o balão que segue o mouse só nascia quando o cursor caía exatamente
+sobre a barra ou a coluna colorida. Numa coluna baixa — um mês de pouco
+movimento — quase não havia o que acertar, e o balão não vinha. O calendário
+da agenda já acertava a faixa inteira do dia; agora os gráficos de coluna e de
+barra fazem igual: passar o mouse em qualquer ponto da faixa daquele item já
+mostra o balão, tenha a barra a altura que tiver.
+
 ## 1.44.1 — 2026-08-17
 
 **Some o balão preto do navegador sobre os gráficos do Painel**

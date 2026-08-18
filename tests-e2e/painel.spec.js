@@ -68,13 +68,36 @@ test("o tooltip próprio aparece na hora, com o valor em destaque",
   await barra.hover();
   await expect(tt).toBeVisible();
   // o valor é o elemento forte; o rótulo (mês/série) é secundário — a
-  // hierarquia que a skill dataviz pede para tooltip (valor lidera)
-  await expect(tt.locator(".v")).toHaveText(/R\$/);
+  // hierarquia que a skill dataviz pede para tooltip (valor lidera). O balão
+  // de coluna mostra as duas séries (estimado + homologado), daí o first()
+  await expect(tt.locator(".v").first()).toHaveText(/R\$/);
   await expect(tt.locator(".l")).not.toHaveCount(0);
 
   // sai do gráfico, some — não é um painel que fica aberto
   await page.locator(".painel-topo").hover();
   await expect(tt).toBeHidden();
+});
+
+test("o balão dispara na faixa toda do item, não só na barra fina",
+    async ({ page }) => {
+  // a barra é um alvo estreito; passar o mouse na coluna/linha inteira (longe
+  // da barra) já mostra o item — como o calendário e as linhas. Sem isso, o
+  // usuário precisava mirar a barra fina e achava que "não tinha tooltip".
+  const tt = page.locator(".graf-tt");
+  // coluna do gráfico de meses: hover num ponto da coluna longe da barra
+  // (`position` é determinístico e dispara mousemove — mouse.move teleporta)
+  const g = page.locator('#p-execucao [data-graf="meses"] .graf-echart');
+  const box = await g.boundingBox();
+  await g.hover({ position: { x: box.width * 0.25, y: box.height * 0.5 } });
+  await expect(tt).toBeVisible();
+  await expect(tt).toContainText("R$");
+
+  // barra horizontal: hover na área do RÓTULO (esquerda), longe da barra
+  await page.locator('.subabas button[data-vista="economia"]').click();
+  const bar = page.locator('#p-economia [data-graf="economia_modalidade"]');
+  const bb = await bar.boundingBox();
+  await bar.hover({ position: { x: bb.width * 0.12, y: bb.height * 0.3 } });
+  await expect(tt).toBeVisible();
 });
 
 test("o corte vertical lê todos os anos no mês apontado", async ({ page }) => {

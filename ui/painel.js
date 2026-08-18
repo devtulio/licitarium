@@ -171,6 +171,26 @@ function _ptEvento(params) {
   return [nativo?.clientX ?? 0, nativo?.clientY ?? 0];
 }
 
+// Balão próprio disparado pela FAIXA inteira do eixo, não só pela marca fina.
+// Barra de coluna/linha é um alvo estreito; passar o mouse na coluna toda (não
+// só na barra) mostra o item — como o calendário e os gráficos de linha já
+// fazem. Feito à mão para NÃO desenhar overlay: o `axisPointer` do ECharts põe
+// um retângulo por cima das barras que rouba o `:hover` do realce por marca.
+// Aqui só leio o índice da categoria sob o cursor (`convertFromPixel`) no
+// mousemove — sem tocar em nada do desenho. `dimCategoria`: 0 quando a
+// categoria é o eixo X (colunas), 1 quando é o eixo Y (barras horizontais).
+function ligarBaloEixo(chart, alvo, linhasDe, dimCategoria = 0) {
+  alvo.addEventListener("mousemove", (e) => {
+    const r = alvo.getBoundingClientRect();
+    const pt = chart.convertFromPixel("grid",
+      [e.clientX - r.left, e.clientY - r.top]);
+    const linhas = pt ? linhasDe(Math.round(pt[dimCategoria])) : null;
+    if (!linhas || !linhas.length) return esconderTt();
+    mostrarTt(e.clientX, e.clientY, linhas);
+  });
+  alvo.addEventListener("mouseleave", esconderTt);
+}
+
 // instância presa ao elemento (não a uma variável de módulo): vários
 // cartões desenham ao mesmo tempo (ver desenharBoxplotPreco em app.js) —
 // uma só variável faria o dispose() de um derrubar o outro
@@ -199,7 +219,8 @@ function grafMeses(el, meses, larg = 660) {
   el.innerHTML = `<div class="graf-echart" style="height:196px"></div>
     <div class="leg"><span><i style="background:var(--s1);opacity:.32"></i>Estimado</span>
     <span><i style="background:var(--s1)"></i>Homologado</span></div>`;
-  const chart = _iniciarEchart(el.querySelector(".graf-echart"));
+  const alvo = el.querySelector(".graf-echart");
+  const chart = _iniciarEchart(alvo);
   chart.setOption({
     animation: false,
     grid: { left: 8, right: 8, top: 10, bottom: 8, containLabel: true },
@@ -218,15 +239,16 @@ function grafMeses(el, meses, larg = 660) {
         emphasis: { disabled: true } }
     ]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    const m = dados[p.dataIndex];
-    const rotulo = p.seriesName === "Homologado"
-      ? `${MES[m.mes - 1]} · homologado · ${m.n} ${m.n === 1 ? "processo" : "processos"}`
-      : `${MES[m.mes - 1]} · estimado`;
-    mostrarTt(..._ptEvento(p), [{ v: compacto(p.value), l: rotulo }]);
+  // a coluna inteira do mês mostra os dois valores (estimado + homologado)
+  ligarBaloEixo(chart, alvo, (i) => {
+    const m = dados[i];
+    if (!m) return null;
+    return [
+      { v: compacto(m.valor || 0), cor: "var(--s1)",
+        l: `homologado · ${m.n} ${m.n === 1 ? "processo" : "processos"}` },
+      { v: compacto(m.estimado || 0), l: "estimado" },
+    ];
   });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
 }
 
 // ── barras horizontais, uma série, rótulo direto ──────────────────────────
@@ -282,12 +304,11 @@ function grafBarras(el, itens, {valor, rotulo, sub, cor = "var(--s1)"}, larg = 3
       label: { show: true, position: "right", ...VAL_TXT,
         formatter: p => p.data._rotuloValor } }]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    const it = itens[p.dataIndex];
-    mostrarTt(..._ptEvento(p), [{ v: compacto(valor(it)), l: rotulo(it) }]);
-  });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+  // a linha inteira do item (não só a barra) mostra o valor
+  ligarBaloEixo(chart, el, (i) => {
+    const it = itens[i];
+    return it ? [{ v: compacto(valor(it)), l: rotulo(it), cor }] : null;
+  }, 1);
 }
 
 // ── linhas do acumulado: ano corrente em destaque, anteriores em contexto ──
@@ -465,14 +486,13 @@ function grafDesagio(el, desagios, larg = 500) {
           formatter: p => pct(p.value) } }
     ]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    const d = desagios[p.dataIndex];
-    mostrarTt(..._ptEvento(p), [{ v: pct(d.pct), l: `${d.modalidade} · ${
+  // a linha inteira da modalidade mostra o deságio
+  ligarBaloEixo(chart, el.querySelector(".graf-echart"), (i) => {
+    const d = desagios[i];
+    return d ? [{ v: pct(d.pct), l: `${d.modalidade} · ${
       d.pct >= 0 ? "de deságio" : "acima do estimado"} · ${d.n} ${
-      d.n === 1 ? "processo" : "processos"}` }]);
-  });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+      d.n === 1 ? "processo" : "processos"}` }] : null;
+  }, 1);
 }
 
 // ── concentração: curva do valor acumulado por fornecedor ─────────────────
@@ -668,13 +688,12 @@ function grafLimites(el, objetos, limite, larg = 500) {
       }
     ]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series" || p.seriesName !== "limite") return;
-    const o = objetos[p.dataIndex];
-    mostrarTt(..._ptEvento(p),
-      [{ v: dinheiro(o.total), l: `${o.objeto} · de ${dinheiro(limite)}` }]);
-  });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+  // a linha inteira do objeto mostra o total contra o limite
+  ligarBaloEixo(chart, el, (i) => {
+    const o = objetos[i];
+    return o ? [{ v: dinheiro(o.total),
+                  l: `${o.objeto} · de ${dinheiro(limite)}` }] : null;
+  }, 1);
 }
 
 // ── funil: onde os processos do exercício pararam ─────────────────────────
