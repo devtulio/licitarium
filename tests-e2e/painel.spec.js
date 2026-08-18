@@ -98,6 +98,21 @@ test("o balão dispara na faixa toda do item, não só na barra fina",
   const bb = await bar.boundingBox();
   await bar.hover({ position: { x: bb.width * 0.12, y: bb.height * 0.3 } });
   await expect(tt).toBeVisible();
+
+  // funil (vigilância): hover à direita da barra curta, na faixa da etapa
+  await page.locator('.subabas button[data-vista="vigilancia"]').click();
+  const funil = page.locator('#p-vigilancia [data-graf="funil"]');
+  const bf = await funil.boundingBox();
+  await funil.hover({ position: { x: bf.width * 0.75, y: bf.height * 0.85 } });
+  await expect(tt).toBeVisible();
+
+  // heatmap (análise): hover numa célula vazia — a grade toda resolve a célula
+  await page.locator('.subabas button[data-vista="analise"]').click();
+  const calor = page.locator('#p-analise [data-graf="calor"]');
+  const bh = await calor.boundingBox();
+  await calor.hover({ position: { x: bh.width * 0.24, y: bh.height * 0.4 } });
+  await expect(tt).toBeVisible();
+  await expect(tt).toContainText("processo");
 });
 
 test("o corte vertical lê todos os anos no mês apontado", async ({ page }) => {

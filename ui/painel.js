@@ -606,7 +606,8 @@ function grafCalor(el, calor, meses) {
       <span>menos</span>${[1, 2, 3, 4, 5].map(n =>
         `<i style="width:22px;height:13px;border-radius:2px;background:var(--seq${n})"></i>`
       ).join("")}<span>mais processos</span></div>`;
-  const chart = _iniciarEchart(el.querySelector(".graf-echart"));
+  const alvo = el.querySelector(".graf-echart");
+  const chart = _iniciarEchart(alvo);
   const data = [];
   linhas.forEach(([, valores], i) => valores.forEach((v, m) => {
     const n = nivel(v);
@@ -631,13 +632,19 @@ function grafCalor(el, calor, meses) {
       itemStyle: { borderColor: "var(--surface)", borderWidth: 2, borderRadius: 3 },
       emphasis: { disabled: true } }]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    const [m, i, v] = p.value;
-    mostrarTt(..._ptEvento(p), [{ v: `${v} ${v === 1 ? "processo" : "processos"}`,
-      l: `${MES[m]} · ${linhas[i][0]}` }]);
+  // qualquer ponto da grade resolve a célula sob o cursor — não só a marca:
+  // a borda de 2px entre células e os cantos deixavam buracos onde o balão
+  // não vinha. `convertFromPixel` devolve [coluna, linha] do heatmap.
+  alvo.addEventListener("mousemove", (e) => {
+    const r = alvo.getBoundingClientRect();
+    const pt = chart.convertFromPixel("grid", [e.clientX - r.left, e.clientY - r.top]);
+    const m = pt ? Math.round(pt[0]) : -1, i = pt ? Math.round(pt[1]) : -1;
+    if (!linhas[i] || m < 0 || m >= meses.length) return esconderTt();
+    const v = linhas[i][1][m] || 0;
+    mostrarTt(e.clientX, e.clientY, [{ v: `${v} ${v === 1 ? "processo" : "processos"}`,
+      l: `${MES[meses[m] - 1]} · ${linhas[i][0]}` }]);
   });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+  alvo.addEventListener("mouseleave", esconderTt);
 }
 
 // ── medidores do limite anual de dispensa ─────────────────────────────────
@@ -716,11 +723,11 @@ function grafFunil(el, f, larg = 500) {
       emphasis: { disabled: true },
       label: { show: true, position: "right", ...VAL_TXT } }]
   });
-  chart.on("mouseover", (p) => {
-    if (p.componentType !== "series") return;
-    mostrarTt(..._ptEvento(p), [{ v: p.value, l: etapas[p.dataIndex][0] }]);
-  });
-  chart.on("mouseout", (p) => { if (p.componentType === "series") esconderTt(); });
+  // a linha inteira da etapa (não só a barra) mostra o valor
+  ligarBaloEixo(chart, el, (i) => {
+    const et = etapas[i];
+    return et ? [{ v: et[1], l: et[0] }] : null;
+  }, 1);
 }
 
 // ── agenda dos próximos 90 dias ───────────────────────────────────────────

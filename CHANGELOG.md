@@ -7,9 +7,12 @@
 No Painel, o balão que segue o mouse só nascia quando o cursor caía exatamente
 sobre a barra ou a coluna colorida. Numa coluna baixa — um mês de pouco
 movimento — quase não havia o que acertar, e o balão não vinha. O calendário
-da agenda já acertava a faixa inteira do dia; agora os gráficos de coluna e de
-barra fazem igual: passar o mouse em qualquer ponto da faixa daquele item já
-mostra o balão, tenha a barra a altura que tiver.
+da agenda já acertava a faixa inteira do dia; agora todos os gráficos fazem
+igual: passar o mouse em qualquer ponto da faixa daquele item já mostra o
+balão, tenha a barra a altura que tiver. Vale para as colunas de mês, as
+barras horizontais, o deságio, os limites, o funil "do edital ao contrato" e
+o mapa de calor — onde até a borda entre as células e as células vazias agora
+respondem ao cursor.
 
 ## 1.44.1 — 2026-08-17
 
