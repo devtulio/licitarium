@@ -205,10 +205,18 @@ test("nenhuma marca de gráfico soma o balão nativo ao tooltip próprio",
   for (const vista of ["execucao", "analise", "vigilancia", "economia"]) {
     if (vista !== "execucao")
       await page.locator(`.subabas button[data-vista="${vista}"]`).click();
-    const dobrados = await page.evaluate(() =>
-      [...document.querySelectorAll(".vista:not(.oculto) [data-tip-v][title]")]
-        .map(e => e.getAttribute("title").slice(0, 40)));
-    expect(dobrados, `vista ${vista}`).toEqual([]);
+    const baloesNativos = await page.evaluate(() => {
+      const raiz = document.querySelector(".vista:not(.oculto)");
+      // marca com data-tip-v + title (calendário) OU svg de gráfico com <title>
+      // (o nome acessível de todo gráfico virou aria-label — nenhum <title>
+      // pode sobrar desenhando o balão preto por cima do tooltip próprio)
+      const marcas = [...raiz.querySelectorAll("[data-tip-v][title]")]
+        .map(e => e.getAttribute("title").slice(0, 40));
+      const svgs = [...raiz.querySelectorAll("svg > title")]
+        .map(t => t.textContent.slice(0, 40));
+      return [...marcas, ...svgs];
+    });
+    expect(baloesNativos, `vista ${vista}`).toEqual([]);
   }
   // e o dia com vencimento continua tendo nome acessível
   const comNome = await page.locator('[data-graf="agenda"] .cal-dia.venc')

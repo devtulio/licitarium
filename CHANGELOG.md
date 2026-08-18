@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.44.1 — 2026-08-17
+
+**Some o balão preto do navegador sobre os gráficos do Painel**
+
+Ao passar o mouse sobre um gráfico do Painel, além do balão próprio (bonito,
+instantâneo, que segue o cursor) aparecia, depois de um segundo, um segundo
+balão preto e quadrado do próprio navegador, dizendo a mesma coisa. Era o
+`<title>` que o programa punha no gráfico para o leitor de tela — e o
+navegador o desenha sozinho.
+
+O nome acessível do gráfico passou a ser um `aria-label`: ele fala para o
+leitor de tela sem desenhar balão nenhum, e os números escritos dentro do
+gráfico continuam sendo lidos. É a mesma correção já feita no calendário da
+agenda, agora estendida a todos os gráficos.
+
 ## 1.44.0 — 2026-08-17
 
 **A pesquisa de preços saiu do Free — ele volta a ser o repositório de

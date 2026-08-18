@@ -43,8 +43,10 @@ function escala(maximo) {
 // rótulo direto DENTRO do desenho — é regra do projeto, ver
 // design/DASHBOARD.md ("cor nunca sozinha: toda série tem rótulo direto").
 // Com role="img" o leitor de tela ouvia um nome e perdia justamente os
-// números. O nome acessível entra como <title> em `desenharGraficos`, que
-// é o ponto único por onde todo gráfico passa.
+// números. O nome acessível entra como `aria-label` em `desenharGraficos`
+// (era <title>, que desenhava o balão preto nativo por cima do tooltip
+// próprio — trocado em toda parte, mesma correção do calendário na 1.40.1),
+// que é o ponto único por onde todo gráfico passa.
 function svg(largura, altura, dentro) {
   return `<svg viewBox="0 0 ${largura} ${altura}" width="100%"
     height="${altura}" preserveAspectRatio="xMidYMid meet"
@@ -856,13 +858,17 @@ function desenharGraficos(raiz) {
       saida.ligar?.(el);
     }
     // nome acessível do gráfico, num ponto só: sem isto o SVG entrava sem
-    // nenhum nome (auditoria de acessibilidade, 2026-08-09)
+    // nenhum nome (auditoria de acessibilidade, 2026-08-09). Vai como
+    // `aria-label`, NÃO como <title>: o <title> desenhava o balão preto nativo
+    // do navegador (~1s de atraso, não segue o cursor) por cima do tooltip
+    // próprio — mesma praga que já tirei do calendário na 1.40.1. `aria-label`
+    // fala pro leitor de tela e não desenha; e, sem `role="img"`, os rótulos
+    // diretos DENTRO do desenho (os números) continuam acessíveis.
     const desenho = el.querySelector("svg");
-    if (desenho && el.dataset.titulo && !desenho.querySelector("title")) {
-      const titulo = document.createElementNS(
-        "http://www.w3.org/2000/svg", "title");
-      titulo.textContent = el.dataset.titulo;
-      desenho.insertBefore(titulo, desenho.firstChild);
+    if (desenho && el.dataset.titulo) {
+      const antigo = desenho.querySelector(":scope > title");
+      if (antigo) antigo.remove();          // limpa <title> de captura anterior
+      desenho.setAttribute("aria-label", el.dataset.titulo);
     }
   });
 }

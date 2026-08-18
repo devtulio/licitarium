@@ -35,12 +35,17 @@ test("todo gráfico tem nome acessível e não esconde os rótulos",
   const graficos = await page.evaluate(() =>
     [...document.querySelectorAll("#p-economia svg:not([data-overlay])")]
       .map(s => ({
-        nome: s.querySelector("title")?.textContent ?? "",
+        // o nome acessível é `aria-label`, não <title>: o <title> desenhava o
+        // balão preto nativo por cima do tooltip próprio (trocado por todos os
+        // gráficos, mesma correção do calendário na 1.40.1)
+        nome: s.getAttribute("aria-label") ?? "",
+        temTitle: !!s.querySelector(":scope > title"),
         papel: s.getAttribute("role"),
       })));
   expect(graficos.length).toBeGreaterThanOrEqual(4);
   for (const g of graficos) {
-    expect(g.nome.length).toBeGreaterThan(3);   // <title> = nome acessível
+    expect(g.nome.length).toBeGreaterThan(3);   // aria-label = nome acessível
+    expect(g.temTitle).toBe(false);             // nada de balão preto nativo
     // role="img" tornaria os <text> de dentro apresentacionais, e é neles
     // que moram os números — ver comentário em painel.js:svg()
     expect(g.papel).toBeNull();
